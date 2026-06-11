@@ -115,12 +115,30 @@
         return CHAT_SURFACE_MODES.indexOf(mode) >= 0 ? mode : 'compact';
     }
 
+    function isCompactOnlyElectronChatHost() {
+        var body = document.body;
+        return !!(
+            body
+            && isElectronChatWindow()
+            && body.getAttribute('data-chat-host-kind') === 'compact'
+        );
+    }
+
+    function coerceChatSurfaceModeForHost(mode) {
+        var normalized = normalizeChatSurfaceMode(mode);
+        // /chat 是 Electron 紧凑宿主；full 由 /chat_full 独立窗口承载，避免历史 full 状态污染透明承载窗。
+        if (normalized === 'full' && isCompactOnlyElectronChatHost()) {
+            return 'compact';
+        }
+        return normalized;
+    }
+
     function normalizeCompactChatState(mode) {
         return COMPACT_CHAT_STATES.indexOf(mode) >= 0 ? mode : 'default';
     }
 
     function getCurrentChatSurfaceMode() {
-        return normalizeChatSurfaceMode(state.chatSurfaceMode);
+        return coerceChatSurfaceModeForHost(state.chatSurfaceMode);
     }
 
     function getCurrentCompactChatState() {
@@ -147,9 +165,9 @@
     }
 
     function getNextChatSurfaceMode(mode) {
-        var normalized = normalizeChatSurfaceMode(mode);
+        var normalized = coerceChatSurfaceModeForHost(mode);
         if (normalized === 'minimized') {
-            return normalizeChatSurfaceMode(lastRestorableChatSurfaceMode);
+            return coerceChatSurfaceModeForHost(lastRestorableChatSurfaceMode);
         }
         // Any real surface — compact or the revived legacy full — minimizes to the
         // ball; restoring returns to the last real surface via the branch above.
@@ -195,7 +213,7 @@
     }
 
     function readChatSurfaceModePreference() {
-        var fallback = getDefaultChatSurfaceMode();
+        var fallback = coerceChatSurfaceModeForHost(getDefaultChatSurfaceMode());
         if (!shouldPersistChatSurfaceModePreference()) {
             return fallback;
         }
@@ -205,8 +223,8 @@
             // revived legacy 'full'. An explicit stored choice wins; otherwise we
             // fall back to the per-runtime default (web=full / Electron=compact).
             // A stray 'minimized' never lingers — rewrite it to the fallback.
-            if (raw === 'full') return 'full';
-            if (raw === 'compact') return 'compact';
+            if (raw === 'full') return coerceChatSurfaceModeForHost('full');
+            if (raw === 'compact') return coerceChatSurfaceModeForHost('compact');
             if (raw === 'minimized') {
                 localStorage.setItem(CHAT_SURFACE_MODE_STORAGE_KEY, fallback);
             }
@@ -223,6 +241,9 @@
             : '';
         var declaredMode = declaredModeAttr ? normalizeChatSurfaceMode(declaredModeAttr) : '';
         if (declaredMode === 'compact' || declaredMode === 'full') {
+            if (declaredMode === 'full' && isCompactOnlyElectronChatHost()) {
+                return 'compact';
+            }
             return declaredMode;
         }
         return readChatSurfaceModePreference();
@@ -454,6 +475,18 @@
         // chat.html 用 <body class="electron-chat-window">；Electron 独立聊天窗口。
         // 本 PR 的所有移动端改动都必须对它无感，作为显式隔离在全局 touch 处理里用来短路。
         return !!(document.body && document.body.classList.contains('electron-chat-window'));
+    }
+
+    function isElectronLinuxRuntime() {
+        var runtime = window.__NEKO_DESKTOP_RUNTIME__ || {};
+        return !!(
+            isElectronChatWindow()
+            && (
+                runtime.isLinux ||
+                runtime.isLinuxX11 ||
+                runtime.platform === 'linux'
+            )
+        );
     }
 
     function isMobileWidth() {
@@ -1287,6 +1320,24 @@
         };
     }
 
+    function getIdleCat1CompactMirrorNativeReserveRect(mirrorRect, surfaceRect) {
+        var mirror = normalizeCompactDomRect(mirrorRect);
+        var surface = normalizeCompactDomRect(surfaceRect);
+        if (!mirror) return null;
+        if (!surface) return mirror;
+        var horizontalPad = Math.ceil(mirror.width / 2);
+        var left = Math.round(surface.left - horizontalPad);
+        var right = Math.round(surface.right + horizontalPad);
+        var top = Math.round(Math.min(mirror.top, surface.top));
+        var bottom = Math.round(Math.max(mirror.bottom, surface.top));
+        return normalizeCompactDomRect({
+            left: left,
+            top: top,
+            width: Math.max(1, right - left),
+            height: Math.max(1, bottom - top)
+        });
+    }
+
     function intersectCompactRects(a, b) {
         var leftRect = normalizeCompactDomRect(a);
         var rightRect = normalizeCompactDomRect(b);
@@ -1593,6 +1644,7 @@
             }
             if (compactGeometryItem === 'cat1Mirror') {
                 var mirrorRect = getCompactGeometryElementRect(element);
+                var mirrorNativeRect = getIdleCat1CompactMirrorNativeReserveRect(mirrorRect, shellRect);
                 if (mirrorRect) {
                     items.push({
                         id: 'cat1Mirror:native',
@@ -1600,7 +1652,7 @@
                         kind: 'cat1Mirror',
                         visualRect: mirrorRect,
                         hitRect: null,
-                        nativeRect: mirrorRect,
+                        nativeRect: mirrorNativeRect || mirrorRect,
                         interactive: false
                     });
                 }
@@ -3562,7 +3614,7 @@
         var nextProps = nextViewProps || {};
         var surfaceModeChanged = false;
         if (Object.prototype.hasOwnProperty.call(nextProps, 'chatSurfaceMode')) {
-            var normalizedChatSurfaceMode = normalizeChatSurfaceMode(nextProps.chatSurfaceMode);
+            var normalizedChatSurfaceMode = coerceChatSurfaceModeForHost(nextProps.chatSurfaceMode);
             var previousChatSurfaceMode = getCurrentChatSurfaceMode();
             surfaceModeChanged = normalizedChatSurfaceMode !== previousChatSurfaceMode;
             if (surfaceModeChanged
@@ -3792,6 +3844,7 @@
     var isMinimizeTransitioning = false;
     var activeAnimationCleanup = null; // 当前进行中动画的清理函数
     var pendingChatSurfaceMode = null;
+    var pendingMinimizedSurfaceCommit = null;
 
     // ── Idle-dock: independent orchestration (Phase 4) ──────────
     // Positions the minimized ball next to CAT2/CAT3 return-ball.
@@ -4072,6 +4125,7 @@
     }
 
     async function applyElectronCat1PairMoveBounds(bounds) {
+        if (isElectronLinuxRuntime()) return;
         var targetBounds = electronRectToBounds(bounds);
         if (!targetBounds) return;
         var bridge = getElectronIdleDockBridge();
@@ -4091,6 +4145,7 @@
 
     function scheduleElectronCat1PairMoveBounds(bounds) {
         if (!isElectronChatWindow()) return;
+        if (isElectronLinuxRuntime()) return;
         electronCat1PairMovePendingBounds = electronRectToBounds(bounds);
         if (!electronCat1PairMovePendingBounds || electronCat1PairMoveBoundsFrame) return;
         electronCat1PairMoveBoundsFrame = window.requestAnimationFrame(function () {
@@ -4515,7 +4570,7 @@
             }
             savedShellSize = null;
             savedShellPosition = null;
-            state.chatSurfaceMode = normalizeChatSurfaceMode(lastRestorableChatSurfaceMode);
+            state.chatSurfaceMode = coerceChatSurfaceModeForHost(lastRestorableChatSurfaceMode);
             renderWindow();
             syncMinimizeUI();
             syncChatSurfaceModeUI();
@@ -4528,7 +4583,7 @@
         }
 
         if (wasActive && triggered && minimized) {
-            setChatSurfaceMode(normalizeChatSurfaceMode(lastRestorableChatSurfaceMode));
+            setChatSurfaceMode(coerceChatSurfaceModeForHost(lastRestorableChatSurfaceMode));
         }
     }
 
@@ -4668,14 +4723,12 @@
         // 也走这里），避免该回调在窗口关闭/重开后幽灵触发 setChatSurfaceMode('minimized')。
         clearCompactMinimizePressTimer();
         pendingChatSurfaceMode = null;
+        pendingMinimizedSurfaceCommit = null;
     }
 
-    // The minimized ball belongs to the surface we'll restore to: the revived
-    // legacy full uses its breathing-light orb, every other surface (compact)
-    // keeps the yarn ball. Gated purely on lastRestorableChatSurfaceMode so the
-    // compact path never sees a behavior change.
+    // 最小化球皮肤跟随可恢复形态；紧凑 Electron 宿主会把历史 full 规整回 compact。
     function isLegacyFullMinimizedBall() {
-        return normalizeChatSurfaceMode(lastRestorableChatSurfaceMode) === 'full';
+        return coerceChatSurfaceModeForHost(lastRestorableChatSurfaceMode) === 'full';
     }
 
     function applyMinimizedBallSkin(ballIcon) {
@@ -4729,8 +4782,24 @@
         return normalized;
     }
 
+    function commitPendingMinimizedSurfaceMode() {
+        if (!pendingMinimizedSurfaceCommit) return false;
+
+        var commit = pendingMinimizedSurfaceCommit;
+        pendingMinimizedSurfaceCommit = null;
+        state.chatSurfaceMode = commit.mode;
+        resetCompactChatState();
+        renderWindow();
+        syncChatSurfaceModeUI();
+        dispatchHostEvent('chat-surface-mode-change', {
+            mode: commit.mode,
+            previousMode: commit.previousMode
+        });
+        return true;
+    }
+
     function setChatSurfaceMode(nextMode) {
-        var normalized = normalizeChatSurfaceMode(nextMode);
+        var normalized = coerceChatSurfaceModeForHost(nextMode);
         var previousMode = getCurrentChatSurfaceMode();
         var nextMinimized = normalized === 'minimized';
         var previousMinimized = previousMode === 'minimized';
@@ -4765,6 +4834,17 @@
         }
 
         resetCompactChatState();
+
+        if (!previousMinimized && nextMinimized && previousMode === 'full' && !isElectronChatWindow() && getShell()) {
+            pendingMinimizedSurfaceCommit = {
+                mode: normalized,
+                previousMode: previousMode
+            };
+            setMinimized(true);
+            return normalized;
+        }
+
+        pendingMinimizedSurfaceCommit = null;
         state.chatSurfaceMode = normalized;
         persistChatSurfaceModePreference(normalized);
         if (normalized === 'compact') {
@@ -4909,6 +4989,7 @@
                 // minimize from the revived legacy full shows its breathing-light
                 // orb instead of the stale compact yarn ball.
                 applyMinimizedBallSkin(ensureMinimizedBallIcon());
+                commitPendingMinimizedSurfaceMode();
                 isMinimizeTransitioning = false;
                 flushPendingChatSurfaceModeIfNeeded();
             };
@@ -4926,6 +5007,7 @@
                 shell.classList.remove('is-collapsing');
                 shell.style.transform = 'none';
                 shell.style.removeProperty('transform-origin');
+                pendingMinimizedSurfaceCommit = null;
                 handled = true;
             };
 
@@ -5227,7 +5309,7 @@
                     // rebuilds the compact body instead of the (blank) minimized
                     // surface; closeWindow performs the same reset when it clears
                     // the minimized shell.
-                    state.chatSurfaceMode = normalizeChatSurfaceMode(lastRestorableChatSurfaceMode);
+                    state.chatSurfaceMode = coerceChatSurfaceModeForHost(lastRestorableChatSurfaceMode);
                     resetCompactChatState();
                 }
                 if (getCurrentChatSurfaceMode() === 'compact') {
@@ -5327,7 +5409,7 @@
             // openWindow() rebuilds the React props with chatSurfaceMode:
             // 'minimized', rendering a blank body over a no-longer-minimized
             // shell.
-            state.chatSurfaceMode = normalizeChatSurfaceMode(lastRestorableChatSurfaceMode);
+            state.chatSurfaceMode = coerceChatSurfaceModeForHost(lastRestorableChatSurfaceMode);
             resetCompactChatState();
             savedShellSize = null;
             savedShellPosition = null;
