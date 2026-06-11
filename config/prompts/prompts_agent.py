@@ -301,6 +301,45 @@ CHANNEL_DESC_COMPUTER_USE = {
 }
 
 
+CHANNEL_DESC_CLAUDE_CODE = {
+    'zh': ("- **claude_code**: Anthropic Claude Code 本地 AI 编程代理。"
+           "擅长代码生成、编辑、审查、调试和文件操作。"
+           "可以直接读写项目文件、执行代码修复、重构、创建新功能。"
+           "适合编程相关任务：写代码、修 bug、代码审查、解释代码、运行测试。"
+           "不适合非编程任务（网页浏览、桌面控制、数据处理）。"),
+    'en': ("- **claude_code**: Local AI coding agent by Anthropic (Claude Code). "
+           "Excels at code generation, editing, review, debugging, and file operations. "
+           "Can directly read/write project files, perform code fixes, refactoring, and create new features. "
+           "Best for programming tasks: writing code, fixing bugs, code review, explaining code, running tests. "
+           "NOT suitable for non-coding tasks (web browsing, desktop control, data processing)."),
+    'ja': ("- **claude_code**: Anthropic Claude Code ローカルAIプログラミングエージェント。"
+           "コード生成、編集、レビュー、デバッグ、ファイル操作に優れる。"
+           "プロジェクトファイルの直接読み書き、コード修正、リファクタリング、新機能作成が可能。"
+           "プログラミングタスクに最適：コード作成、バグ修正、コードレビュー、コード説明、テスト実行。"
+           "非プログラミングタスク（Web閲覧、デスクトップ操作、データ処理）には不向き。"),
+    'ko': ("- **claude_code**: Anthropic Claude Code 로컬 AI 프로그래밍 에이전트. "
+           "코드 생성, 편집, 리뷰, 디버깅 및 파일 작업에 뛰어남. "
+           "프로젝트 파일을 직접 읽고 쓸 수 있으며, 코드 수정, 리팩토링, 새로운 기능 생성이 가능. "
+           "프로그래밍 작업에 최적: 코드 작성, 버그 수정, 코드 리뷰, 코드 설명, 테스트 실행. "
+           "비 프로그래밍 작업(웹 탐색, 데스크톱 제어, 데이터 처리)에는 부적합."),
+    'ru': ("- **claude_code**: Локальный AI-агент для программирования от Anthropic (Claude Code). "
+           "Отлично подходит для генерации кода, редактирования, ревью, отладки и файловых операций. "
+           "Может напрямую читать/записывать файлы проекта, исправлять код, рефакторить, создавать новые функции. "
+           "Лучше всего для задач программирования: написание кода, исправление багов, код-ревью, объяснение кода, запуск тестов. "
+           "НЕ подходит для не-программных задач (веб-браузинг, управление рабочим столом, обработка данных)."),
+    'es': ("- **claude_code**: Agente local de programación por IA de Anthropic (Claude Code). "
+           "Destaca en generación de código, edición, revisión, depuración y operaciones con archivos. "
+           "Puede leer/escribir archivos del proyecto directamente, realizar correcciones, refactorización y crear nuevas funciones. "
+           "Ideal para tareas de programación: escribir código, corregir bugs, revisión de código, explicar código, ejecutar tests. "
+           "NO sirve para tareas no relacionadas con código (navegación web, control de escritorio, procesamiento de datos)."),
+    'pt': ("- **claude_code**: Agente local de programação por IA da Anthropic (Claude Code). "
+           "Excelente em geração de código, edição, revisão, depuração e operações com arquivos. "
+           "Pode ler/gravar arquivos do projeto diretamente, realizar correções, refatoração e criar novas funcionalidades. "
+           "Ideal para tarefas de programação: escrever código, corrigir bugs, revisão de código, explicar código, executar testes. "
+           "NÃO serve para tarefas não relacionadas a código (navegação web, controle de desktop, processamento de dados)."),
+}
+
+
 # =====================================================================
 # ======= User Plugin 评估 =======
 # =====================================================================

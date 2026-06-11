@@ -39,6 +39,7 @@ from config.prompts.prompts_agent import (
     CHANNEL_DESC_OPENFANG,
     CHANNEL_DESC_BROWSER_USE,
     CHANNEL_DESC_COMPUTER_USE,
+    CHANNEL_DESC_CLAUDE_CODE,
     USER_PLUGIN_SYSTEM_PROMPT,
     USER_PLUGIN_COARSE_SCREEN_PROMPT,
 )
@@ -52,6 +53,7 @@ from .computer_use import ComputerUseAdapter
 from .browser_use_adapter import BrowserUseAdapter
 from .openclaw_adapter import OpenClawAdapter
 from .openfang_adapter import OpenFangAdapter
+from .claude_code_adapter import ClaudeCodeAdapter, ClaudeCodeConfig
 from .plugin_filter import (
     stage1_filter,
     annotate_keyword_hits,
@@ -121,7 +123,7 @@ class TaskResult:
     task_id: str
     has_task: bool = False
     task_description: str = ""
-    execution_method: str = "none"  # "computer_use" | "browser_use" | "user_plugin" | "openclaw" | "openfang" | "none"
+    execution_method: str = "none"  # "computer_use" | "browser_use" | "user_plugin" | "openclaw" | "openfang" | "claude_code" | "none"
     success: bool = False
     result: Any = None
     error: Optional[str] = None
@@ -190,15 +192,17 @@ class UnifiedChannelDecision:
     openfang: Optional[Dict[str, Any]] = None
     browser_use: Optional[Dict[str, Any]] = None
     computer_use: Optional[Dict[str, Any]] = None
+    claude_code: Optional[Dict[str, Any]] = None
 
 
-# 优先级：qwenpaw > openfang > browser_use > computer_use
-_CHANNEL_PRIORITY = ["qwenpaw", "openfang", "browser_use", "computer_use"]
+# 优先级：qwenpaw > openfang > claude_code > browser_use > computer_use
+_CHANNEL_PRIORITY = ["qwenpaw", "openfang", "claude_code", "browser_use", "computer_use"]
 _CHANNEL_TO_METHOD = {
     "qwenpaw": "openclaw",
     "openfang": "openfang",
     "browser_use": "browser_use",
     "computer_use": "computer_use",
+    "claude_code": "claude_code",
 }
 
 
@@ -209,11 +213,13 @@ class DirectTaskExecutor:
     
     def __init__(self, computer_use: Optional[ComputerUseAdapter] = None, browser_use: Optional[BrowserUseAdapter] = None,
                  openclaw: Optional[OpenClawAdapter] = None,
-                 openfang: Optional[OpenFangAdapter] = None):
+                 openfang: Optional[OpenFangAdapter] = None,
+                 claude_code: Optional[ClaudeCodeAdapter] = None):
         self.computer_use = computer_use or ComputerUseAdapter()
         self.browser_use = browser_use
         self.openclaw = openclaw
         self.openfang: Optional[OpenFangAdapter] = openfang
+        self.claude_code: Optional[ClaudeCodeAdapter] = claude_code
         self._config_manager = get_config_manager()
         self.plugin_list = []
         self.user_plugin_enabled_default = False
@@ -235,6 +241,7 @@ class DirectTaskExecutor:
             "qwenpaw": "openclaw",
             "openfang": "openfang",
             "user_plugin": "user_plugin",
+            "claude_code": "claude_code",
         }
 
     def _normalize_correction_tool_name(self, value: Any) -> str:
@@ -893,12 +900,13 @@ class DirectTaskExecutor:
         openfang_available: bool = False,
         browser_available: bool = False,
         cu_available: bool = False,
+        claude_code_available: bool = False,
         latest_user_request: str = "",
         normalized_intent: str = "",
         recent_context: Optional[List[Dict[str, str]]] = None,
         lang: str = "en",
     ) -> UnifiedChannelDecision:
-        """一次 LLM 调用评估所有非 plugin 渠道（qwenpaw / openfang / browser / computer）。
+        """一次 LLM 调用评估所有非 plugin 渠道（qwenpaw / openfang / browser / computer / claude_code）。
 
         根据 available 标志动态组装 prompt，要求 LLM 选出最合适的渠道。
         如果 LLM 输出多个 can_execute=true，由调用方按优先级选取。
@@ -914,6 +922,10 @@ class DirectTaskExecutor:
         if openfang_available:
             available_keys.append("openfang")
             channel_descs.append(_loc(CHANNEL_DESC_OPENFANG, lang))
+
+        if claude_code_available:
+            available_keys.append("claude_code")
+            channel_descs.append(_loc(CHANNEL_DESC_CLAUDE_CODE, lang))
 
         if browser_available:
             available_keys.append("browser_use")
@@ -1585,13 +1597,14 @@ class DirectTaskExecutor:
         user_plugin_enabled = agent_flags.get("user_plugin_enabled", False)
         openfang_enabled = agent_flags.get("openfang_enabled", False)
         openclaw_enabled = agent_flags.get("openclaw_enabled", False)
+        claude_code_enabled = agent_flags.get("claude_code_enabled", False)
 
         logger.debug(
-            "[TaskExecutor] analyze_and_execute: task_id=%s lanlan=%s flags={cu=%s, bu=%s, up=%s, nk=%s, of=%s}",
-            task_id, lanlan_name, computer_use_enabled, browser_use_enabled, user_plugin_enabled, openclaw_enabled, openfang_enabled,
+            "[TaskExecutor] analyze_and_execute: task_id=%s lanlan=%s flags={cu=%s, bu=%s, up=%s, nk=%s, of=%s, cc=%s}",
+            task_id, lanlan_name, computer_use_enabled, browser_use_enabled, user_plugin_enabled, openclaw_enabled, openfang_enabled, claude_code_enabled,
         )
 
-        if not computer_use_enabled and not browser_use_enabled and not user_plugin_enabled and not openclaw_enabled and not openfang_enabled:
+        if not computer_use_enabled and not browser_use_enabled and not user_plugin_enabled and not openclaw_enabled and not openfang_enabled and not claude_code_enabled:
             logger.debug("[TaskExecutor] All execution channels disabled, skipping")
             return None
 
@@ -1639,6 +1652,14 @@ class DirectTaskExecutor:
             except Exception as e:
                 logger.warning("[TaskExecutor] Failed to check QwenPaw: %s", e)
 
+        cc_available = False
+        if claude_code_enabled and self.claude_code:
+            try:
+                cc_available = await self.claude_code.check_available()
+                logger.info("[TaskExecutor] ClaudeCode available: %s", cc_available)
+            except Exception as e:
+                logger.warning("[TaskExecutor] Failed to check ClaudeCode: %s", e)
+
         # ── 魔法命令前置拦截（仅对 openclaw/qwenpaw）──────────────────────
         user_intent, user_attachments = self._extract_latest_user_payload(messages)
         if not user_intent:
@@ -1683,8 +1704,8 @@ class DirectTaskExecutor:
         if user_plugin_enabled and plugins:
             parallel_tasks.append(('up', self._assess_user_plugin(conversation, plugins, lang=lang)))
 
-        # 统一渠道评估（qwenpaw / openfang / browser / computer）
-        has_any_unified = qwenpaw_available or of_available or browser_available or cu_available
+        # 统一渠道评估（qwenpaw / openfang / claude_code / browser / computer）
+        has_any_unified = qwenpaw_available or of_available or browser_available or cu_available or cc_available
         if has_any_unified:
             parallel_tasks.append(('unified', self._assess_unified_channels(
                 conversation,
@@ -1692,6 +1713,7 @@ class DirectTaskExecutor:
                 openfang_available=of_available,
                 browser_available=browser_available,
                 cu_available=cu_available,
+                claude_code_available=cc_available,
                 latest_user_request=latest_user_request,
                 normalized_intent=normalized_intent,
                 recent_context=recent_context,
@@ -1749,7 +1771,7 @@ class DirectTaskExecutor:
                 latest_user_request=latest_user_request,
             )
 
-        # 2. 统一渠道 — 按优先级 qwenpaw > openfang > browser_use > computer_use
+        # 2. 统一渠道 — 按优先级 qwenpaw > openfang > claude_code > browser_use > computer_use
         if isinstance(unified, UnifiedChannelDecision):
             for ch_key in _CHANNEL_PRIORITY:
                 ch_info = getattr(unified, ch_key, None)
@@ -1764,6 +1786,11 @@ class DirectTaskExecutor:
                 tool_args = None
                 if method == "openclaw":
                     tool_args = {"instruction": user_intent, "attachments": user_attachments}
+                elif method == "claude_code":
+                    tool_args = {
+                        "prompt": user_intent or task_desc,
+                        "working_dir": ".",
+                    }
                 result_context_kwargs = {}
                 if method in {"browser_use", "computer_use"}:
                     result_context_kwargs = {

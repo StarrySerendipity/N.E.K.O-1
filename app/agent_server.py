@@ -54,6 +54,7 @@ try:
     from brain.browser_use_adapter import BrowserUseAdapter
     from brain.openclaw_adapter import OpenClawAdapter
     from brain.openfang_adapter import OpenFangAdapter
+    from brain.claude_code_adapter import ClaudeCodeAdapter
     from brain.deduper import TaskDeduper
     from brain.task_executor import DirectTaskExecutor
     from brain.agent_session import get_session_manager
@@ -124,6 +125,7 @@ class Modules:
         "user_plugin_enabled": False,
         "openclaw_enabled": False,
         "openfang_enabled": False,
+        "claude_code_enabled": False,
     }
     # Notification queue for frontend (one-time messages)
     notification: Optional[str] = None
@@ -141,6 +143,7 @@ class Modules:
         "user_plugin": {"ready": False, "reason": "AGENT_PRECHECK_PENDING"},
         "openclaw": {"ready": False, "reason": "AGENT_PRECHECK_PENDING"},
         "openfang": {"ready": False, "reason": "AGENT_PRECHECK_PENDING"},
+        "claude_code": {"ready": False, "reason": "AGENT_PRECHECK_PENDING"},
     }
     _background_tasks: ClassVar[set] = set()
     _persistent_tasks: ClassVar[set] = set()
@@ -3162,6 +3165,190 @@ async def _do_analyze_and_plan(messages: list[dict[str, Any]], lanlan_name: Opti
             else:
                 logger.warning("[OpenFang] ⚠️ Task requires OpenFang but it is disabled or unavailable")
 
+        elif result.execution_method == 'claude_code':
+            if Modules.agent_flags.get("claude_code_enabled", False) and Modules.task_executor and Modules.task_executor.claude_code:
+                dup, matched = await _is_duplicate_task(result.task_description or str(result.tool_args or {}), lanlan_name)
+                if not dup:
+                    sm = get_session_manager()
+                    cc_session = sm.get_or_create(None, "claude_code")
+                    cc_session.add_task(result.task_description or "")
+
+                    cc_task_id = str(uuid.uuid4())
+                    cc_start = _now_iso()
+                    cc_prompt = (result.tool_args or {}).get("prompt", result.task_description or "")
+                    cc_working_dir = (result.tool_args or {}).get("working_dir", ".")
+                    cc_info = {
+                        "id": cc_task_id,
+                        "type": "claude_code",
+                        "status": "running",
+                        "start_time": cc_start,
+                        "params": {"prompt": cc_prompt, "working_dir": cc_working_dir},
+                        "lanlan_name": lanlan_name,
+                        "session_id": cc_session.session_id,
+                        "result": None,
+                        "error": None,
+                        "_trigger_user_fingerprint": trigger_user_msg_sig,
+                    }
+                    Modules.task_registry[cc_task_id] = cc_info
+                    _task_tracker.record_assigned(
+                        lanlan_name, task_id=cc_task_id, method="claude_code",
+                        desc=result.task_description or "",
+                    )
+
+                    try:
+                        await _emit_main_event(
+                            "task_update", lanlan_name,
+                            task={"id": cc_task_id, "status": "running", "type": "claude_code",
+                                  "start_time": cc_start,
+                                  "params": {"prompt": cc_prompt, "working_dir": cc_working_dir},
+                                  "session_id": cc_session.session_id},
+                        )
+                    except Exception as e:
+                        logger.debug("[ClaudeCode] emit task_update(running) failed: task_id=%s error=%s", cc_task_id, e)
+
+                    async def _run_claude_code_dispatch():
+                        try:
+                            from utils.instrument import counter as _ic
+                            _ic("agent_invoked", agent_type="claude_code")
+                        except Exception:
+                            pass
+                        try:
+                            adapter = Modules.task_executor.claude_code
+                            cc_res = await adapter.execute(
+                                task_id=cc_task_id,
+                                prompt=cc_prompt,
+                                working_dir=cc_working_dir,
+                                on_progress=lambda msg: print(f"[ClaudeCode][{cc_task_id}] {msg}"),
+                            )
+                            logger.info(
+                                "[ClaudeCode] Task completed: success=%s, output_len=%d, exit_code=%s, duration=%.1fs",
+                                cc_res.get("success"),
+                                len(str(cc_res.get("output", ""))),
+                                cc_res.get("exit_code"),
+                                cc_res.get("duration_seconds", 0),
+                            )
+                            cc_output = str(cc_res.get("output", ""))
+                            cc_error = str(cc_res.get("error") or "")
+                            if cc_res.get("success"):
+                                cc_info["status"] = "completed"
+                                cc_info["result"] = _tt(cc_output, TASK_ERROR_MAX_TOKENS)
+                                cc_session.complete_task(cc_output, success=True)
+                                _task_tracker.record_completed(
+                                    lanlan_name, task_id=cc_task_id, method="claude_code",
+                                    desc=result.task_description or "", detail=cc_output[:TASK_TRACKER_DETAIL_MAX_CHARS], success=True,
+                                )
+                                summary_text = f'Claude Code 任务 "{result.task_description}" 已完成'
+                                try:
+                                    await _emit_task_result(
+                                        lanlan_name, channel="claude_code", task_id=cc_task_id,
+                                        success=True,
+                                        summary=summary_text,
+                                        detail=_tt(cc_output, 800),
+                                    )
+                                except Exception:
+                                    logger.debug("[ClaudeCode] emit_task_result(success) failed: task_id=%s", cc_task_id, exc_info=True)
+                                try:
+                                    await _emit_main_event(
+                                        "task_update", lanlan_name,
+                                        task={"id": cc_task_id, "status": "completed", "type": "claude_code",
+                                              "start_time": cc_start, "end_time": _now_iso(),
+                                              "session_id": cc_session.session_id},
+                                    )
+                                except Exception:
+                                    logger.debug("[ClaudeCode] emit task_update(completed) failed: task_id=%s", cc_task_id, exc_info=True)
+                                # 可选：通知用户 Claude Code 完成了任务
+                                try:
+                                    await _emit_main_event(
+                                        "agent_notification", lanlan_name,
+                                        text=f"🔧 Claude Code 已完成任务:\n{_tt(cc_output, 200)}",
+                                        source="brain",
+                                    )
+                                except Exception:
+                                    logger.debug("[ClaudeCode] emit notification failed", exc_info=True)
+                            else:
+                                cc_info["status"] = "failed"
+                                cc_info["error"] = _tt(cc_error, TASK_ERROR_MAX_TOKENS)
+                                cc_session.complete_task(cc_error, success=False)
+                                _task_tracker.record_completed(
+                                    lanlan_name, task_id=cc_task_id, method="claude_code",
+                                    desc=result.task_description or "", detail=cc_error[:TASK_TRACKER_DETAIL_MAX_CHARS], success=False,
+                                )
+                                try:
+                                    await _emit_task_result(
+                                        lanlan_name, channel="claude_code", task_id=cc_task_id,
+                                        success=False,
+                                        summary=f'Claude Code 任务 "{result.task_description}" 执行失败',
+                                        error_message=cc_error,
+                                    )
+                                except Exception:
+                                    logger.debug("[ClaudeCode] emit_task_result(failed) failed: task_id=%s", cc_task_id, exc_info=True)
+                                try:
+                                    await _emit_main_event(
+                                        "task_update", lanlan_name,
+                                        task={"id": cc_task_id, "status": "failed", "type": "claude_code",
+                                              "start_time": cc_start, "end_time": _now_iso(),
+                                              "error": cc_info.get("error"), "session_id": cc_session.session_id},
+                                    )
+                                except Exception:
+                                    logger.debug("[ClaudeCode] emit task_update(failed) failed: task_id=%s", cc_task_id, exc_info=True)
+                        except asyncio.CancelledError:
+                            if cc_info.get("status") == "cancelled":
+                                return
+                            cancel_msg = "任务被取消"
+                            cc_info["status"] = "cancelled"
+                            cc_info["end_time"] = _now_iso()
+                            cc_info["error"] = cancel_msg
+                            cc_session.complete_task(cancel_msg, success=False)
+                            _task_tracker.record_completed(
+                                lanlan_name, task_id=cc_task_id, method="claude_code",
+                                desc=result.task_description or "", detail=cancel_msg, success=False,
+                            )
+                            raise
+                        except Exception as e:
+                            if cc_info.get("status") == "cancelled":
+                                return
+                            logger.warning(f"[ClaudeCode] Task failed (exc_type={type(e).__name__})")
+                            print(f"[ClaudeCode] Task raw error: {e}")
+                            cc_info["status"] = "failed"
+                            cc_info["end_time"] = _now_iso()
+                            cc_info["error"] = _tt(str(e), TASK_ERROR_MAX_TOKENS)
+                            cc_session.complete_task(str(e), success=False)
+                            _task_tracker.record_completed(
+                                lanlan_name, task_id=cc_task_id, method="claude_code",
+                                desc=result.task_description or "", detail=str(e)[:TASK_TRACKER_DETAIL_MAX_CHARS], success=False,
+                            )
+                            try:
+                                await _emit_task_result(
+                                    lanlan_name, channel="claude_code", task_id=cc_task_id,
+                                    success=False,
+                                    summary=f'Claude Code 任务 "{result.task_description}" 执行异常',
+                                    error_message=str(e),
+                                )
+                            except Exception:
+                                logger.debug("[ClaudeCode] emit_task_result(failed) failed: task_id=%s", cc_task_id, exc_info=True)
+                            try:
+                                await _emit_main_event(
+                                    "task_update", lanlan_name,
+                                    task={"id": cc_task_id, "status": "failed", "type": "claude_code",
+                                          "start_time": cc_start, "end_time": _now_iso(),
+                                          "error": _tt(str(e), TASK_ERROR_MAX_TOKENS),
+                                          "session_id": cc_session.session_id},
+                                )
+                            except Exception:
+                                logger.debug("[ClaudeCode] emit task_update(failed) failed: task_id=%s", cc_task_id, exc_info=True)
+
+                    cc_task = asyncio.create_task(_run_claude_code_dispatch())
+                    Modules.task_async_handles[cc_task_id] = cc_task
+                    Modules._background_tasks.add(cc_task)
+                    def _cleanup_cc_task(_t, _tid=cc_task_id):
+                        Modules._background_tasks.discard(_t)
+                        Modules.task_async_handles.pop(_tid, None)
+                    cc_task.add_done_callback(_cleanup_cc_task)
+                else:
+                    logger.info(f"[ClaudeCode] Duplicate task detected, matched with {matched}")
+            else:
+                logger.warning("[ClaudeCode] ⚠️ Task requires Claude Code but it is disabled or unavailable")
+
         else:
             logger.info(f"[TaskExecutor] No suitable execution method: {result.reason}")
     
@@ -3197,10 +3384,12 @@ async def startup():
     os.environ["NEKO_PLUGIN_HOSTED_BY_AGENT"] = "true"
     Modules.computer_use = ComputerUseAdapter()
     Modules.openclaw = OpenClawAdapter()
+    Modules.claude_code = ClaudeCodeAdapter()
     Modules.task_executor = DirectTaskExecutor(
         computer_use=Modules.computer_use,
         browser_use=None,
         openclaw=Modules.openclaw,
+        claude_code=Modules.claude_code,
     )
     Modules.deduper = TaskDeduper()
     Modules.throttled_logger = ThrottledLogger(logger, interval=30.0)
@@ -4685,11 +4874,13 @@ async def set_agent_flags(payload: Dict[str, Any]):
         Modules.agent_flags["browser_use_enabled"] = False
         Modules.agent_flags["openclaw_enabled"] = False
         Modules.agent_flags["openfang_enabled"] = False
+        Modules.agent_flags["claude_code_enabled"] = False
         first_reason = (gate.get('reasons') or ['AGENT_ENDPOINT_NOT_CONFIGURED'])[0]
         _set_capability("computer_use", False, first_reason)
         _set_capability("browser_use", False, first_reason)
         _set_capability("openclaw", False, first_reason)
         _set_capability("openfang", False, first_reason)
+        _set_capability("claude_code", False, first_reason)
         # Swallow these requests so the per-flag handlers below don't re-toggle
         # them ON; ``uf`` is intentionally left alone so user_plugin processing
         # proceeds.
@@ -4879,6 +5070,33 @@ async def set_agent_flags(payload: Dict[str, Any]):
                 except Exception as e:
                     logger.warning("[Agent] OpenFang cancel on disable failed: %s", e)
 
+    # 7. Handle Claude Code Flag with Capability Check
+    cc_flag = (payload or {}).get("claude_code_enabled")
+    if isinstance(cc_flag, bool):
+        if cc_flag:
+            if not Modules.claude_code:
+                Modules.agent_flags["claude_code_enabled"] = False
+                Modules.notification = json.dumps({"code": "AGENT_CC_MODULE_NOT_LOADED"})
+                logger.warning("[Agent] Cannot enable Claude Code: Module not loaded")
+            else:
+                try:
+                    avail = await Modules.claude_code.check_available()
+                    _set_capability("claude_code", bool(avail), "CLAUDE_CODE_CLI_NOT_FOUND" if not avail else "")
+                    if avail:
+                        Modules.agent_flags["claude_code_enabled"] = True
+                        logger.info("[Agent] Claude Code enabled")
+                    else:
+                        Modules.agent_flags["claude_code_enabled"] = False
+                        Modules.notification = json.dumps({"code": "AGENT_CC_UNAVAILABLE", "details": {"reason": "claude CLI not found or not authenticated"}})
+                        logger.warning("[Agent] Cannot enable Claude Code: CLI unavailable")
+                except Exception as e:
+                    Modules.agent_flags["claude_code_enabled"] = False
+                    Modules.notification = json.dumps({"code": "AGENT_CC_ENABLE_FAILED", "details": {"error": str(e)}})
+                    logger.error("[Agent] Cannot enable Claude Code: %s", e)
+        else:
+            Modules.agent_flags["claude_code_enabled"] = False
+            _set_capability("claude_code", False, "")
+
     # Persist user intent for each explicitly-requested flag.
     # Rule: a flag is persisted only when the user's request actually took
     # effect in-memory. If the user requested ON but capability auto-rejected
@@ -4899,6 +5117,7 @@ async def set_agent_flags(payload: Dict[str, Any]):
                 ("user_plugin_enabled", uf),
                 ("openclaw_enabled", nf),
                 ("openfang_enabled", of),
+                ("claude_code_enabled", cc_flag),
             ):
                 if not isinstance(requested, bool):
                     continue
