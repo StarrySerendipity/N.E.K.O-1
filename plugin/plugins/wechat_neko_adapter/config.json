@@ -1,9 +1,10 @@
 {
-    "session_dir": "",
     "poll_interval": 2.0,
+    "cred_path": "",
     "auto_reply": true,
     "group_whitelist": [],
     "group_blacklist": [],
     "blacklist": [],
-    "group_auto_reply_mode": "mention_only"
+    "group_auto_reply_mode": "mention_only",
+    "typing_indicator": true
 }
