@@ -1,0 +1,14 @@
+[plugin]
+id = "wechat_neko_adapter"
+name = "WeChat Neko Adapter"
+description = "将微信 iLink Bot API 接入猫娘，实现微信私聊和群聊对话能力"
+version = "1.0.0"
+type = "adapter"
+entry = "plugins.wechat_neko_adapter:WeChatAdapterPlugin"
+
+[plugin.sdk]
+recommended = ">=0.1.0,<0.2.0"
+supported = ">=0.1.0,<0.3.0"
+
+[plugin_runtime]
+enabled = true
