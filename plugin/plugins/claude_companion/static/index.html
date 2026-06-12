@@ -997,7 +997,7 @@
             if (!name) { showToast(t('ui.toast_username_empty', '请输入用户名')); return; }
             var r = await callPlugin('set_user_name', { name: name });
             if (r && r.user_name) {
-                showToast(t('ui.toast_username_updated', '用户名已更新为: ').replace('{name}', r.user_name) + r.user_name);
+                showToast(t('ui.toast_username_updated', '用户名已更新为: {name}').replace('{name}', r.user_name));
                 loadStatus();
             } else {
                 showToast(t('ui.toast_fail', '更新失败'));
