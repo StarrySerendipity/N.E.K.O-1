@@ -377,9 +377,16 @@ class _HookHTTPHandler(BaseHTTPRequestHandler):
         self._respond(200, {"status": "ok"})
 
     def _handle_turn_end(self, data: dict):
-        """处理 Stop hook - 解析对话、生成摘要、推送消息。"""
+        """处理 Stop hook - 异步执行，不阻塞 HTTP 响应。"""
         if self.plugin_instance:
-            self.plugin_instance._on_turn_end(data)
+            # 在新线程中执行，不阻塞 HTTP 响应
+            # 这样可以安全等待 transcript 文件稳定，不会导致 Claude Code 超时
+            threading.Thread(
+                target=self.plugin_instance._on_turn_end,
+                args=(data,),
+                daemon=True,
+                name="turn-end-handler"
+            ).start()
         self._respond(200, {"status": "ok"})
 
     def _handle_push_summary(self, data: dict):
@@ -481,18 +488,19 @@ class TranscriptParser:
             role = msg.get("role", "") or entry.get("role", "")
             msg_type = entry.get("type", "")
 
-            # 找到助手回复（必须有文本内容才算找到）
-            if (role == "assistant" or msg_type == "assistant") and not found_assistant:
+            # 收集所有 assistant 消息的工具使用信息（不管有没有 text）
+            if role == "assistant" or msg_type == "assistant":
                 content = msg.get("content", "") or entry.get("content", "")
 
-                text_parts = []
-                if isinstance(content, str):
-                    text_parts = [content]
-                elif isinstance(content, list):
+                if isinstance(content, list):
                     for block in content:
                         if isinstance(block, dict):
-                            if block.get("type") == "text":
-                                text_parts.append(block.get("text", ""))
+                            if block.get("type") == "text" and not found_assistant:
+                                # 找到有文本的 assistant 消息
+                                text = block.get("text", "")
+                                if text:
+                                    found_assistant = True
+                                    last_assistant_text = text
                             elif block.get("type") == "tool_use":
                                 tool_name = block.get("name", "")
                                 tools_used.append(tool_name)
@@ -502,12 +510,9 @@ class TranscriptParser:
                                     val = tool_input.get(key, "")
                                     if val and isinstance(val, str) and ("/" in val or "\\" in val):
                                         files_touched.append(val)
-
-                # 只有当有文本内容时才认为找到了助手回复
-                # 纯 tool_use 的 assistant 消息不算，继续向前扫描
-                if text_parts:
+                elif isinstance(content, str) and content and not found_assistant:
                     found_assistant = True
-                    last_assistant_text = " ".join(text_parts)
+                    last_assistant_text = content
 
             # 找到用户消息（在助手回复之前的第一个用户消息）
             # 注意：跳过 tool_result 类型的消息，只找真正的用户文本消息
@@ -781,9 +786,26 @@ class ClaudeCompanionPlugin(NekoPluginBase):
             self.logger.debug("Duplicate push blocked (within cooldown)")
             return
 
+        # 等待 transcript 文件稳定（不再被写入）
+        # 解决时序竞争问题：hook 触发时 transcript 可能还在写入
+        # 由于现在是异步执行，可以安全等待，不会阻塞 Claude Code
+        last_size = -1
+        for _ in range(10):  # 最多等1秒
+            try:
+                current_size = os.path.getsize(transcript_path)
+            except OSError:
+                break
+            if current_size == last_size:
+                break  # 文件大小没变化，说明写入完成
+            last_size = current_size
+            time.sleep(0.1)  # 等100ms
+
         # 解析转录
         turn_info = TranscriptParser.parse_latest_turn(transcript_path)
-        self.logger.debug("Parsed turn: tools={}, has_significant={}", turn_info["tools_used"], turn_info["has_significant_action"])
+        self.logger.debug("Parsed turn: user_msg={}, assistant_msg={}, tools={}",
+                         turn_info["user_message"][:50] if turn_info["user_message"] else "",
+                         turn_info["assistant_message"][:50] if turn_info["assistant_message"] else "",
+                         turn_info["tools_used"])
 
         # 检测活动类型
         activity_type = _detect_activity_type(
@@ -801,12 +823,7 @@ class ClaudeCompanionPlugin(NekoPluginBase):
             assistant_msg=turn_info["assistant_message"],
         )
 
-        # 仅在有重要操作时推送
-        if not turn_info.get("has_significant_action", False):
-            self.logger.debug("Skipping push: no significant action")
-            return
-
-        # 推送到 NEKO 伙伴
+        # 推送到 NEKO 伙伴（所有对话都推送）
         if not self._notify_companion(summary, activity_type, turn_info):
             return
         self._last_push_time = now
