@@ -916,7 +916,7 @@ class ClaudeCompanionPlugin(NekoPluginBase):
                 visibility=["chat"],
                 ai_behavior="respond",
                 parts=[{"type": "text", "text": summary}],
-                priority=5,
+                priority=8,  # 高优先级，确保消息不会被挤掉
                 metadata={
                     "activity_type": activity_type,
                     "tools_used": turn_info.get("tools_used", []),
