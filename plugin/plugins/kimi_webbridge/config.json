@@ -1,0 +1,14 @@
+{
+  "default_session": "webbridge-session",
+  "auto_start_daemon": true,
+  "timeout": 30,
+  "language": "zh-CN",
+  "ui": {
+    "theme": "light",
+    "animations": true
+  },
+  "logging": {
+    "level": "info",
+    "file": "kimi_webbridge.log"
+  }
+}

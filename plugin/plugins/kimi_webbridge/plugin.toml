@@ -1,0 +1,10 @@
+[plugin]
+id = "kimi_webbridge"
+name = "Kimi WebBridge 浏览器自动化"
+description = "通过Kimi WebBridge控制用户真实浏览器，实现导航、点击、填表、截图、数据提取等操作"
+version = "1.0.0"
+entry = "plugins.kimi_webbridge:KimiWebBridgePlugin"
+
+[plugin.sdk]
+recommended = ">=0.1.0,<0.2.0"
+supported = ">=0.1.0,<0.3.0"
