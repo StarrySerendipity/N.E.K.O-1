@@ -266,40 +266,25 @@ class ActivitySummarizer:
         tools_used: List[str] = None,
         assistant_msg: str = "",
     ) -> str:
-        """生成活动摘要：用户做了什么 + Claude 回复了什么。"""
-        import random
+        """生成活动摘要：用户说了什么 + Claude 回复了什么。"""
         name = user_name or "你"
 
-        # 提取用户意图（去掉系统提示等无关内容）
-        user_intent = ""
+        # 获取完整用户消息
+        user_text = ""
         if user_msg and len(user_msg.strip()) > 0:
-            # 取前100个字符作为用户意图
-            user_intent = user_msg.strip()[:100]
-            if len(user_msg) > 100:
-                user_intent += "..."
+            user_text = user_msg.strip()
 
-        # 提取 Claude 回复摘要（取前80个字符）
-        claude_reply = ""
+        # 获取完整 Claude 回复
+        claude_text = ""
         if assistant_msg and len(assistant_msg.strip()) > 0:
-            claude_reply = assistant_msg.strip()[:80]
-            if len(assistant_msg) > 80:
-                claude_reply += "..."
+            claude_text = assistant_msg.strip()
 
-        # 从模板中随机选取一条温暖的陪伴消息
-        templates = cls.TEMPLATES.get(activity_type, cls.TEMPLATES.get("general", []))
-        template_msg = ""
-        if templates:
-            files_str = ", ".join(files_touched[:2]) if files_touched else "代码"
-            template_msg = random.choice(templates).format(name=name, files=files_str)
-
-        # 生成摘要：模板消息 + 用户意图 + Claude回复
+        # 生成摘要：完整用户消息 + 完整 Claude 回复
         parts = []
-        if template_msg:
-            parts.append(template_msg)
-        if user_intent:
-            parts.append(f"用户说：「{user_intent}」")
-        if claude_reply:
-            parts.append(f"Claude 回复：「{claude_reply}」")
+        if user_text:
+            parts.append(f"用户说：「{user_text}」")
+        if claude_text:
+            parts.append(f"Claude 回复：「{claude_text}」")
 
         return " | ".join(parts) if parts else f"{name}和 Claude 在交流"
 
@@ -441,8 +426,8 @@ class TranscriptParser:
 
         返回:
             {
-                "user_message": str,      # 用户最新消息
-                "assistant_message": str,  # 助手最新文本回复
+                "user_message": str,      # 用户最新消息（完整）
+                "assistant_message": str,  # 助手最新文本回复（完整）
                 "tools_used": [str],       # 使用的工具列表
                 "files_touched": [str],    # 涉及的文件路径
                 "has_significant_action": bool,  # 是否有重要操作
@@ -471,6 +456,7 @@ class TranscriptParser:
         tools_used = []
         files_touched = []
         found_assistant = False
+        found_user = False
 
         for line in reversed(lines):
             line = line.strip()
@@ -516,10 +502,11 @@ class TranscriptParser:
 
             # 找到用户消息（在助手回复之前的第一个用户消息）
             # 注意：跳过 tool_result 类型的消息，只找真正的用户文本消息
-            if (role == "user" or msg_type == "user") and found_assistant:
+            if (role == "user" or msg_type == "user") and found_assistant and not found_user:
                 content = msg.get("content", "") or entry.get("content", "")
                 if isinstance(content, str):
                     last_user_msg = content
+                    found_user = True
                     break
                 elif isinstance(content, list):
                     text_parts = []
@@ -534,9 +521,11 @@ class TranscriptParser:
                     # 跳过纯 tool_result 消息
                     if text_parts:
                         last_user_msg = " ".join(text_parts)
+                        found_user = True
                         break
                     elif not has_tool_result:
                         # 没有 tool_result 也没有 text，可能是空消息
+                        found_user = True
                         break
                     # 如果是 tool_result，继续向前扫描
 
