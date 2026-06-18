@@ -1009,7 +1009,7 @@
             if (isNaN(sec) || sec < 10) { showToast(t('ui.toast_cooldown_invalid', '冷却时间至少 10 秒')); return; }
             var r = await callPlugin('set_cooldown', { seconds: sec });
             if (r && r.cooldown_seconds) {
-                showToast(t('ui.toast_cooldown_updated', '冷却时间已设为 ').replace('{sec}', r.cooldown_seconds) + r.cooldown_seconds + ' 秒');
+                showToast(t('ui.toast_cooldown_updated', '冷却时间已设为 {sec} 秒').replace('{sec}', r.cooldown_seconds));
                 loadStatus();
             } else {
                 showToast(t('ui.toast_fail', '更新失败'));
