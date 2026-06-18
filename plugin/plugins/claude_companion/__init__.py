@@ -632,6 +632,15 @@ class ClaudeCompanionPlugin(NekoPluginBase):
         except (TypeError, ValueError):
             self._cooldown = _DEFAULT_COOLDOWN
 
+        # 从 store 读取之前保存的冷却时间（优先级高于配置文件）
+        try:
+            stored_cooldown = self.store._read_value("cooldown_seconds", None)
+            if stored_cooldown is not None:
+                self._cooldown = max(10, int(stored_cooldown))
+                self.logger.info("Loaded cooldown from store: {}s", self._cooldown)
+        except Exception as e:
+            self.logger.warning("Failed to load cooldown from store: {}", e)
+
         # API 鉴权 token（用于 NEKO → Claude 方向的接口）
         self._api_token = cc_cfg.get("api_token") or os.environ.get("NEKO_CLAUDE_COMPANION_TOKEN") or ""
         if not self._api_token:
@@ -1018,6 +1027,10 @@ class ClaudeCompanionPlugin(NekoPluginBase):
     async def set_cooldown(self, seconds: int = 60, **_):
         seconds = max(10, int(seconds))
         self._cooldown = seconds
+        try:
+            self.store._write_value("cooldown_seconds", seconds)
+        except Exception as e:
+            self.logger.warning("Failed to persist cooldown: {}", e)
         self.logger.info("Cooldown set to: {}s", seconds)
         return Ok({"cooldown_seconds": seconds})
 
