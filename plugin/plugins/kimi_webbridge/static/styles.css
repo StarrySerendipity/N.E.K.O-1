@@ -386,6 +386,24 @@ body {
     opacity: 0.8;
 }
 
+.tutorial-link {
+    display: inline-block;
+    margin-top: 12px;
+    padding: 6px 16px;
+    border-radius: 20px;
+    background: linear-gradient(135deg, rgba(110,181,255,0.15), rgba(255,182,193,0.15));
+    color: var(--primary-color);
+    text-decoration: none;
+    font-size: 0.85rem;
+    border: 1px solid rgba(110,181,255,0.3);
+    transition: var(--transition);
+}
+
+.tutorial-link:hover {
+    background: linear-gradient(135deg, rgba(110,181,255,0.3), rgba(255,182,193,0.3));
+    transform: translateY(-1px);
+}
+
 /* 响应式设计 */
 @media (max-width: 768px) {
     .container {

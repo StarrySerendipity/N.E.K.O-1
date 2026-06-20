@@ -1,0 +1,277 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Kimi WebBridge - 使用教程</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: 'Segoe UI', 'PingFang SC', 'Microsoft YaHei', sans-serif;
+            background: linear-gradient(135deg, #e0f7fa 0%, #f3e5f5 50%, #fce4ec 100%);
+            min-height: 100vh;
+            color: #37474f;
+            line-height: 1.8;
+        }
+        .container { max-width: 800px; margin: 0 auto; padding: 40px 24px; }
+
+        /* Header */
+        .header {
+            text-align: center;
+            padding: 48px 0 36px;
+            position: relative;
+        }
+        .header::before {
+            content: '';
+            position: absolute;
+            top: 0; left: 50%;
+            transform: translateX(-50%);
+            width: 120px; height: 3px;
+            background: linear-gradient(90deg, #81d4fa, #f48fb1);
+            border-radius: 2px;
+        }
+        .header h1 {
+            font-size: 28px;
+            background: linear-gradient(135deg, #42a5f5, #ec407a);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            font-weight: 700;
+            margin-bottom: 8px;
+        }
+        .header .subtitle {
+            color: #78909c;
+            font-size: 15px;
+        }
+
+        /* Steps */
+        .step {
+            background: rgba(255,255,255,0.85);
+            backdrop-filter: blur(10px);
+            border-radius: 16px;
+            padding: 28px 32px;
+            margin-bottom: 20px;
+            border: 1px solid rgba(129,212,250,0.3);
+            box-shadow: 0 2px 12px rgba(0,0,0,0.04);
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+        .step:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(0,0,0,0.08);
+        }
+        .step-number {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 32px; height: 32px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, #81d4fa, #f48fb1);
+            color: #fff;
+            font-weight: 700;
+            font-size: 14px;
+            margin-right: 12px;
+            vertical-align: middle;
+        }
+        .step h2 {
+            display: inline;
+            font-size: 18px;
+            color: #37474f;
+            font-weight: 600;
+        }
+        .step p { margin-top: 12px; color: #546e7a; font-size: 14px; }
+
+        /* Code blocks */
+        .code-block {
+            background: #263238;
+            color: #b0bec5;
+            border-radius: 10px;
+            padding: 16px 20px;
+            margin: 12px 0;
+            font-family: 'Cascadia Code', 'Fira Code', monospace;
+            font-size: 13px;
+            overflow-x: auto;
+            position: relative;
+        }
+        .code-block .label {
+            position: absolute;
+            top: 8px; right: 12px;
+            font-size: 11px;
+            color: #78909c;
+            font-family: sans-serif;
+        }
+        .code-block code { color: #80cbc4; }
+
+        /* Tips */
+        .tip {
+            background: linear-gradient(135deg, #e3f2fd, #fce4ec);
+            border-left: 3px solid #81d4fa;
+            border-radius: 0 10px 10px 0;
+            padding: 14px 18px;
+            margin: 12px 0;
+            font-size: 13px;
+            color: #546e7a;
+        }
+        .tip::before { content: '💡 '; }
+
+        /* Links */
+        a {
+            color: #42a5f5;
+            text-decoration: none;
+            border-bottom: 1px dashed #81d4fa;
+        }
+        a:hover { color: #ec407a; border-bottom-color: #f48fb1; }
+
+        /* Checklist */
+        .checklist { list-style: none; padding: 0; }
+        .checklist li {
+            padding: 6px 0;
+            padding-left: 24px;
+            position: relative;
+            font-size: 14px;
+            color: #546e7a;
+        }
+        .checklist li::before {
+            content: '✓';
+            position: absolute;
+            left: 0;
+            color: #81d4fa;
+            font-weight: 700;
+        }
+
+        /* Footer */
+        .footer {
+            text-align: center;
+            padding: 36px 0 24px;
+            color: #b0bec5;
+            font-size: 12px;
+        }
+        .footer .heart { color: #f48fb1; }
+
+        /* Nav buttons */
+        .nav-btn {
+            display: inline-block;
+            padding: 8px 20px;
+            border-radius: 20px;
+            font-size: 13px;
+            text-decoration: none;
+            margin: 4px;
+            transition: all 0.2s;
+        }
+        .nav-btn.back {
+            background: rgba(129,212,250,0.15);
+            color: #42a5f5;
+            border: 1px solid rgba(129,212,250,0.4);
+        }
+        .nav-btn.back:hover {
+            background: rgba(129,212,250,0.3);
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1 data-i18n="tutorial_title">Kimi WebBridge 使用教程</h1>
+            <p class="subtitle" data-i18n="tutorial_subtitle">让猫娘拥有控制你浏览器的魔法 ✨</p>
+        </div>
+
+        <!-- Step 1 -->
+        <div class="step">
+            <span class="step-number">1</span>
+            <h2 data-i18n="step1_title">安装 Kimi WebBridge 守护进程</h2>
+            <p data-i18n="step1_desc">在 PowerShell 中运行以下命令，一键安装守护进程：</p>
+            <div class="code-block">
+                <span class="label">PowerShell</span>
+                <code>irm https://cdn.kimi.com/webbridge/install.ps1 | iex</code>
+            </div>
+            <div class="tip" data-i18n="step1_tip">安装完成后，守护进程会自动配置好，无需额外设置。</div>
+        </div>
+
+        <!-- Step 2 -->
+        <div class="step">
+            <span class="step-number">2</span>
+            <h2 data-i18n="step2_title">安装浏览器扩展</h2>
+            <p data-i18n="step2_desc">在你的 Chrome 或 Edge 浏览器中安装 Kimi WebBridge 扩展：</p>
+            <ul class="checklist">
+                <li data-i18n="step2_check1">打开浏览器扩展商店，搜索 "Kimi WebBridge"</li>
+                <li data-i18n="step2_check2">点击"添加到浏览器"安装扩展</li>
+                <li data-i18n="step2_check3">安装后扩展会自动连接到本地守护进程</li>
+            </ul>
+            <div class="tip" data-i18n="step2_tip">扩展图标显示绿色表示已连接，红色表示未连接。</div>
+        </div>
+
+        <!-- Step 3 -->
+        <div class="step">
+            <span class="step-number">3</span>
+            <h2 data-i18n="step3_title">启动守护进程</h2>
+            <p data-i18n="step3_desc">守护进程会在插件启动时自动尝试启动。你也可以手动启动：</p>
+            <div class="code-block">
+                <span class="label">PowerShell</span>
+                <code>kimi-webbridge start</code>
+            </div>
+            <div class="tip" data-i18n="step3_tip">守护进程启动后会监听 127.0.0.1:10086 端口。</div>
+        </div>
+
+        <!-- Step 4 -->
+        <div class="step">
+            <span class="step-number">4</span>
+            <h2 data-i18n="step4_title">开始使用</h2>
+            <p data-i18n="step4_desc">一切就绪！现在你可以对猫娘说：</p>
+            <div class="code-block">
+                <code>帮我打开B站，搜索猫咪视频</code>
+            </div>
+            <p data-i18n="step4_desc2">猫娘会自动：</p>
+            <ul class="checklist">
+                <li data-i18n="step4_check1">调用 navigate 打开B站</li>
+                <li data-i18n="step4_check2">调用 snapshot 获取页面结构</li>
+                <li data-i18n="step4_check3">调用 fill 在搜索框输入关键词</li>
+                <li data-i18n="step4_check4">调用 click 点击搜索按钮</li>
+            </ul>
+        </div>
+
+        <!-- Step 5 -->
+        <div class="step">
+            <span class="step-number">5</span>
+            <h2 data-i18n="step5_title">可用工具一览</h2>
+            <p data-i18n="step5_desc">猫娘拥有以下浏览器操作能力：</p>
+            <ul class="checklist">
+                <li data-i18n="step5_check1"><strong>navigate</strong> - 导航到指定URL</li>
+                <li data-i18n="step5_check2"><strong>snapshot</strong> - 获取页面结构快照</li>
+                <li data-i18n="step5_check3"><strong>click</strong> - 点击页面元素</li>
+                <li data-i18n="step5_check4"><strong>fill</strong> - 填写表单输入框</li>
+                <li data-i18n="step5_check5"><strong>screenshot</strong> - 页面截图</li>
+                <li data-i18n="step5_check6"><strong>evaluate</strong> - 执行JavaScript代码</li>
+                <li data-i18n="step5_check7"><strong>upload</strong> - 上传文件</li>
+                <li data-i18n="step5_check8"><strong>list_tabs / find_tab / close_tab</strong> - 标签页管理</li>
+            </ul>
+        </div>
+
+        <!-- FAQ -->
+        <div class="step">
+            <span class="step-number">?</span>
+            <h2 data-i18n="faq_title">常见问题</h2>
+            <p><strong data-i18n="faq_q1">Q: 猫娘打开的页面和我看到的不一样？</strong></p>
+            <p data-i18n="faq_a1">A: Kimi WebBridge 控制的是你的真实浏览器，页面应该完全一致。如果不一样，请检查扩展是否已连接。</p>
+            <p style="margin-top:12px"><strong data-i18n="faq_q2">Q: 操作失败提示"守护进程无响应"？</strong></p>
+            <p data-i18n="faq_a2">A: 请确保浏览器扩展已安装并启用，扩展图标显示绿色连接状态。</p>
+            <p style="margin-top:12px"><strong data-i18n="faq_q3">Q: 支持哪些浏览器？</strong></p>
+            <p data-i18n="faq_a3">A: 支持 Chrome 和 Edge 浏览器。</p>
+        </div>
+
+        <div class="footer">
+            <p data-i18n="footer_text">用 <span class="heart">♥</span> 为 N.E.K.O 猫娘打造</p>
+            <a href="index.html" class="nav-btn back" data-i18n="back_to_main">← 返回主界面</a>
+        </div>
+    </div>
+
+    <script src="i18n.js"></script>
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            const lang = window.i18nModule?.initI18n?.() || 'zh-CN';
+            document.querySelectorAll('[data-i18n]').forEach(el => {
+                const key = el.getAttribute('data-i18n');
+                const text = window.i18nModule?.getTranslation?.(key, lang);
+                if (text) el.textContent = text;
+            });
+        });
+    </script>
+</body>
+</html>
