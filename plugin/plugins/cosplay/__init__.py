@@ -1530,13 +1530,20 @@ class CosplayPlugin(NekoPluginBase):
 
     def _push_to_main_dialog_model(self, text: str) -> dict[str, Any]:
         target_lanlan = getattr(self.ctx, "_current_lanlan", None)
+        # 构建强提示词，让 LLM 只复述台词，不添加额外内容
+        strict_prompt = (
+            "【剧情演绎模式】你现在正在扮演角色进行对话。\n"
+            "请严格按照以下台词说出，不要添加任何额外内容、解释或动作描述。\n"
+            "只需复述台词本身，保持自然语气即可。\n\n"
+            f"你的台词：{text}"
+        )
         try:
             self.ctx.push_message(
                 source="memo_reminder",
                 message_type="proactive_notification",
                 description="COSPLAY剧情演绎台词投递",
                 priority=8,
-                content=text,
+                content=strict_prompt,
                 metadata={
                     "plugin_id": self.plugin_id,
                     "channel": "memo_reminder_style",
