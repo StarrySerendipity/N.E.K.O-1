@@ -145,15 +145,15 @@ def fail(
 
 def is_envelope(value: Any) -> bool:
     """检查值是否是标准响应格式
-    
+
     验证给定的值是否符合ok()/fail()返回的标准响应格式。
-    
+
     Args:
         value: 要检查的值
-    
+
     Returns:
         True 如果是标准响应格式,False 否则
-    
+
     Example:
         >>> is_envelope(ok(data="test"))
         True
@@ -167,7 +167,5 @@ def is_envelope(value: Any) -> bool:
     if value.get("success") not in (True, False):
         return False
     if "error" not in value:
-        return False
-    if "time" not in value:
         return False
     return True
