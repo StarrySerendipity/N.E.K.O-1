@@ -1,5 +1,5 @@
 """
-Web Searching Plugin — 联网搜索 v1.5.0
+Web Searching Plugin — 联网搜索 v1.4.1
 
 独立开发的联网搜索插件，让猫娘具备联网搜索能力。
 注册为 @llm_tool，猫娘可在遇到知识盲区时主动调用。
@@ -98,59 +98,6 @@ async def _fetch(url: str, params: dict, headers: dict, timeout: float,
             return resp
     except Exception:
         return None
-
-
-async def _resolve_redirect_url(url: str, timeout: float = 5.0) -> str:
-    """跟随重定向获取真实 URL。
-
-    百度/搜狗返回的是跳转链接（baidu.com/link?url=xxx, sogou.com/link?url=xxx），
-    需要跟随重定向获取真实页面 URL，否则 fetch_page_content 无法使用。
-    """
-    # 只对跳转链接处理
-    if "/link?url=" not in url and "baidu.com/link" not in url:
-        return url
-
-    headers = {
-        "User-Agent": _UA_PC,
-        "Accept": "text/html",
-        "Accept-Language": "zh-CN,zh;q=0.9",
-    }
-    try:
-        async with httpx.AsyncClient(
-            timeout=timeout, follow_redirects=True, headers=headers,
-        ) as client:
-            resp = await client.get(url)
-            final_url = str(resp.url)
-            # 确保拿到的是真实 URL 而非搜索引擎自身
-            if final_url and not ("baidu.com/link" in final_url or "sogou.com/link" in final_url):
-                return final_url
-    except Exception:
-        pass
-    return url
-
-
-async def _search_with_retry(
-    engine_fn, query: str, max_results: int, timeout: float,
-    retries: int = 1
-) -> List[Dict[str, str]]:
-    """带重试的搜索封装。第一次失败后等 2 秒重试一次。"""
-    for attempt in range(retries + 1):
-        try:
-            results = await asyncio.wait_for(
-                engine_fn(query, max_results, timeout),
-                timeout=timeout + 5,
-            )
-            if results:
-                return results
-        except asyncio.TimeoutError:
-            if attempt < retries:
-                await asyncio.sleep(2)
-                continue
-        except Exception:
-            if attempt < retries:
-                await asyncio.sleep(2)
-                continue
-    return []
 
 
 # ─── 策略 1: DuckDuckGo Instant Answer API ──────────────────────────────────
@@ -313,8 +260,8 @@ async def _search_sogou(query: str, max_results: int = 8, timeout: float = 15.0)
     soup = BeautifulSoup(resp.text, "html.parser")
     results: List[Dict[str, str]] = []
 
-    # 搜狗结果容器 — 扩大选择器范围
-    containers = soup.select("div.vrwrap, div.rb, div.result, div.results div[lang], div[class*='vrItem'], div[class*='news-item']")
+    # 搜狗结果容器
+    containers = soup.select("div.vrwrap, div.rb, div.result, div.results div[lang]")
     for item in containers:
         link = item.find("a", href=True)
         if not link:
@@ -329,28 +276,13 @@ async def _search_sogou(query: str, max_results: int = 8, timeout: float = 15.0)
         if not title or not href:
             continue
 
-        # 搜狗相对路径补全为完整URL
-        if href.startswith("/link"):
-            href = "https://www.sogou.com" + href
-        elif href.startswith("/"):
-            href = "https://www.sogou.com" + href
-
-        # 摘要提取 — 大幅扩展选择器
         snippet = ""
-        for sel in [
-            ".str_info", ".str-text-info", ".rb-info", ".vr-info",
-            ".abstract", ".star-wiki", ".ft", ".news-text",
-            "p[class*='info']", "p[class*='text']", "p[class*='content']",
-            ".desc", "div[class*='content']", "div[class*='info']",
-            "span[class*='info']", "div[class*='abstract']",
-            "div.space_str", "div.str_text_info",
-        ]:
+        for sel in [".str_info", ".rb-info", ".vr-info", ".abstract",
+                    "p[class*='info']", ".desc", "div[class*='content']"]:
             sn = item.select_one(sel)
             if sn:
-                text = sn.get_text(strip=True)
-                if text and len(text) > 10:
-                    snippet = text
-                    break
+                snippet = sn.get_text(strip=True)
+                break
 
         results.append({"title": title, "url": href, "snippet": snippet})
         if len(results) >= max_results:
@@ -581,22 +513,10 @@ async def _fetch_page_content(url: str, timeout: float = 15.0) -> Dict[str, str]
     """抓取指定 URL 的页面正文内容。
 
     优先使用 Jina Reader（支持 JS 渲染），失败则回退到直接 HTTP + HTML 解析。
-    百度/搜狗跳转链接会自动跟随重定向获取真实 URL。
+    百度链接会自动跟随重定向获取真实 URL。
 
     返回 {"url", "final_url", "title", "content", "content_length", "error"}
     """
-    # ── 预处理：如果是百度/搜狗跳转链接，先解析真实 URL ──
-    if "baidu.com/link" in url or "sogou.com/link" in url or "/link?url=" in url:
-        try:
-            real_url = await asyncio.wait_for(
-                _resolve_redirect_url(url, timeout=5.0),
-                timeout=8.0,
-            )
-            if real_url and real_url != url:
-                url = real_url
-        except (asyncio.TimeoutError, Exception):
-            pass  # 解析失败，继续用原 URL 尝试
-
     # ── 策略 1: Jina Reader（支持 JS 渲染，微信文章，动态站点）──
     try:
         jina_result = await asyncio.wait_for(
@@ -820,10 +740,10 @@ class WebSearchingPlugin(NekoPluginBase):
         except Exception as e:
             self.logger.warning("set_list_actions failed: {}", e)
 
-        self.logger.info("WebSearchingPlugin started v1.5.0")
+        self.logger.info("WebSearchingPlugin started v1.4.1")
         return Ok({
             "status": "running",
-            "version": "1.5.0",
+            "version": "1.4.1",
             "engines": {
                 "chinese": ["baidu", "sogou", "bing", "ddg"],
                 "english": ["ddg", "bing", "baidu"],
@@ -1030,82 +950,55 @@ class WebSearchingPlugin(NekoPluginBase):
                 strategy_used = strategy_used + "+wiki"
             wiki_summary_text = wiki_result.get("summary", "")
 
-        # ── Web 结果层：Jina Search 首选，搜狗降权到最后 ──
-        # 搜狗降权原因：返回相对路径链接，fetch_page_content 打不开
+        # ── Web 结果层：按国内可达性排序引擎 ──
+        # Jina/DDG 在国内可能不可达，降权到最后作为 fallback
         if is_chinese:
             engines = [
-                ("jina", _jina_search),
                 ("baidu", _search_baidu),
                 ("bing", _search_bing),
-                ("ddg", _search_ddg_html),
                 ("sogou", _search_sogou),
+                ("ddg", _search_ddg_html),
+                ("jina", _jina_search),
             ]
         else:
             engines = [
-                ("jina", _jina_search),
-                ("ddg", _search_ddg_html),
                 ("bing", _search_bing),
+                ("ddg", _search_ddg_html),
                 ("baidu", _search_baidu),
+                ("jina", _jina_search),
             ]
 
         web_results: List[Dict[str, str]] = []
+        # 每个引擎独立短超时（12s），避免单个引擎卡住整个搜索
+        per_engine_timeout = min(12.0, timeout)
         for engine_name, engine_fn in engines:
-            # Jina 和百度用重试机制（超时自动重试一次）
-            use_retry = engine_name in ("jina", "baidu")
-            if use_retry:
-                results = await _search_with_retry(
-                    engine_fn, query, max_results, timeout, retries=1
+            try:
+                results = await asyncio.wait_for(
+                    engine_fn(query, max_results, per_engine_timeout),
+                    timeout=per_engine_timeout + 3,
                 )
-            else:
-                try:
-                    results = await asyncio.wait_for(
-                        engine_fn(query, max_results, timeout),
-                        timeout=timeout + 5,
-                    )
-                except (asyncio.TimeoutError, Exception) as e:
-                    if not isinstance(e, asyncio.TimeoutError):
-                        self.logger.warning("{} failed: {}", engine_name, e)
-                    results = []
+                if results:
+                    web_results = results
+                    if strategy_used == "none":
+                        strategy_used = engine_name
+                    else:
+                        strategy_used = strategy_used + "+" + engine_name
+                    break  # 找到结果就停止
+            except (asyncio.TimeoutError, Exception) as e:
+                if not isinstance(e, asyncio.TimeoutError):
+                    self.logger.warning("{} failed: {}", engine_name, e)
 
-            if results:
-                web_results = results
-                if strategy_used == "none":
-                    strategy_used = engine_name
-                else:
-                    strategy_used = strategy_used + "+" + engine_name
-                break  # 找到结果就停止
-
-        # ── 后处理：去重 + 相关性排序 ──
+        # ── 后处理：去重 + 相关性排序（排除字典解释，攻略类加分）──
         if web_results:
             web_results = _deduplicate_results(web_results, query)
 
-        # ── 跳转链接解析：对百度/搜狗的跳转链接跟随重定向获取真实URL ──
-        if web_results:
-            redirect_tasks = []
-            redirect_indices = []
-            for idx, r in enumerate(web_results):
-                url = r.get("url", "")
-                # 检测跳转链接
-                if ("baidu.com/link" in url or "sogou.com/link" in url
-                        or "/link?url=" in url):
-                    redirect_tasks.append(_resolve_redirect_url(url, timeout=5.0))
-                    redirect_indices.append(idx)
-
-            if redirect_tasks:
-                self.logger.info("Resolving {} redirect URLs", len(redirect_tasks))
-                resolved = await asyncio.gather(*redirect_tasks, return_exceptions=True)
-                for i, real_url in enumerate(resolved):
-                    idx = redirect_indices[i]
-                    if isinstance(real_url, str) and real_url:
-                        web_results[idx]["url"] = real_url
-
-        # ── 正文增强：对没有 page_content 的结果用 Jina Reader 抓取 ──
+        # ── 正文增强：对没有 page_content 的 Top 3 结果用 Jina Reader 抓取 ──
         if web_results:
             enrich_timeout = min(12.0, timeout)
             enrich_tasks = []
             enrich_indices = []
             for idx, r in enumerate(web_results[:5]):
-                # 已有内容的结果跳过
+                # Jina Search 已返回内容的结果跳过
                 if r.get("page_content") and len(r["page_content"]) > 50:
                     continue
                 url = r.get("url", "")
@@ -1376,7 +1269,7 @@ class WebSearchingPlugin(NekoPluginBase):
     )
     async def get_status(self, **_):
         return Ok({
-            "version": "1.5.0",
+            "version": "1.4.1",
             "engines": {
                 "chinese": ["baidu", "sogou", "bing", "ddg"],
                 "english": ["ddg", "bing", "baidu"],
