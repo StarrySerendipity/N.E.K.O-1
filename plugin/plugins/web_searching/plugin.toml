@@ -1,0 +1,30 @@
+[plugin]
+name = "Web Searching"
+description = "独立开发的联网搜索插件。注册为 LLM 工具，猫娘可在遇到知识盲区时主动联网搜索。智能引擎选择：中文查询用百度/搜狗/Bing，英文用 DuckDuckGo/Bing。知识层：DDG IA + Wikipedia API。自动抓取 Top 3 结果页面正文，结果去重+相关性排序。新增 fetch_page_content 工具让猫娘可抓取任意 URL 正文。"
+short_description = "Smart multi-engine web search + page content extraction. Chinese: Baidu/Sogou. English: DDG/Bing."
+keywords = ["搜索", "search", "联网", "web", "百度", "baidu", "搜狗", "sogou", "网络", "internet", "查", "检索", "wiki", "duckduckgo", "bing", "fetch", "抓取", "正文"]
+version = "1.3.0"
+id = "web_searching"
+entry = "plugin.plugins.web_searching:WebSearchingPlugin"
+
+[plugin.author]
+name = "N.E.K.O Community"
+
+[plugin.sdk]
+recommended = ">=0.1.0,<0.2.0"
+supported = ">=0.1.0,<0.3.0"
+
+[plugin.i18n]
+default_locale = "zh-CN"
+locales_dir = "i18n"
+
+[plugin_runtime]
+enabled = true
+auto_start = true
+
+[plugin.store]
+enabled = true
+
+[search]
+max_results = 8
+timeout_seconds = 25
