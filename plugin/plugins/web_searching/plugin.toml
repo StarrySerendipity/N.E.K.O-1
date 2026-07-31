@@ -1,9 +1,9 @@
 [plugin]
 name = "Web Searching"
-description = "独立开发的联网搜索插件。注册为 LLM 工具。Jina Search/Reader API（免费，支持JS渲染）为首选引擎，百度/搜狗/Bing/DDG 为 fallback。自动提取页面正文，去重+相关性排序（攻略类优先，排除字典解释）。fetch_page_content 工具让猫娘可抓取任意 URL 正文。"
-short_description = "Jina-powered web search + page content extraction. Supports JS rendering. Free, no API key."
-keywords = ["搜索", "search", "联网", "web", "jina", "百度", "baidu", "搜狗", "sogou", "网络", "internet", "查", "检索", "wiki", "duckduckgo", "bing", "fetch", "抓取", "正文"]
-version = "1.4.0"
+description = "独立开发的联网搜索插件。注册为 LLM 工具。Jina Search/Reader（免费，支持JS渲染）首选，百度/Bing/DDG fallback。搜狗降权（相对路径问题）。自动解析跳转链接获取真实URL，搜索重试机制，改进摘要提取。fetch_page_content 工具可抓取任意URL正文。"
+short_description = "Jina-powered web search + redirect resolution + retry. Supports JS rendering. Free, no API key."
+keywords = ["搜索", "search", "联网", "web", "jina", "百度", "baidu", "网络", "internet", "查", "检索", "duckduckgo", "bing", "fetch", "抓取", "正文"]
+version = "1.5.0"
 id = "web_searching"
 entry = "plugin.plugins.web_searching:WebSearchingPlugin"
 
