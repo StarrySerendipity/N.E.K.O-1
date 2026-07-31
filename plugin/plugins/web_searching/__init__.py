@@ -1,5 +1,5 @@
 """
-Web Searching Plugin — 联网搜索 v1.4.1
+Web Searching Plugin — 联网搜索 v1.5.0
 
 独立开发的联网搜索插件，让猫娘具备联网搜索能力。
 注册为 @llm_tool，猫娘可在遇到知识盲区时主动调用。
@@ -610,10 +610,14 @@ def _extract_text_from_html(html: str, url: str, final_url: str) -> Dict[str, st
 
 
 def _deduplicate_results(results: List[Dict[str, str]], query: str) -> List[Dict[str, str]]:
-    """去重 + 关键词相关性排序 + 攻略类内容优先 + 无关内容降权。"""
+    """去重 + 相关性排序 + 攻略类优先 + 同域名限制 + 长尾关键词精确匹配。"""
     seen_titles: set[str] = set()
     seen_urls: set[str] = set()
     query_lower = query.lower()
+    # 长尾关键词检测：>5 个词时优先完整短语匹配
+    word_count = len(query_lower.split())
+    is_long_query = word_count > 5
+    query_phrase = query_lower.replace(" ", "")
     # 提取查询中的所有词（中文按字分，英文按词分）
     query_words = set(re.findall(r'[a-zA-Z]+', query_lower))
     # 中文按 2-4 字组合提取关键词
@@ -632,6 +636,7 @@ def _deduplicate_results(results: List[Dict[str, str]], query: str) -> List[Dict
     ]
 
     deduped: List[Dict[str, str]] = []
+    domain_count: Dict[str, int] = {}  # 同域名出现次数
     for r in results:
         title = r.get("title", "").strip().lower()
         url = r.get("url", "").strip().lower()
@@ -641,6 +646,19 @@ def _deduplicate_results(results: List[Dict[str, str]], query: str) -> List[Dict
             continue
         seen_titles.add(title)
         seen_urls.add(url)
+
+        # 同域名限制：同一域名最多出现 2 次
+        from urllib.parse import urlparse
+        try:
+            domain = urlparse(r.get("url", "")).netloc.lower()
+            if domain.startswith("www."):
+                domain = domain[4:]
+            if domain and domain_count.get(domain, 0) >= 2:
+                continue
+            if domain:
+                domain_count[domain] = domain_count.get(domain, 0) + 1
+        except Exception:
+            pass
 
         title_text = r.get("title", "").lower()
         snippet_text = r.get("snippet", "").lower()
@@ -653,6 +671,15 @@ def _deduplicate_results(results: List[Dict[str, str]], query: str) -> List[Dict
 
         # 计算相关性分数
         score = 0
+        # 长尾查询：完整短语匹配高分
+        if is_long_query and query_phrase:
+            title_nospace = title_text.replace(" ", "")
+            snippet_nospace = snippet_text.replace(" ", "")
+            if query_phrase in title_nospace:
+                score += 10
+            elif query_phrase in snippet_nospace:
+                score += 5
+        # 逐词匹配
         for word in query_words:
             if len(word) > 1:
                 if word in title_text:
@@ -740,10 +767,10 @@ class WebSearchingPlugin(NekoPluginBase):
         except Exception as e:
             self.logger.warning("set_list_actions failed: {}", e)
 
-        self.logger.info("WebSearchingPlugin started v1.4.1")
+        self.logger.info("WebSearchingPlugin started v1.5.0")
         return Ok({
             "status": "running",
-            "version": "1.4.1",
+            "version": "1.5.0",
             "engines": {
                 "chinese": ["baidu", "sogou", "bing", "ddg"],
                 "english": ["ddg", "bing", "baidu"],
@@ -1042,10 +1069,14 @@ class WebSearchingPlugin(NekoPluginBase):
             lines.append(f"【{lang_tag}搜索】(\"{query}\" 共 {len(results)} 条)")
             for i, r in enumerate(results, 1):
                 lines.append(f"{i}. {r.get('title', '')}")
-                if r.get("snippet"):
-                    lines.append(f"   摘要: {r['snippet']}")
-                # 正文预览（关键增强：让猫娘看到页面内容，不用点链接）
-                if r.get("page_content"):
+                # 摘要：优先用 snippet，为空则从 page_content 提取前 200 字
+                snippet = r.get("snippet", "").strip()
+                if not snippet and r.get("page_content"):
+                    snippet = r["page_content"][:200].strip()
+                if snippet:
+                    lines.append(f"   摘要: {snippet}")
+                # 正文预览（让猫娘看到页面内容，不用点链接）
+                if r.get("page_content") and len(r["page_content"]) > 200:
                     lines.append(f"   正文: {r['page_content'][:300]}")
                 lines.append("")
 
@@ -1100,6 +1131,9 @@ class WebSearchingPlugin(NekoPluginBase):
 
         defs = self._defaults()
         max_r = max(3, max_results if max_results and max_results > 0 else defs["max_results"])
+        # 英文查询自动增加结果数量（英文搜索引擎结果更丰富）
+        if not _is_chinese_query(query) and max_r < 10:
+            max_r = 10
         timeout = defs["timeout"]
 
         self.logger.info("web_searching tool: query={!r}", query)
@@ -1269,7 +1303,7 @@ class WebSearchingPlugin(NekoPluginBase):
     )
     async def get_status(self, **_):
         return Ok({
-            "version": "1.4.1",
+            "version": "1.5.0",
             "engines": {
                 "chinese": ["baidu", "sogou", "bing", "ddg"],
                 "english": ["ddg", "bing", "baidu"],
