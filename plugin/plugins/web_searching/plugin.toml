@@ -1,9 +1,9 @@
 [plugin]
 name = "Web Searching"
-description = "独立开发的联网搜索插件。注册为 LLM 工具，猫娘可在遇到知识盲区时主动联网搜索。智能引擎选择：中文查询用百度/搜狗/Bing，英文用 DuckDuckGo/Bing。知识层：DDG IA + Wikipedia API。自动抓取 Top 3 结果页面正文，结果去重+相关性排序。新增 fetch_page_content 工具让猫娘可抓取任意 URL 正文。"
-short_description = "Smart multi-engine web search + page content extraction. Chinese: Baidu/Sogou. English: DDG/Bing."
-keywords = ["搜索", "search", "联网", "web", "百度", "baidu", "搜狗", "sogou", "网络", "internet", "查", "检索", "wiki", "duckduckgo", "bing", "fetch", "抓取", "正文"]
-version = "1.3.0"
+description = "独立开发的联网搜索插件。注册为 LLM 工具。Jina Search/Reader API（免费，支持JS渲染）为首选引擎，百度/搜狗/Bing/DDG 为 fallback。自动提取页面正文，去重+相关性排序（攻略类优先，排除字典解释）。fetch_page_content 工具让猫娘可抓取任意 URL 正文。"
+short_description = "Jina-powered web search + page content extraction. Supports JS rendering. Free, no API key."
+keywords = ["搜索", "search", "联网", "web", "jina", "百度", "baidu", "搜狗", "sogou", "网络", "internet", "查", "检索", "wiki", "duckduckgo", "bing", "fetch", "抓取", "正文"]
+version = "1.4.0"
 id = "web_searching"
 entry = "plugin.plugins.web_searching:WebSearchingPlugin"
 

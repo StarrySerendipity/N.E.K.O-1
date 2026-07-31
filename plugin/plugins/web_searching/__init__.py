@@ -1,5 +1,5 @@
 """
-Web Searching Plugin — 联网搜索 v1.3.0
+Web Searching Plugin — 联网搜索 v1.4.0
 
 独立开发的联网搜索插件，让猫娘具备联网搜索能力。
 注册为 @llm_tool，猫娘可在遇到知识盲区时主动调用。
@@ -60,8 +60,20 @@ _SOGOU_URL = "https://www.sogou.com/web"
 _DDG_HTML_URL = "https://html.duckduckgo.com/html/"
 _BING_URL = "https://www.bing.com/search"
 
+# Jina AI — 免费搜索+阅读器（无需 API key，支持 JS 渲染）
+_JINA_SEARCH_URL = "https://s.jina.ai/"
+_JINA_READER_URL = "https://r.jina.ai/"
+
 # 中文 unicode 范围
 _CJK_RE = re.compile(r'[\u4e00-\u9fff]')
+
+# 攻略/指南类关键词（搜索相关性加分）
+_GUIDE_KEYWORDS = frozenset({
+    "攻略", "指南", "教程", "详解", "解析", "评测", "测评",
+    "guide", "tutorial", "walkthrough", "tips", "build",
+    "技能", "培养", "搭配", "阵容", "输出", "辅助", "副c", "主c",
+    "定位", "强度", "排行", "推荐", "用法", "解析",
+})
 
 
 def _is_chinese_query(query: str) -> bool:
@@ -365,6 +377,120 @@ async def _search_bing(query: str, max_results: int = 8, timeout: float = 15.0) 
     return results
 
 
+# ─── Jina AI 搜索 + 阅读器（免费，支持JS渲染，无需API key）──────────────────
+
+async def _jina_search(query: str, max_results: int = 8, timeout: float = 20.0) -> List[Dict[str, str]]:
+    """Jina Search API — 搜索并自动提取页面内容，返回 Markdown 格式结果。
+
+    优势：
+    - 自带内容提取（不需要二次抓取页面）
+    - 支持 JS 渲染站点
+    - 返回干净的结构化文本
+    - 免费无需 API key（~20 RPM）
+    """
+    headers = {
+        "User-Agent": _UA_PC,
+        "Accept": "text/plain",
+    }
+    params = {"q": query}
+
+    try:
+        async with httpx.AsyncClient(
+            timeout=timeout, follow_redirects=True, headers=headers,
+        ) as client:
+            resp = await client.get(_JINA_SEARCH_URL, params=params)
+            resp.raise_for_status()
+            text = resp.text
+    except Exception:
+        return []
+
+    # Jina 返回 Markdown 格式，解析标题/URL/内容
+    results: List[Dict[str, str]] = []
+    blocks = re.split(r'^Title:\s*', text, flags=re.MULTILINE)
+
+    for block in blocks[1:]:  # 跳过第一个（空或前导文本）
+        lines = block.strip().split('\n')
+        if not lines:
+            continue
+
+        title = lines[0].strip()
+        url = ""
+        content_lines = []
+        for line in lines[1:]:
+            line = line.strip()
+            if line.startswith("URL Source:") or line.startswith("URL:"):
+                url = line.split(":", 1)[1].strip()
+            elif line.startswith("Markdown Content:"):
+                continue
+            elif line:
+                content_lines.append(line)
+
+        content = "\n".join(content_lines).strip()
+        # 截取内容预览
+        snippet = content[:300] if content else ""
+
+        if title and url:
+            results.append({
+                "title": title,
+                "url": url,
+                "snippet": snippet,
+                "page_content": content[:800] if content else "",
+            })
+
+        if len(results) >= max_results:
+            break
+
+    return results
+
+
+async def _jina_reader(url: str, timeout: float = 15.0) -> Dict[str, str]:
+    """Jina Reader API — 抓取任意 URL 的页面内容，支持 JS 渲染。
+
+    用法：在 URL 前加 https://r.jina.ai/
+    返回干净的 Markdown 文本，自动处理 JS 渲染页面。
+    """
+    jina_url = f"{_JINA_READER_URL}{url}"
+    headers = {
+        "User-Agent": _UA_PC,
+        "Accept": "text/plain",
+    }
+
+    try:
+        async with httpx.AsyncClient(
+            timeout=timeout, follow_redirects=True, headers=headers,
+        ) as client:
+            resp = await client.get(jina_url)
+            resp.raise_for_status()
+            content = resp.text
+    except Exception as e:
+        return {"url": url, "final_url": url, "title": "",
+                "content": "", "content_length": 0, "error": str(e)}
+
+    # 尝试提取标题（Jina 通常在第一行返回 Title: ...）
+    title = ""
+    content_lines = content.split("\n")
+    if content_lines and content_lines[0].startswith("Title:"):
+        title = content_lines[0][6:].strip()
+        content = "\n".join(content_lines[1:]).strip()
+
+    # 移除 URL Source 行
+    content = re.sub(r'^URL Source:.*$', '', content, flags=re.MULTILINE).strip()
+    content = re.sub(r'^Markdown Content:', '', content, flags=re.MULTILINE).strip()
+
+    # 截取（最多 2000 字符）
+    if len(content) > 2000:
+        content = content[:2000] + "..."
+
+    return {
+        "url": url,
+        "final_url": url,
+        "title": title,
+        "content": content,
+        "content_length": len(content),
+        "error": "",
+    }
+
+
 # ─── 页面正文提取（解决"点不开链接"痛点）──────────────────────────────────
 
 # 需要移除的噪音标签
@@ -383,12 +509,26 @@ _CONTENT_SELECTORS = (
 )
 
 
-async def _fetch_page_content(url: str, timeout: float = 12.0) -> Dict[str, str]:
+async def _fetch_page_content(url: str, timeout: float = 15.0) -> Dict[str, str]:
     """抓取指定 URL 的页面正文内容。
 
-    返回 {"url", "final_url", "title", "content", "content_length", "error"}
+    优先使用 Jina Reader（支持 JS 渲染），失败则回退到直接 HTTP + HTML 解析。
     百度链接会自动跟随重定向获取真实 URL。
+
+    返回 {"url", "final_url", "title", "content", "content_length", "error"}
     """
+    # ── 策略 1: Jina Reader（支持 JS 渲染，微信文章，动态站点）──
+    try:
+        jina_result = await asyncio.wait_for(
+            _jina_reader(url, timeout=timeout),
+            timeout=timeout + 5,
+        )
+        if jina_result.get("content") and len(jina_result["content"]) > 50:
+            return jina_result
+    except (asyncio.TimeoutError, Exception):
+        pass
+
+    # ── 策略 2: 直接 HTTP + HTML 解析（fallback）──
     headers = {
         "User-Agent": _UA_PC,
         "Accept": "text/html,application/xhtml+xml",
@@ -470,11 +610,26 @@ def _extract_text_from_html(html: str, url: str, final_url: str) -> Dict[str, st
 
 
 def _deduplicate_results(results: List[Dict[str, str]], query: str) -> List[Dict[str, str]]:
-    """去重 + 关键词相关性排序。"""
+    """去重 + 关键词相关性排序 + 攻略类内容优先 + 无关内容降权。"""
     seen_titles: set[str] = set()
     seen_urls: set[str] = set()
     query_lower = query.lower()
-    query_words = set(re.findall(r'\w+', query_lower))
+    # 提取查询中的所有词（中文按字分，英文按词分）
+    query_words = set(re.findall(r'[a-zA-Z]+', query_lower))
+    # 中文按 2-4 字组合提取关键词
+    cjk_chars = re.findall(r'[\u4e00-\u9fff]+', query)
+    for segment in cjk_chars:
+        if len(segment) >= 2:
+            query_words.add(segment.lower())
+            # 也加入 2-gram
+            for i in range(len(segment) - 1):
+                query_words.add(segment[i:i+2].lower())
+
+    # 无关内容特征（降权或排除）
+    _IRRELEVANT_PATTERNS = [
+        "字典", "词典", "百科解释", "汉语词典", "新华字典",
+        "百度汉语", "汉典", "definition", "dictionary",
+    ]
 
     deduped: List[Dict[str, str]] = []
     for r in results:
@@ -487,16 +642,36 @@ def _deduplicate_results(results: List[Dict[str, str]], query: str) -> List[Dict
         seen_titles.add(title)
         seen_urls.add(url)
 
-        # 计算相关性分数
-        score = 0
         title_text = r.get("title", "").lower()
         snippet_text = r.get("snippet", "").lower()
+        content_text = (r.get("page_content", "") or "").lower()
+
+        # 排除明显无关内容（字典/词典解释）
+        is_irrelevant = any(p in title_text for p in _IRRELEVANT_PATTERNS)
+        if is_irrelevant:
+            continue
+
+        # 计算相关性分数
+        score = 0
         for word in query_words:
             if len(word) > 1:
                 if word in title_text:
-                    score += 3
+                    score += 5  # 标题命中权重最高
                 if word in snippet_text:
-                    score += 1
+                    score += 2  # 摘要命中
+                if word in content_text:
+                    score += 1  # 正文命中
+
+        # 攻略/指南类内容加分
+        for kw in _GUIDE_KEYWORDS:
+            if kw in title_text or kw in snippet_text:
+                score += 3
+                break
+
+        # 有正文内容的结果加分（更有价值）
+        if r.get("page_content") and len(r["page_content"]) > 100:
+            score += 2
+
         r["_relevance_score"] = score
         deduped.append(r)
 
@@ -565,10 +740,10 @@ class WebSearchingPlugin(NekoPluginBase):
         except Exception as e:
             self.logger.warning("set_list_actions failed: {}", e)
 
-        self.logger.info("WebSearchingPlugin started v1.3.0")
+        self.logger.info("WebSearchingPlugin started v1.4.0")
         return Ok({
             "status": "running",
-            "version": "1.3.0",
+            "version": "1.4.0",
             "engines": {
                 "chinese": ["baidu", "sogou", "bing", "ddg"],
                 "english": ["ddg", "bing", "baidu"],
@@ -775,9 +950,11 @@ class WebSearchingPlugin(NekoPluginBase):
                 strategy_used = strategy_used + "+wiki"
             wiki_summary_text = wiki_result.get("summary", "")
 
-        # ── Web 结果层：按查询语言智能选择引擎优先级 ──
+        # ── Web 结果层：Jina Search 首选（自带内容），传统引擎 fallback ──
+        # Jina Search 优势：自带页面内容提取，支持JS渲染，无需二次抓取
         if is_chinese:
             engines = [
+                ("jina", _jina_search),
                 ("baidu", _search_baidu),
                 ("sogou", _search_sogou),
                 ("bing", _search_bing),
@@ -785,13 +962,13 @@ class WebSearchingPlugin(NekoPluginBase):
             ]
         else:
             engines = [
+                ("jina", _jina_search),
                 ("ddg", _search_ddg_html),
                 ("bing", _search_bing),
                 ("baidu", _search_baidu),
             ]
 
         web_results: List[Dict[str, str]] = []
-        engines_used = []
         for engine_name, engine_fn in engines:
             try:
                 results = await asyncio.wait_for(
@@ -800,7 +977,6 @@ class WebSearchingPlugin(NekoPluginBase):
                 )
                 if results:
                     web_results = results
-                    engines_used.append(engine_name)
                     if strategy_used == "none":
                         strategy_used = engine_name
                     else:
@@ -810,29 +986,35 @@ class WebSearchingPlugin(NekoPluginBase):
                 if not isinstance(e, asyncio.TimeoutError):
                     self.logger.warning("{} failed: {}", engine_name, e)
 
-        # ── 后处理：去重 + 相关性排序 ──
+        # ── 后处理：去重 + 相关性排序（排除字典解释，攻略类加分）──
         if web_results:
             web_results = _deduplicate_results(web_results, query)
 
-        # ── 正文增强：对 Top 3 结果抓取页面正文摘要 ──
+        # ── 正文增强：对没有 page_content 的 Top 3 结果用 Jina Reader 抓取 ──
         if web_results:
-            enrich_timeout = min(10.0, timeout)
+            enrich_timeout = min(12.0, timeout)
             enrich_tasks = []
-            for r in web_results[:3]:
+            enrich_indices = []
+            for idx, r in enumerate(web_results[:5]):
+                # Jina Search 已返回内容的结果跳过
+                if r.get("page_content") and len(r["page_content"]) > 50:
+                    continue
                 url = r.get("url", "")
                 if url and url.startswith("http"):
                     enrich_tasks.append(_fetch_page_content(url, enrich_timeout))
+                    enrich_indices.append(idx)
 
             if enrich_tasks:
-                self.logger.info("Enriching {} pages with content", len(enrich_tasks))
+                self.logger.info("Enriching {} pages via Jina Reader", len(enrich_tasks))
                 enriched = await asyncio.gather(*enrich_tasks, return_exceptions=True)
                 for i, result in enumerate(enriched):
+                    idx = enrich_indices[i]
                     if isinstance(result, dict) and result.get("content"):
                         content_preview = result["content"][:500]
-                        web_results[i]["page_content"] = content_preview
-                        web_results[i]["final_url"] = result.get("final_url", "")
-                        if not web_results[i].get("title") and result.get("title"):
-                            web_results[i]["title"] = result["title"]
+                        web_results[idx]["page_content"] = content_preview
+                        web_results[idx]["final_url"] = result.get("final_url", "")
+                        if not web_results[idx].get("title") and result.get("title"):
+                            web_results[idx]["title"] = result["title"]
 
         return web_results, strategy_used, instant_answer_text, wiki_summary_text
 
@@ -1085,7 +1267,7 @@ class WebSearchingPlugin(NekoPluginBase):
     )
     async def get_status(self, **_):
         return Ok({
-            "version": "1.3.0",
+            "version": "1.4.0",
             "engines": {
                 "chinese": ["baidu", "sogou", "bing", "ddg"],
                 "english": ["ddg", "bing", "baidu"],
