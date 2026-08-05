@@ -236,17 +236,17 @@ def _make_catgirl_greeting(
     task_count: int,
     first_task: Optional[Dict[str, Any]] = None,
 ) -> str:
-    # v0.3: 使用 {MASTER_NAME} 占位符,由主机端替换实际用户名称
+    # v0.3: 使用 master_name 变量,支持猫娘动态修改称呼
     if first_task:
         ft_time = first_task.get("time", "??:??")
         ft_title = first_task.get("title", "事项")
         body = (
-            f"早安喵~ {{MASTER_NAME}},今天一共有 {task_count} 件事要做哦。\n"
+            f"早安喵~ {master_name},今天一共有 {task_count} 件事要做哦。\n"
             f"第一件是{ft_time}的《{ft_title}》,别忘了呢~ 喵呜~"
         )
     else:
         body = (
-            f"早安喵~ {{MASTER_NAME}},今天还没安排任务呢。\n"
+            f"早安喵~ {master_name},今天还没安排任务呢。\n"
             f"要不要让{catgirl_name}帮你规划一下今天要做些什么呀?"
         )
     return body
@@ -257,7 +257,7 @@ def _make_task_reminder(
     catgirl_name: str,
     master_name: str,
 ) -> str:
-    # v0.3: 使用 {MASTER_NAME} 占位符,由主机端替换实际用户名称
+    # v0.3: 使用 master_name 变量,支持猫娘动态修改称呼
     title = task.get("title", "未命名任务")
     desc = (task.get("description") or "").strip()
     custom = (task.get("catgirl_message") or "").strip()
@@ -269,11 +269,11 @@ def _make_task_reminder(
     prefix = (p + " ") if p else ""
     if desc:
         return (
-            f"⏰ 到点啦~ {{MASTER_NAME}}!该做《{title}》了喵。\n"
+            f"⏰ 到点啦~ {master_name}!该做《{title}》了喵。\n"
             f"小提示: {desc}\n"
             f"—— {catgirl_name}·喵呜~ ({prefix.strip()})"
         )
-    return f"⏰ 到点啦~ {{MASTER_NAME}}!{prefix}该做《{title}》了喵—— {catgirl_name}·喵呜~"
+    return f"⏰ 到点啦~ {master_name}!{prefix}该做《{title}》了喵—— {catgirl_name}·喵呜~"
 
 
 def _make_goodnight(
@@ -282,20 +282,20 @@ def _make_goodnight(
     done: int,
     pending: int,
 ) -> str:
-    # v0.3: 使用 {MASTER_NAME} 占位符,由主机端替换实际用户名称
+    # v0.3: 使用 master_name 变量,支持猫娘动态修改称呼
     if pending == 0 and done > 0:
         return (
-            f"晚安喵~ {{MASTER_NAME}}。\n"
+            f"晚安喵~ {master_name}。\n"
             f"今天完成了 {done} 件事,太棒啦,奖励你一个摸摸头~ ✨\n"
             f"好梦哦,{catgirl_name}去睡啦~ 喵~"
         )
     if done == 0 and pending > 0:
         return (
-            f"嗯~ {{MASTER_NAME}}今天还没完成任何事呢。\n"
+            f"嗯~ {master_name}今天还没完成任何事呢。\n"
             f"还有 {pending} 件事搁着,明天见啦,记得加油喵~"
         )
     return (
-        f"晚安喵~ {{MASTER_NAME}}。\n"
+        f"晚安喵~ {master_name}。\n"
         f"今天完成了 {done} 件,还有 {pending} 件没做完。\n"
         f"明天继续加油,{catgirl_name}会陪着你哒~ 喵呜~"
     )
@@ -1186,7 +1186,7 @@ class CatgirlDailyPlannerPlugin(NekoPluginBase):
             "acknowledged": True,
             "task_id": task_id,
             "title": target.get("title"),
-            "message": f"好的喵~ {target.get('title')} 的提醒已关闭,主人加油哦~"
+            "message": f"好的喵~ {target.get('title')} 的提醒已关闭,{self._master_name}加油哦~"
         })
 
     @llm_tool(
@@ -1249,7 +1249,7 @@ class CatgirlDailyPlannerPlugin(NekoPluginBase):
             "title": target.get("title"),
             "delay_minutes": delay_minutes,
             "next_reminder_at": target.get("next_reminder_at"),
-            "message": f"好的喵~ {delay_minutes}分钟后({target.get('next_reminder_at')[:16].replace('T', ' ')})再提醒主人《{target.get('title')}》~"
+            "message": f"好的喵~ {delay_minutes}分钟后({target.get('next_reminder_at')[:16].replace('T', ' ')})再提醒{self._master_name}《{target.get('title')}》~"
         })
 
     @llm_tool(
