@@ -26,7 +26,9 @@ v0.2 升级:
               "status": "pending",     # pending / done / skipped
               "reminder_id": "...",    # memo_reminder 的提醒 id
               "local_fired_at": "...", # 本地备份 ticker 已推送过
-              "recurring_id": "..."    # 若来自 recurring 任务,记下规则 id
+              "recurring_id": "...",   # 若来自 recurring 任务,记下规则 id
+              "acknowledged": false,   # 用户是否已确认该提醒
+              "next_reminder_at": "..." # 下次提醒时间(ISO格式),用于延迟提醒
           },
           ...
       ],
@@ -613,12 +615,25 @@ class CatgirlDailyPlannerPlugin(NekoPluginBase):
         """本地备份 ticker:到了时间就推任务提醒,90 秒内不重复。
 
         这是 memo_reminder 失败时的兜底,确保用户到点一定收到提醒。
+        v0.3: 尊重 acknowledged 和 next_reminder_at 字段
         """
         now_min = now.hour * 60 + now.minute
         now_iso = now.isoformat()
         for t in plan.get("tasks", []):
             if t.get("status") != _STATUS_PENDING:
                 continue
+            # v0.3: 已确认的任务不再提醒
+            if t.get("acknowledged"):
+                continue
+            # v0.3: 检查延迟提醒时间
+            next_reminder = t.get("next_reminder_at")
+            if next_reminder:
+                try:
+                    next_dt = datetime.fromisoformat(next_reminder)
+                    if now < next_dt:
+                        continue  # 还没到延迟时间
+                except Exception:
+                    pass
             tm = _parse_hhmm(t.get("time", ""))
             if tm is None:
                 continue
@@ -1114,6 +1129,125 @@ class CatgirlDailyPlannerPlugin(NekoPluginBase):
         except Exception:
             self.logger.exception("record stats failed")
         return Ok({"updated": True, "task_id": task_id, "status": status, "title": target.get("title")})
+
+    @llm_tool(
+        name="catgirl_planner_acknowledge_task",
+        description="确认任务提醒。当主人说'我知道了'、'收到'、'明白了'等确认话语时调用此工具,停止该任务的重复提醒。",
+        parameters={
+            "type": "object",
+            "properties": {
+                "date": {"type": "string", "description": "YYYY-MM-DD,留空今天"},
+                "task_id": {"type": "string", "description": "任务ID"},
+            },
+            "required": ["task_id"],
+        },
+        timeout=10.0,
+    )
+    @plugin_entry(
+        id="acknowledge_task",
+        name="确认任务提醒",
+        description="确认任务提醒,停止该任务的重复提醒。",
+        input_schema={
+            "type": "object",
+            "properties": {
+                "date": {"type": "string"},
+                "task_id": {"type": "string"},
+            },
+            "required": ["task_id"],
+        },
+        llm_result_fields=["acknowledged"],
+    )
+    async def acknowledge_task(self, task_id: str, date: str = "", **_):
+        """确认任务提醒,停止重复提醒。"""
+        if not date:
+            date = _today_key(self._tz)
+        else:
+            parsed = _parse_date(date, self._tz)
+            if not parsed:
+                return Err(SdkError(f"date 无法解析: {date!r}"))
+            date = parsed
+
+        plan = self._load_plan(date)
+        target = None
+        for t in plan.get("tasks", []):
+            if t.get("id") == task_id:
+                t["acknowledged"] = True
+                t["next_reminder_at"] = None  # 清除延迟提醒时间
+                target = t
+                break
+        if target is None:
+            return Err(SdkError(f"未找到任务: {task_id}"))
+
+        self._save_plan(date, plan)
+        return Ok({
+            "acknowledged": True,
+            "task_id": task_id,
+            "title": target.get("title"),
+            "message": f"好的喵~ {target.get('title')} 的提醒已关闭,主人加油哦~"
+        })
+
+    @llm_tool(
+        name="catgirl_planner_delay_task_reminder",
+        description="延迟任务提醒。当主人说'半小时后再提醒我'、'10分钟后提醒'等延迟话语时调用此工具,设置下次提醒时间。",
+        parameters={
+            "type": "object",
+            "properties": {
+                "date": {"type": "string", "description": "YYYY-MM-DD,留空今天"},
+                "task_id": {"type": "string", "description": "任务ID"},
+                "delay_minutes": {"type": "integer", "description": "延迟分钟数,如10、30、60", "minimum": 1, "maximum": 1440},
+            },
+            "required": ["task_id", "delay_minutes"],
+        },
+        timeout=10.0,
+    )
+    @plugin_entry(
+        id="delay_task_reminder",
+        name="延迟任务提醒",
+        description="延迟任务提醒,设置下次提醒时间。",
+        input_schema={
+            "type": "object",
+            "properties": {
+                "date": {"type": "string"},
+                "task_id": {"type": "string"},
+                "delay_minutes": {"type": "integer"},
+            },
+            "required": ["task_id", "delay_minutes"],
+        },
+        llm_result_fields=["next_reminder_at"],
+    )
+    async def delay_task_reminder(self, task_id: str, delay_minutes: int, date: str = "", **_):
+        """延迟任务提醒,设置下次提醒时间。"""
+        if not date:
+            date = _today_key(self._tz)
+        else:
+            parsed = _parse_date(date, self._tz)
+            if not parsed:
+                return Err(SdkError(f"date 无法解析: {date!r}"))
+            date = parsed
+
+        plan = self._load_plan(date)
+        target = None
+        for t in plan.get("tasks", []):
+            if t.get("id") == task_id:
+                # 计算下次提醒时间
+                now = datetime.now(self._tz)
+                next_time = now + timedelta(minutes=delay_minutes)
+                t["next_reminder_at"] = next_time.isoformat()
+                t["acknowledged"] = False  # 重置确认状态,允许再次提醒
+                target = t
+                break
+        if target is None:
+            return Err(SdkError(f"未找到任务: {task_id}"))
+
+        self._save_plan(date, plan)
+        return Ok({
+            "delayed": True,
+            "task_id": task_id,
+            "title": target.get("title"),
+            "delay_minutes": delay_minutes,
+            "next_reminder_at": target.get("next_reminder_at"),
+            "message": f"好的喵~ {delay_minutes}分钟后({target.get('next_reminder_at')[:16].replace('T', ' ')})再提醒主人《{target.get('title')}》~"
+        })
 
     @llm_tool(
         name="catgirl_planner_list_today",
