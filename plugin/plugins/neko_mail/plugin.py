@@ -51,7 +51,7 @@ class NekoMailPlugin:
         except Exception as e:
             return {"error": str(e)}
     
-    def get_unread(self, folder: str = "INBOX", limit: int = 10) -> list[dict]:
+    def get_unread(self, folder: str = "INBOX", limit: int = 50) -> list[dict]:
         """获取未读邮件,完整解析"""
         try:
             emails = self.client.get_unread(folder=folder, limit=limit)

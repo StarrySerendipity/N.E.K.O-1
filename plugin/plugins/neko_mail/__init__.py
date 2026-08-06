@@ -172,7 +172,7 @@ class NekoMailPluginEntry(NekoPluginBase):
             "type": "object",
             "properties": {
                 "folder": {"type": "string", "description": "文件夹名称,默认 INBOX"},
-                "limit": {"type": "integer", "description": "最多返回几封,默认 10"},
+                "limit": {"type": "integer", "description": "最多返回几封,默认 50"},
             },
             "required": [],
         },
@@ -192,7 +192,7 @@ class NekoMailPluginEntry(NekoPluginBase):
         },
         llm_result_fields=["emails"],
     )
-    async def get_unread(self, folder: str = "INBOX", limit: int = 10, **_):
+    async def get_unread(self, folder: str = "INBOX", limit: int = 50, **_):
         """获取未读邮件"""
         try:
             plugin = self._get_plugin()
