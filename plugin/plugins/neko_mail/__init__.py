@@ -285,13 +285,14 @@ class NekoMailPluginEntry(NekoPluginBase):
 
     @llm_tool(
         name="neko_mail_search",
-        description="搜索邮件。可以按关键词搜索主题、发件人、正文。",
+        description="搜索邮件。可以按关键词搜索主题、发件人、正文。支持分页。",
         parameters={
             "type": "object",
             "properties": {
                 "keyword": {"type": "string", "description": "搜索关键词"},
                 "folder": {"type": "string", "description": "文件夹名称,默认 INBOX"},
-                "limit": {"type": "integer", "description": "最多返回几封,默认 10"},
+                "limit": {"type": "integer", "description": "每页数量,默认 100"},
+                "offset": {"type": "integer", "description": "偏移量,用于加载更多,默认 0"},
             },
             "required": ["keyword"],
         },
@@ -300,26 +301,27 @@ class NekoMailPluginEntry(NekoPluginBase):
     @plugin_entry(
         id="search",
         name="搜索邮件",
-        description="按关键词搜索邮件",
+        description="按关键词搜索邮件,支持分页",
         input_schema={
             "type": "object",
             "properties": {
                 "keyword": {"type": "string"},
                 "folder": {"type": "string"},
                 "limit": {"type": "integer"},
+                "offset": {"type": "integer"},
             },
             "required": ["keyword"],
         },
-        llm_result_fields=["emails"],
+        llm_result_fields=["emails", "total", "offset", "count"],
     )
-    async def search(self, keyword: str, folder: str = "INBOX", limit: int = 10, **_):
-        """搜索邮件"""
+    async def search(self, keyword: str, folder: str = "INBOX", limit: int = 100, offset: int = 0, **_):
+        """搜索邮件，支持分页"""
         try:
             plugin = self._get_plugin()
-            result = plugin.search(keyword=keyword, folder=folder, limit=limit)
+            result = plugin.search(keyword=keyword, folder=folder, limit=limit, offset=offset)
             if isinstance(result, dict) and "error" in result:
                 return Err(SdkError(result["error"]))
-            return Ok({"emails": result, "count": len(result), "keyword": keyword})
+            return Ok({**result, "keyword": keyword})
         except Exception as e:
             return Err(SdkError(f"搜索邮件失败: {e}"))
 
@@ -360,6 +362,84 @@ class NekoMailPluginEntry(NekoPluginBase):
             return Ok(result)
         except Exception as e:
             return Err(SdkError(f"标记已读失败: {e}"))
+
+    @llm_tool(
+        name="neko_mail_batch_mark_read",
+        description="批量标记邮件已读。可以传入多个邮件 UID 一次性标记为已读。",
+        parameters={
+            "type": "object",
+            "properties": {
+                "uids": {
+                    "type": "array",
+                    "items": {"type": "string"},
+                    "description": "邮件 UID 列表",
+                },
+                "folder": {"type": "string", "description": "文件夹名称,默认 INBOX"},
+            },
+            "required": ["uids"],
+        },
+        timeout=30.0,
+    )
+    @plugin_entry(
+        id="batch_mark_read",
+        name="批量标记邮件已读",
+        description="批量标记多封邮件为已读",
+        input_schema={
+            "type": "object",
+            "properties": {
+                "uids": {"type": "array", "items": {"type": "string"}},
+                "folder": {"type": "string"},
+            },
+            "required": ["uids"],
+        },
+        llm_result_fields=["success", "failed", "failed_uids"],
+    )
+    async def batch_mark_read(self, uids: list[str], folder: str = "INBOX", **_):
+        """批量标记邮件已读"""
+        try:
+            plugin = self._get_plugin()
+            result = plugin.batch_mark_read(uids=uids, folder=folder)
+            if "error" in result:
+                return Err(SdkError(result["error"]))
+            return Ok(result)
+        except Exception as e:
+            return Err(SdkError(f"批量标记已读失败: {e}"))
+
+    @llm_tool(
+        name="neko_mail_mark_all_read",
+        description="标记文件夹内所有邮件为已读。默认标记 INBOX 文件夹。",
+        parameters={
+            "type": "object",
+            "properties": {
+                "folder": {"type": "string", "description": "文件夹名称,默认 INBOX"},
+            },
+            "required": [],
+        },
+        timeout=30.0,
+    )
+    @plugin_entry(
+        id="mark_all_read",
+        name="标记所有邮件已读",
+        description="标记文件夹内所有邮件为已读",
+        input_schema={
+            "type": "object",
+            "properties": {
+                "folder": {"type": "string"},
+            },
+            "required": [],
+        },
+        llm_result_fields=["success", "message"],
+    )
+    async def mark_all_read(self, folder: str = "INBOX", **_):
+        """标记所有邮件已读"""
+        try:
+            plugin = self._get_plugin()
+            result = plugin.mark_all_read(folder=folder)
+            if "error" in result:
+                return Err(SdkError(result["error"]))
+            return Ok(result)
+        except Exception as e:
+            return Err(SdkError(f"标记所有已读失败: {e}"))
 
     @llm_tool(
         name="neko_mail_send",

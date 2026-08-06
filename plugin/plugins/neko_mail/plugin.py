@@ -94,11 +94,17 @@ class NekoMailPlugin:
         except Exception as e:
             return {"error": str(e)}
     
-    def search(self, keyword: str, folder: str = "INBOX", limit: int = 10) -> list[dict]:
-        """关键词搜索主题+正文+发件人"""
+    def search(self, keyword: str, folder: str = "INBOX", limit: int = 100, offset: int = 0) -> dict:
+        """关键词搜索主题+正文+发件人，支持分页"""
         try:
-            emails = self.client.search(keyword=keyword, folder=folder, limit=limit)
-            return [self._email_to_dict(e) for e in emails]
+            emails = self.client.search(keyword=keyword, folder=folder, limit=limit, offset=offset)
+            total = self.client.search_count(keyword=keyword, folder=folder)
+            return {
+                "emails": [self._email_to_dict(e) for e in emails],
+                "total": total,
+                "offset": offset,
+                "count": len(emails)
+            }
         except Exception as e:
             return {"error": str(e)}
     
@@ -157,6 +163,22 @@ class NekoMailPlugin:
         try:
             success = self.client.mark_read(uid=uid, folder=folder)
             return {"success": success, "uid": uid}
+        except Exception as e:
+            return {"error": str(e)}
+    
+    def batch_mark_read(self, uids: list[str], folder: str = "INBOX") -> dict:
+        """批量标记邮件已读"""
+        try:
+            result = self.client.batch_mark_read(uids=uids, folder=folder)
+            return result
+        except Exception as e:
+            return {"error": str(e)}
+    
+    def mark_all_read(self, folder: str = "INBOX") -> dict:
+        """标记文件夹内所有邮件为已读"""
+        try:
+            result = self.client.mark_all_read(folder=folder)
+            return result
         except Exception as e:
             return {"error": str(e)}
     

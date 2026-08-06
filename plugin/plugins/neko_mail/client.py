@@ -504,8 +504,8 @@ class NekoMailClient:
             self._reconnect()
             raise RuntimeError(f"获取邮件详情失败: {e}")
     
-    def search(self, keyword: str, folder: str = "INBOX", limit: int = 10) -> list[EmailMessage]:
-        """关键词搜索主题+正文+发件人"""
+    def search(self, keyword: str, folder: str = "INBOX", limit: int = 100, offset: int = 0) -> list[EmailMessage]:
+        """关键词搜索主题+正文+发件人，支持分页"""
         self._ensure_connected()
         
         try:
@@ -529,7 +529,11 @@ class NekoMailClient:
             if not all_uids:
                 return []
             
-            uids = sorted(all_uids, key=lambda x: int(x))[-limit:]
+            # 排序并应用分页
+            sorted_uids = sorted(all_uids, key=lambda x: int(x))
+            if offset > 0:
+                sorted_uids = sorted_uids[:-offset] if offset < len(sorted_uids) else []
+            uids = sorted_uids[-limit:] if limit > 0 else sorted_uids
             
             emails = []
             for uid in uids:
@@ -545,6 +549,32 @@ class NekoMailClient:
             self._reconnect()
             raise RuntimeError(f"搜索邮件失败: {e}")
     
+    def search_count(self, keyword: str, folder: str = "INBOX") -> int:
+        """获取搜索结果总数"""
+        self._ensure_connected()
+        
+        try:
+            self._imap.select(folder, readonly=True)
+            
+            criteria = [
+                f'(SUBJECT "{keyword}")',
+                f'(FROM "{keyword}")',
+                f'(BODY "{keyword}")',
+            ]
+            
+            all_uids = set()
+            for crit in criteria:
+                try:
+                    status, messages = self._imap.search(None, crit)
+                    if status == 'OK' and messages[0]:
+                        all_uids.update(messages[0].split())
+                except Exception:
+                    continue
+            
+            return len(all_uids)
+        except Exception:
+            return 0
+    
     def mark_read(self, uid: str, folder: str = "INBOX") -> bool:
         """标记邮件已读"""
         self._ensure_connected()
@@ -556,6 +586,56 @@ class NekoMailClient:
         except Exception as e:
             self._reconnect()
             return False
+    
+    def batch_mark_read(self, uids: list[str], folder: str = "INBOX") -> dict:
+        """批量标记邮件已读"""
+        self._ensure_connected()
+        
+        try:
+            self._imap.select(folder)
+            success_count = 0
+            failed_uids = []
+            
+            for uid in uids:
+                try:
+                    self._imap.store(uid.encode(), '+FLAGS', '\\Seen')
+                    success_count += 1
+                except Exception:
+                    failed_uids.append(uid)
+            
+            return {
+                "success": success_count,
+                "failed": len(failed_uids),
+                "failed_uids": failed_uids
+            }
+        except Exception as e:
+            self._reconnect()
+            return {"success": 0, "failed": len(uids), "error": str(e)}
+    
+    def mark_all_read(self, folder: str = "INBOX") -> dict:
+        """标记文件夹内所有邮件为已读"""
+        self._ensure_connected()
+        
+        try:
+            self._imap.select(folder)
+            # 搜索所有未读邮件
+            status, messages = self._imap.search(None, 'UNSEEN')
+            
+            if status != 'OK' or not messages[0]:
+                return {"success": 0, "message": "没有未读邮件"}
+            
+            uids = messages[0].split()
+            count = len(uids)
+            
+            # 批量标记
+            if uids:
+                uid_str = b','.join(uids)
+                self._imap.store(uid_str, '+FLAGS', '\\Seen')
+            
+            return {"success": count, "message": f"已标记 {count} 封邮件为已读"}
+        except Exception as e:
+            self._reconnect()
+            return {"success": 0, "error": str(e)}
     
     def send(
         self,

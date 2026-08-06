@@ -469,6 +469,16 @@
     text-align: center; letter-spacing: 0.3px;
   }
 
+  /* ── Search Highlight ── */
+  .search-highlight {
+    background: linear-gradient(135deg, #fff3cd, #ffe69c);
+    color: var(--ink);
+    padding: 1px 4px;
+    border-radius: 4px;
+    font-weight: 600;
+    box-shadow: 0 1px 3px rgba(255, 193, 7, 0.3);
+  }
+
   /* ── Scrollbar ── */
   ::-webkit-scrollbar { width: 8px; height: 8px; }
   ::-webkit-scrollbar-track { background: transparent; }
@@ -609,14 +619,25 @@
 <!-- ====== 搜索 ====== -->
 <div class="tabpane hidden" data-pane="search">
   <div class="panel">
-    <div class="panel-head"><h3>🔍 搜索邮件</h3></div>
+    <div class="panel-head">
+      <h3>🔍 搜索邮件</h3>
+      <span class="hint" id="searchHint"></span>
+    </div>
     <div class="form-group">
       <div style="display:flex;gap:10px;">
         <input type="text" id="searchInput" placeholder="输入关键词（主题/发件人/正文）..." style="flex:1;" onkeydown="if(event.key==='Enter')doSearch()" />
         <button onclick="doSearch()">搜索</button>
       </div>
     </div>
-    <ul class="email-list" id="searchList"></ul>
+    <div class="filter-bar" id="searchFilter">
+      <span class="filter-chip on" data-prio="">全部</span>
+      <span class="filter-chip" data-prio="high">🔥 紧急</span>
+      <span class="filter-chip" data-prio="medium">⭐ 一般</span>
+      <span class="filter-chip" data-prio="low">🌿 普通</span>
+    </div>
+    <ul class="email-list" id="searchList">
+      <li class="empty"><span class="empty-icon">🔍</span>输入关键词开始搜索~</li>
+    </ul>
   </div>
 </div>
 
@@ -686,6 +707,13 @@ let ALL_CACHE = [];
 let ALL_OFFSET = 0;
 let ALL_TOTAL = 0;
 let ALL_LOADING = false;
+
+let SEARCH_CACHE = [];
+let SEARCH_OFFSET = 0;
+let SEARCH_TOTAL = 0;
+let SEARCH_LOADING = false;
+let SEARCH_KEYWORD = '';
+let SEARCH_FILTER = '';
 
 // ── API ──
 async function callPlugin(entry, args) {
@@ -1049,6 +1077,90 @@ function renderAllFilteredList() {
   }
 }
 
+// ── 批量操作 ──
+let SELECTED_EMAILS = new Set();
+
+function toggleEmailSelection(uid, checkbox) {
+  if (checkbox.checked) {
+    SELECTED_EMAILS.add(uid);
+  } else {
+    SELECTED_EMAILS.delete(uid);
+  }
+  updateBatchActionBar();
+}
+
+function selectAllEmails() {
+  const checkboxes = document.querySelectorAll('.email-checkbox');
+  const allChecked = Array.from(checkboxes).every(cb => cb.checked);
+  
+  checkboxes.forEach(cb => {
+    cb.checked = !allChecked;
+    const uid = cb.dataset.uid;
+    if (cb.checked) {
+      SELECTED_EMAILS.add(uid);
+    } else {
+      SELECTED_EMAILS.delete(uid);
+    }
+  });
+  
+  updateBatchActionBar();
+}
+
+function updateBatchActionBar() {
+  const actionBar = document.getElementById('batchActionBar');
+  const countSpan = document.getElementById('selectedCount');
+  
+  if (SELECTED_EMAILS.size > 0) {
+    actionBar.style.display = 'flex';
+    countSpan.textContent = SELECTED_EMAILS.size;
+  } else {
+    actionBar.style.display = 'none';
+  }
+}
+
+async function batchMarkRead() {
+  if (SELECTED_EMAILS.size === 0) return;
+  
+  const uids = Array.from(SELECTED_EMAILS);
+  try {
+    const result = await api('batch_mark_read', {uids});
+    showToast(`已标记 ${result.success} 封邮件为已读`, 'success');
+    
+    // 更新缓存
+    ALL_CACHE = ALL_CACHE.map(e => {
+      if (uids.includes(e.uid)) {
+        return {...e, flags: [...(e.flags || []), '\\Seen']};
+      }
+      return e;
+    });
+    
+    SELECTED_EMAILS.clear();
+    renderAllFilteredList();
+    updateBatchActionBar();
+  } catch (e) {
+    showToast('批量标记失败: ' + e.message, 'error');
+  }
+}
+
+async function markAllRead() {
+  if (!confirm('确定要标记所有邮件为已读吗？')) return;
+  
+  try {
+    const result = await api('mark_all_read');
+    showToast(result.message || '已标记所有邮件为已读', 'success');
+    
+    // 更新缓存
+    ALL_CACHE = ALL_CACHE.map(e => ({
+      ...e,
+      flags: [...new Set([...(e.flags || []), '\\Seen'])]
+    }));
+    
+    renderAllFilteredList();
+  } catch (e) {
+    showToast('标记失败: ' + e.message, 'error');
+  }
+}
+
 document.querySelectorAll('#allFilter .filter-chip').forEach(chip => {
   chip.addEventListener('click', () => {
     document.querySelectorAll('#allFilter .filter-chip').forEach(c => c.classList.remove('on'));
@@ -1106,21 +1218,133 @@ async function viewFolder(folderName) {
 
 // ── Search ──
 async function doSearch() {
+  if (SEARCH_LOADING) return;
+  SEARCH_LOADING = true;
+  
   const kw = document.getElementById('searchInput').value.trim();
-  if (!kw) { showToast('请输入关键词', 'error'); return; }
+  if (!kw) { 
+    showToast('请输入关键词', 'error'); 
+    SEARCH_LOADING = false;
+    return; 
+  }
+  
+  SEARCH_KEYWORD = kw;
+  SEARCH_CACHE = [];
+  SEARCH_OFFSET = 0;
+  
   const list = document.getElementById('searchList');
   list.innerHTML = '<li class="loading"><span class="spinner"></span></li>';
+  document.getElementById('searchHint').textContent = '搜索中...';
+  
   try {
-    const data = await api('search', {keyword: kw, limit: 30});
-    if (data.emails && data.emails.length > 0) {
-      list.innerHTML = data.emails.map(e => renderEmail(e, false, true)).join('');
-    } else {
-      list.innerHTML = '<li class="empty"><span class="empty-icon">🔍</span>没有找到相关邮件~</li>';
-    }
+    const data = await api('search', {keyword: kw, limit: PAGE_SIZE, offset: 0});
+    const emails = data.emails || [];
+    SEARCH_TOTAL = data.total || emails.length;
+    SEARCH_CACHE = emails;
+    SEARCH_OFFSET = emails.length;
+    
+    document.getElementById('searchHint').textContent = `找到 ${SEARCH_TOTAL} 封相关邮件`;
+    renderSearchFilteredList();
   } catch (e) {
+    document.getElementById('searchHint').textContent = '搜索失败';
     list.innerHTML = '<li class="empty">❌ 搜索失败: ' + esc(e.message) + '</li>';
+  } finally {
+    SEARCH_LOADING = false;
   }
 }
+
+async function loadMoreSearch() {
+  if (SEARCH_LOADING || SEARCH_OFFSET >= SEARCH_TOTAL) return;
+  SEARCH_LOADING = true;
+  
+  const loadMoreBtn = document.getElementById('loadMoreSearchBtn');
+  if (loadMoreBtn) {
+    loadMoreBtn.textContent = '加载中...';
+    loadMoreBtn.disabled = true;
+  }
+  
+  try {
+    const data = await api('search', {keyword: SEARCH_KEYWORD, limit: PAGE_SIZE, offset: SEARCH_OFFSET});
+    const emails = data.emails || [];
+    SEARCH_CACHE = SEARCH_CACHE.concat(emails);
+    SEARCH_OFFSET += emails.length;
+    
+    document.getElementById('searchHint').textContent = `找到 ${SEARCH_CACHE.length} / ${SEARCH_TOTAL} 封相关邮件`;
+    renderSearchFilteredList();
+  } catch (e) {
+    showToast('加载更多失败: ' + e.message, 'error');
+  } finally {
+    SEARCH_LOADING = false;
+  }
+}
+
+function highlightKeyword(text, keyword) {
+  if (!text || !keyword) return esc(text || '');
+  const escaped = esc(text);
+  const regex = new RegExp('(' + keyword.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + ')', 'gi');
+  return escaped.replace(regex, '<mark class="search-highlight">$1</mark>');
+}
+
+function renderSearchEmail(e) {
+  const p = e.priority || 'medium';
+  const pLabel = {high:'🔥 紧急', medium:'⭐ 一般', low:'🌿 普通'}[p] || '⭐ 一般';
+  const initial = getInitial(e.sender);
+  const hasAtt = e.has_attachments || (e.attachments && e.attachments.length > 0);
+  const attCount = hasAtt ? (e.attachments || []).length : 0;
+  const read = isRead(e);
+
+  let html = '<li class="email-item ' + p + '" onclick="showEmailDetail(\'' + esc(e.uid) + '\')">';
+  html += '<div class="avatar ' + p + '">' + esc(initial) + '</div>';
+  html += '<div class="body">';
+  html += '<div class="title">' + highlightKeyword(e.subject || '(无主题)', SEARCH_KEYWORD);
+  if (hasAtt) html += ' <span class="tag attach">📎 ' + attCount + '</span>';
+  if (read) html += ' <span class="tag read">已读</span>';
+  else html += ' <span class="tag unread">未读</span>';
+  html += '</div>';
+  html += '<div class="meta">';
+  html += '<span>📮 ' + highlightKeyword(e.sender || '', SEARCH_KEYWORD) + '</span>';
+  html += '<span>🕐 ' + esc(e.time_str || '') + '</span>';
+  html += '<span class="tag prio-' + p + '">' + pLabel + '</span>';
+  html += '</div>';
+  if (e.preview) html += '<div class="preview">' + highlightKeyword(e.preview, SEARCH_KEYWORD) + '</div>';
+  html += '</div>';
+  html += '</li>';
+  return html;
+}
+
+function renderSearchFilteredList() {
+  const list = document.getElementById('searchList');
+  let filtered = SEARCH_CACHE;
+  if (SEARCH_FILTER) {
+    filtered = filtered.filter(e => (e.priority || 'medium') === SEARCH_FILTER);
+  }
+  if (filtered.length > 0) {
+    let html = filtered.map(e => renderSearchEmail(e)).join('');
+    // 添加"加载更多"按钮
+    if (SEARCH_OFFSET < SEARCH_TOTAL) {
+      const remaining = SEARCH_TOTAL - SEARCH_OFFSET;
+      html += `<li class="load-more-container" style="text-align:center;padding:20px;">
+        <button id="loadMoreSearchBtn" class="ghost" onclick="loadMoreSearch()">
+          🔍 加载更多 (还有 ${remaining} 封)
+        </button>
+      </li>`;
+    }
+    list.innerHTML = html;
+  } else if (SEARCH_FILTER) {
+    list.innerHTML = '<li class="empty"><span class="empty-icon">🔍</span>该分类下没有搜索结果~</li>';
+  } else {
+    list.innerHTML = '<li class="empty"><span class="empty-icon">🔍</span>没有找到相关邮件~</li>';
+  }
+}
+
+document.querySelectorAll('#searchFilter .filter-chip').forEach(chip => {
+  chip.addEventListener('click', () => {
+    document.querySelectorAll('#searchFilter .filter-chip').forEach(c => c.classList.remove('on'));
+    chip.classList.add('on');
+    SEARCH_FILTER = chip.dataset.prio;
+    renderSearchFilteredList();
+  });
+});
 
 // ── Send ──
 async function doSend() {
