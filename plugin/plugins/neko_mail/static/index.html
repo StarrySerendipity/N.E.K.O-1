@@ -283,6 +283,8 @@
   .tag.prio-medium { background: #bee3f8; color: #2c5282; }
   .tag.prio-low { background: #ececec; color: #666; }
   .tag.attach { background: var(--peach-soft); color: #b07700; }
+  .tag.read { background: #e8f5e9; color: #2e7d32; }
+  .tag.unread { background: #fff3e0; color: #ef6c00; }
 
   /* ── Buttons ── */
   button {
@@ -500,6 +502,7 @@
     <div class="header-actions">
       <button class="ghost tiny" onclick="loadSummary()">🔄 刷新摘要</button>
       <button class="ghost tiny" onclick="loadUnread()">📬 刷新未读</button>
+      <button class="ghost tiny" onclick="loadAllEmails()">📥 刷新全部</button>
     </div>
   </div>
   <div class="greeting" id="greeting">主人~让喵喵帮您管理邮件吧~ 喵呜~</div>
@@ -513,6 +516,7 @@
 <div class="tabs" id="tabs">
   <div class="tab active" data-tab="summary">📊 今日摘要</div>
   <div class="tab" data-tab="unread">📬 未读邮件 <span class="tab-count" id="unreadTabCount">--</span></div>
+  <div class="tab" data-tab="all">📥 全部邮件 <span class="tab-count" id="allTabCount">--</span></div>
   <div class="tab" data-tab="folders">📁 文件夹</div>
   <div class="tab" data-tab="search">🔍 搜索</div>
   <div class="tab" data-tab="send">✉️ 发送</div>
@@ -565,6 +569,25 @@
       <span class="filter-chip" data-prio="low">🌿 普通</span>
     </div>
     <ul class="email-list" id="unreadList">
+      <li class="loading"><span class="spinner"></span></li>
+    </ul>
+  </div>
+</div>
+
+<!-- ====== 全部邮件 ====== -->
+<div class="tabpane hidden" data-pane="all">
+  <div class="panel">
+    <div class="panel-head">
+      <h3>📥 全部邮件 <span class="hint" id="allHint"></span></h3>
+      <button class="ghost tiny" onclick="loadAllEmails()">🔄 刷新</button>
+    </div>
+    <div class="filter-bar" id="allFilter">
+      <span class="filter-chip on" data-prio="">全部</span>
+      <span class="filter-chip" data-prio="high">🔥 紧急</span>
+      <span class="filter-chip" data-prio="medium">⭐ 一般</span>
+      <span class="filter-chip" data-prio="low">🌿 普通</span>
+    </div>
+    <ul class="email-list" id="allList">
       <li class="loading"><span class="spinner"></span></li>
     </ul>
   </div>
@@ -626,7 +649,9 @@
   <div class="modal" id="emailModal">
     <h3 id="modalTitle">邮件详情</h3>
     <div class="email-detail-meta" id="modalMeta"></div>
-    <div class="email-detail-body" id="modalBody"></div>
+    <div class="email-detail-body" id="modalBody">
+      <div class="loading"><span class="spinner"></span><p style="margin-top:10px;">加载邮件内容中...</p></div>
+    </div>
     <div class="modal-actions">
       <button class="ghost" onclick="modalMarkRead()">✅ 标记已读</button>
       <button class="ghost" onclick="closeModal()">关闭</button>
@@ -637,7 +662,7 @@
 <div class="toast" id="toast"></div>
 
 <div class="footer-info">
-  数据来自 QQ 邮箱 · 猫娘邮件秘书 v0.1.0 · 喵呜~
+  数据来自 QQ 邮箱 · 猫娘邮件秘书 v0.2.0 · 喵呜~
 </div>
 
 </div>
@@ -645,8 +670,11 @@
 <script>
 const PLUGIN_ID = 'neko_mail';
 let CURRENT_FILTER = '';
+let ALL_FILTER = '';
 let CURRENT_MODAL_EMAIL = null;
+let CURRENT_MODAL_UID = null;
 let UNREAD_CACHE = [];
+let ALL_CACHE = [];
 
 // ── API ──
 async function callPlugin(entry, args) {
@@ -721,18 +749,28 @@ function getInitial(name) {
   return s.charAt(0).toUpperCase();
 }
 
-function renderEmail(e, showActions = false) {
+function isRead(email) {
+  const flags = email.flags || [];
+  return flags.some(f => f === '\\Seen' || f === 'Seen');
+}
+
+function renderEmail(e, showActions = false, showReadStatus = false) {
   const p = e.priority || 'medium';
   const pLabel = {high:'🔥 紧急', medium:'⭐ 一般', low:'🌿 普通'}[p] || '⭐ 一般';
   const initial = getInitial(e.sender);
   const hasAtt = e.has_attachments || (e.attachments && e.attachments.length > 0);
   const attCount = hasAtt ? (e.attachments || []).length : 0;
+  const read = isRead(e);
 
   let html = '<li class="email-item ' + p + '" onclick="showEmailDetail(\'' + esc(e.uid) + '\')">';
   html += '<div class="avatar ' + p + '">' + esc(initial) + '</div>';
   html += '<div class="body">';
   html += '<div class="title">' + esc(e.subject || '(无主题)');
   if (hasAtt) html += ' <span class="tag attach">📎 ' + attCount + '</span>';
+  if (showReadStatus) {
+    if (read) html += ' <span class="tag read">已读</span>';
+    else html += ' <span class="tag unread">未读</span>';
+  }
   html += '</div>';
   html += '<div class="meta">';
   html += '<span>📮 ' + esc(e.sender || '') + '</span>';
@@ -741,7 +779,7 @@ function renderEmail(e, showActions = false) {
   html += '</div>';
   if (e.preview) html += '<div class="preview">' + esc(e.preview) + '</div>';
   html += '</div>';
-  if (showActions) {
+  if (showActions && !read) {
     html += '<div class="actions" onclick="event.stopPropagation()">';
     html += '<button class="ghost tiny" onclick="markRead(\'' + esc(e.uid) + '\', this)">✅ 已读</button>';
     html += '</div>';
@@ -778,6 +816,7 @@ document.querySelectorAll('.tab').forEach(tab => {
     document.querySelector('[data-pane="' + name + '"]').classList.remove('hidden');
     if (name === 'summary') loadSummary();
     else if (name === 'unread') loadUnread();
+    else if (name === 'all') loadAllEmails();
     else if (name === 'folders') loadFolders();
   });
 });
@@ -873,6 +912,49 @@ document.querySelectorAll('#unreadFilter .filter-chip').forEach(chip => {
   });
 });
 
+// ── All Emails ──
+async function loadAllEmails() {
+  const list = document.getElementById('allList');
+  list.innerHTML = '<li class="loading"><span class="spinner"></span></li>';
+  document.getElementById('allHint').textContent = '加载中...';
+
+  try {
+    const data = await api('get_all_emails', {limit: 50});
+    const emails = data.emails || [];
+    ALL_CACHE = emails;
+    document.getElementById('allHint').textContent = '共 ' + emails.length + ' 封邮件';
+    document.getElementById('allTabCount').textContent = emails.length;
+    renderAllFilteredList();
+  } catch (e) {
+    document.getElementById('allHint').textContent = '加载失败';
+    list.innerHTML = '<li class="empty"><span class="empty-icon">❌</span>加载失败: ' + esc(e.message) + '</li>';
+  }
+}
+
+function renderAllFilteredList() {
+  const list = document.getElementById('allList');
+  let filtered = ALL_CACHE;
+  if (ALL_FILTER) {
+    filtered = filtered.filter(e => (e.priority || 'medium') === ALL_FILTER);
+  }
+  if (filtered.length > 0) {
+    list.innerHTML = filtered.map(e => renderEmail(e, !isRead(e), true)).join('');
+  } else if (ALL_FILTER) {
+    list.innerHTML = '<li class="empty"><span class="empty-icon">🔍</span>该分类下没有邮件~</li>';
+  } else {
+    list.innerHTML = '<li class="empty"><span class="empty-icon">📭</span>没有邮件~</li>';
+  }
+}
+
+document.querySelectorAll('#allFilter .filter-chip').forEach(chip => {
+  chip.addEventListener('click', () => {
+    document.querySelectorAll('#allFilter .filter-chip').forEach(c => c.classList.remove('on'));
+    chip.classList.add('on');
+    ALL_FILTER = chip.dataset.prio;
+    renderAllFilteredList();
+  });
+});
+
 // ── Folders ──
 async function loadFolders() {
   const list = document.getElementById('folderList');
@@ -900,20 +982,20 @@ async function loadFolders() {
 async function viewFolder(folderName) {
   showToast('查看文件夹: ' + folderName);
   document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
-  document.querySelector('[data-tab="unread"]').classList.add('active');
+  document.querySelector('[data-tab="all"]').classList.add('active');
   document.querySelectorAll('.tabpane').forEach(p => p.classList.add('hidden'));
-  document.querySelector('[data-pane="unread"]').classList.remove('hidden');
+  document.querySelector('[data-pane="all"]').classList.remove('hidden');
 
-  const list = document.getElementById('unreadList');
+  const list = document.getElementById('allList');
   list.innerHTML = '<li class="loading"><span class="spinner"></span></li>';
-  document.getElementById('unreadHint').textContent = '加载中 ' + folderName + '...';
+  document.getElementById('allHint').textContent = '加载中 ' + folderName + '...';
 
   try {
-    const data = await api('get_unread', {folder: folderName, limit: 50});
+    const data = await api('get_all_emails', {folder: folderName, limit: 50});
     const emails = data.emails || [];
-    UNREAD_CACHE = emails;
-    document.getElementById('unreadHint').textContent = folderName + ' · 共 ' + emails.length + ' 封未读';
-    renderUnreadFilteredList();
+    ALL_CACHE = emails;
+    document.getElementById('allHint').textContent = folderName + ' · 共 ' + emails.length + ' 封邮件';
+    renderAllFilteredList();
   } catch (e) {
     list.innerHTML = '<li class="empty">❌ 加载失败: ' + esc(e.message) + '</li>';
   }
@@ -928,7 +1010,7 @@ async function doSearch() {
   try {
     const data = await api('search', {keyword: kw, limit: 30});
     if (data.emails && data.emails.length > 0) {
-      list.innerHTML = data.emails.map(e => renderEmail(e, false)).join('');
+      list.innerHTML = data.emails.map(e => renderEmail(e, false, true)).join('');
     } else {
       list.innerHTML = '<li class="empty"><span class="empty-icon">🔍</span>没有找到相关邮件~</li>';
     }
@@ -963,52 +1045,95 @@ async function markRead(uid, btn) {
       btn.textContent = '✅ 已读';
     }
     UNREAD_CACHE = UNREAD_CACHE.filter(e => e.uid !== uid);
+    // Update read status in ALL_CACHE
+    const idx = ALL_CACHE.findIndex(e => e.uid === uid);
+    if (idx >= 0) {
+      if (!ALL_CACHE[idx].flags) ALL_CACHE[idx].flags = [];
+      if (!ALL_CACHE[idx].flags.includes('\\Seen')) {
+        ALL_CACHE[idx].flags.push('\\Seen');
+      }
+    }
+    renderUnreadFilteredList();
+    renderAllFilteredList();
   } catch (e) {}
 }
 
 // ── Email Detail Modal ──
 async function showEmailDetail(uid) {
-  let emailData = UNREAD_CACHE.find(e => e.uid === uid);
-  if (!emailData) {
-    showToast('加载邮件详情...');
-    return;
-  }
+  // Find in cache first
+  let emailData = UNREAD_CACHE.find(e => e.uid === uid) || ALL_CACHE.find(e => e.uid === uid);
+  
+  CURRENT_MODAL_UID = uid;
+  
+  // Show basic info immediately
+  if (emailData) {
+    CURRENT_MODAL_EMAIL = emailData;
+    const p = emailData.priority || 'medium';
+    const pLabel = {high:'🔥 紧急', medium:'⭐ 一般', low:'🌿 普通'}[p] || '⭐ 一般';
 
-  CURRENT_MODAL_EMAIL = emailData;
-  const p = emailData.priority || 'medium';
-  const pLabel = {high:'🔥 紧急', medium:'⭐ 一般', low:'🌿 普通'}[p] || '⭐ 一般';
+    document.getElementById('modalTitle').textContent = emailData.subject || '(无主题)';
 
-  document.getElementById('modalTitle').textContent = emailData.subject || '(无主题)';
-
-  let metaHtml = '';
-  metaHtml += '<div class="row"><span class="label">发件人</span><span class="value">' + esc(emailData.sender || '') + '</span></div>';
-  metaHtml += '<div class="row"><span class="label">收件人</span><span class="value">' + esc((emailData.recipients || []).join(', ')) + '</span></div>';
-  if (emailData.cc && emailData.cc.length > 0) {
-    metaHtml += '<div class="row"><span class="label">抄送</span><span class="value">' + esc(emailData.cc.join(', ')) + '</span></div>';
+    let metaHtml = '';
+    metaHtml += '<div class="row"><span class="label">发件人</span><span class="value">' + esc(emailData.sender || '') + '</span></div>';
+    metaHtml += '<div class="row"><span class="label">收件人</span><span class="value">' + esc((emailData.recipients || []).join(', ')) + '</span></div>';
+    if (emailData.cc && emailData.cc.length > 0) {
+      metaHtml += '<div class="row"><span class="label">抄送</span><span class="value">' + esc(emailData.cc.join(', ')) + '</span></div>';
+    }
+    metaHtml += '<div class="row"><span class="label">时间</span><span class="value">' + esc(emailData.time_str || emailData.date || '') + '</span></div>';
+    metaHtml += '<div class="row"><span class="label">优先级</span><span class="value"><span class="tag prio-' + p + '">' + pLabel + '</span></span></div>';
+    document.getElementById('modalMeta').innerHTML = metaHtml;
+  } else {
+    document.getElementById('modalTitle').textContent = '加载邮件...';
+    document.getElementById('modalMeta').innerHTML = '';
   }
-  metaHtml += '<div class="row"><span class="label">时间</span><span class="value">' + esc(emailData.time_str || emailData.date || '') + '</span></div>';
-  metaHtml += '<div class="row"><span class="label">优先级</span><span class="value"><span class="tag prio-' + p + '">' + pLabel + '</span></span></div>';
-  if (emailData.has_attachments || (emailData.attachments && emailData.attachments.length > 0)) {
-    const atts = emailData.attachments || [];
-    metaHtml += '<div class="row"><span class="label">附件</span><span class="value">' +
-      atts.map(a => esc(a.filename) + ' (' + (a.size_human || a.size || '?') + ')').join(', ') +
-      '</span></div>';
-  }
-  document.getElementById('modalMeta').innerHTML = metaHtml;
-  document.getElementById('modalBody').textContent = emailData.body_text || '(无正文)';
+  
+  // Show loading in body
+  document.getElementById('modalBody').innerHTML = '<div class="loading"><span class="spinner"></span><p style="margin-top:10px;">加载邮件内容中...</p></div>';
   document.getElementById('modalMask').classList.add('show');
+
+  // Fetch full detail via API
+  try {
+    const data = await api('get_email_detail', {uid: uid});
+    const fullEmail = data.email;
+    if (fullEmail) {
+      CURRENT_MODAL_EMAIL = fullEmail;
+      document.getElementById('modalTitle').textContent = fullEmail.subject || '(无主题)';
+      
+      const p = fullEmail.priority || 'medium';
+      const pLabel = {high:'🔥 紧急', medium:'⭐ 一般', low:'🌿 普通'}[p] || '⭐ 一般';
+      
+      let metaHtml = '';
+      metaHtml += '<div class="row"><span class="label">发件人</span><span class="value">' + esc(fullEmail.sender || '') + '</span></div>';
+      metaHtml += '<div class="row"><span class="label">收件人</span><span class="value">' + esc((fullEmail.recipients || []).join(', ')) + '</span></div>';
+      if (fullEmail.cc && fullEmail.cc.length > 0) {
+        metaHtml += '<div class="row"><span class="label">抄送</span><span class="value">' + esc(fullEmail.cc.join(', ')) + '</span></div>';
+      }
+      metaHtml += '<div class="row"><span class="label">时间</span><span class="value">' + esc(fullEmail.time_str || fullEmail.date || '') + '</span></div>';
+      metaHtml += '<div class="row"><span class="label">优先级</span><span class="value"><span class="tag prio-' + p + '">' + pLabel + '</span></span></div>';
+      if (fullEmail.has_attachments || (fullEmail.attachments && fullEmail.attachments.length > 0)) {
+        const atts = fullEmail.attachments || [];
+        metaHtml += '<div class="row"><span class="label">附件</span><span class="value">' +
+          atts.map(a => esc(a.filename) + ' (' + (a.size_human || a.size || '?') + ')').join(', ') +
+          '</span></div>';
+      }
+      document.getElementById('modalMeta').innerHTML = metaHtml;
+      document.getElementById('modalBody').textContent = fullEmail.body_text || '(无正文)';
+    }
+  } catch (e) {
+    document.getElementById('modalBody').textContent = '加载失败: ' + e.message;
+  }
 }
 
 function closeModal() {
   document.getElementById('modalMask').classList.remove('show');
   CURRENT_MODAL_EMAIL = null;
+  CURRENT_MODAL_UID = null;
 }
 
 async function modalMarkRead() {
-  if (!CURRENT_MODAL_EMAIL) return;
-  await markRead(CURRENT_MODAL_EMAIL.uid);
+  if (!CURRENT_MODAL_UID) return;
+  await markRead(CURRENT_MODAL_UID);
   closeModal();
-  renderUnreadFilteredList();
 }
 
 document.getElementById('modalMask').addEventListener('click', (e) => {

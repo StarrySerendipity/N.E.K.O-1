@@ -204,6 +204,82 @@ class NekoMailPluginEntry(NekoPluginBase):
             return Err(SdkError(f"获取未读邮件失败: {e}"))
 
     @llm_tool(
+        name="neko_mail_get_all_emails",
+        description="获取所有邮件列表(已读+未读)。返回邮件的详细信息,包括主题、发件人、时间、优先级等。",
+        parameters={
+            "type": "object",
+            "properties": {
+                "folder": {"type": "string", "description": "文件夹名称,默认 INBOX"},
+                "limit": {"type": "integer", "description": "最多返回几封,默认 50"},
+            },
+            "required": [],
+        },
+        timeout=30.0,
+    )
+    @plugin_entry(
+        id="get_all_emails",
+        name="获取所有邮件",
+        description="获取所有邮件列表(已读+未读)",
+        input_schema={
+            "type": "object",
+            "properties": {
+                "folder": {"type": "string"},
+                "limit": {"type": "integer"},
+            },
+            "required": [],
+        },
+        llm_result_fields=["emails"],
+    )
+    async def get_all_emails(self, folder: str = "INBOX", limit: int = 50, **_):
+        """获取所有邮件(已读+未读)"""
+        try:
+            plugin = self._get_plugin()
+            result = plugin.get_all_emails(folder=folder, limit=limit)
+            if isinstance(result, dict) and "error" in result:
+                return Err(SdkError(result["error"]))
+            return Ok({"emails": result, "count": len(result)})
+        except Exception as e:
+            return Err(SdkError(f"获取所有邮件失败: {e}"))
+
+    @llm_tool(
+        name="neko_mail_get_email_detail",
+        description="获取单封邮件的完整详情,包括正文、附件等。",
+        parameters={
+            "type": "object",
+            "properties": {
+                "uid": {"type": "string", "description": "邮件 UID"},
+                "folder": {"type": "string", "description": "文件夹名称,默认 INBOX"},
+            },
+            "required": ["uid"],
+        },
+        timeout=30.0,
+    )
+    @plugin_entry(
+        id="get_email_detail",
+        name="获取邮件详情",
+        description="获取单封邮件完整详情",
+        input_schema={
+            "type": "object",
+            "properties": {
+                "uid": {"type": "string"},
+                "folder": {"type": "string"},
+            },
+            "required": ["uid"],
+        },
+        llm_result_fields=["email"],
+    )
+    async def get_email_detail(self, uid: str, folder: str = "INBOX", **_):
+        """获取邮件详情"""
+        try:
+            plugin = self._get_plugin()
+            result = plugin.get_email_detail(uid=uid, folder=folder)
+            if isinstance(result, dict) and "error" in result:
+                return Err(SdkError(result["error"]))
+            return Ok({"email": result})
+        except Exception as e:
+            return Err(SdkError(f"获取邮件详情失败: {e}"))
+
+    @llm_tool(
         name="neko_mail_search",
         description="搜索邮件。可以按关键词搜索主题、发件人、正文。",
         parameters={
