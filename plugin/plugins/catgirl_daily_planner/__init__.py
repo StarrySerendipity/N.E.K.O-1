@@ -101,8 +101,8 @@ WEEKDAY_LABELS = ["一", "二", "三", "四", "五", "六", "日"]
 # 早安/晚安/任务 推送的 ai_behavior
 _BEHAVIOR = "respond"
 
-# 本地提醒去重窗口(秒):同一任务在 90 秒内不重复推
-_LOCAL_DEDUP_WINDOW = 90
+# 本地提醒去重窗口(秒):同一任务在 1 小时内不重复推
+_LOCAL_DEDUP_WINDOW = 3600
 
 # ── 模板 ──────────────────────────────────────────────────────────────
 
@@ -258,11 +258,14 @@ def _make_task_reminder(
     master_name: str,
 ) -> str:
     # v0.3: 使用 master_name 变量,支持猫娘动态修改称呼
+    # v0.4: 在消息中包含 task_id,方便猫娘调用 acknowledge_task 工具
     title = task.get("title", "未命名任务")
     desc = (task.get("description") or "").strip()
     custom = (task.get("catgirl_message") or "").strip()
+    task_id = task.get("id", "")
+    
     if custom:
-        return f"⏰ {title} | {custom}"
+        return f"⏰ {title} | {custom}\n[task_id: {task_id}]"
 
     prio_map = {1: "🔥紧急", 2: "⭐重要", 3: "🌿一般"}
     p = prio_map.get(int(task.get("priority", 2)), "")
@@ -271,9 +274,10 @@ def _make_task_reminder(
         return (
             f"⏰ 到点啦~ {master_name}!该做《{title}》了喵。\n"
             f"小提示: {desc}\n"
-            f"—— {catgirl_name}·喵呜~ ({prefix.strip()})"
+            f"—— {catgirl_name}·喵呜~ ({prefix.strip()})\n"
+            f"[task_id: {task_id}]"
         )
-    return f"⏰ 到点啦~ {master_name}!{prefix}该做《{title}》了喵—— {catgirl_name}·喵呜~"
+    return f"⏰ 到点啦~ {master_name}!{prefix}该做《{title}》了喵—— {catgirl_name}·喵呜~\n[task_id: {task_id}]"
 
 
 def _make_goodnight(
@@ -615,10 +619,11 @@ class CatgirlDailyPlannerPlugin(NekoPluginBase):
     def _fire_due_tasks_local(
         self, plan: Dict[str, Any], now: datetime,
     ) -> Dict[str, Any]:
-        """本地备份 ticker:到了时间就推任务提醒,90 秒内不重复。
+        """本地备份 ticker:到了时间就推任务提醒。
 
         这是 memo_reminder 失败时的兜底,确保用户到点一定收到提醒。
         v0.3: 尊重 acknowledged 和 next_reminder_at 字段
+        v0.4: 修复延迟提醒逻辑 - 推送后清除 next_reminder_at
         """
         now_min = now.hour * 60 + now.minute
         now_iso = now.isoformat()
@@ -628,13 +633,15 @@ class CatgirlDailyPlannerPlugin(NekoPluginBase):
             # v0.3: 已确认的任务不再提醒
             if t.get("acknowledged"):
                 continue
-            # v0.3: 检查延迟提醒时间
+            # v0.3/v0.4: 检查延迟提醒时间
             next_reminder = t.get("next_reminder_at")
             if next_reminder:
                 try:
                     next_dt = datetime.fromisoformat(next_reminder)
                     if now < next_dt:
                         continue  # 还没到延迟时间
+                    # 到了延迟时间,清除该字段,避免重复触发
+                    t["next_reminder_at"] = None
                 except Exception:
                     pass
             tm = _parse_hhmm(t.get("time", ""))
