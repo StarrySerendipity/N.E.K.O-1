@@ -1174,6 +1174,42 @@ class CatgirlDailyPlannerPlugin(NekoPluginBase):
         return Ok({"updated": True, "task": target})
 
     @llm_tool(
+        name="catgirl_planner_get_current_time",
+        description="获取当前系统实际时间。当需要计算相对时间（如'半小时后'、'10分钟后'）时调用此工具，确保任务时间准确。",
+        parameters={
+            "type": "object",
+            "properties": {},
+            "required": [],
+        },
+        timeout=5.0,
+    )
+    @plugin_entry(
+        id="get_current_time",
+        name="获取当前时间",
+        description="获取当前系统实际时间,用于计算相对时间。",
+        input_schema={
+            "type": "object",
+            "properties": {},
+            "required": [],
+        },
+        llm_result_fields=["datetime", "date", "time", "weekday"],
+    )
+    async def get_current_time(self, **_):
+        """获取当前系统实际时间。"""
+        now = datetime.now(self._tz)
+        weekday_names = ["星期一", "星期二", "星期三", "星期四", "星期五", "星期六", "星期日"]
+        weekday = weekday_names[now.weekday()]
+        
+        return Ok({
+            "datetime": now.strftime("%Y-%m-%d %H:%M:%S"),
+            "date": now.strftime("%Y-%m-%d"),
+            "time": now.strftime("%H:%M:%S"),
+            "weekday": weekday,
+            "timestamp": int(now.timestamp()),
+            "timezone": str(self._tz),
+        })
+
+    @llm_tool(
         name="catgirl_planner_mark_done",
         description="标记任务为完成、跳过或恢复为待办状态。",
         parameters={
