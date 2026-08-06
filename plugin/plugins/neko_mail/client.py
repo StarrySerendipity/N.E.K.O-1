@@ -4,10 +4,10 @@
 """
 
 import email
+import imaplib
 import smtplib
 from datetime import datetime, date
 from typing import Optional
-from imapclient import IMAPClient
 from .models import EmailMessage, Attachment, FolderInfo
 from .parser import (
     decode_header_value,
@@ -41,7 +41,7 @@ class NekoMailClient:
         self.high_priority_senders = high_priority_senders or []
         self.ignore_folders = ignore_folders or []
         
-        self._imap: Optional[IMAPClient] = None
+        self._imap: Optional[imaplib.IMAP4_SSL] = None
         self._connected = False
     
     def _ensure_connected(self):
@@ -52,7 +52,7 @@ class NekoMailClient:
     def _connect(self):
         """连接到 IMAP 服务器"""
         try:
-            self._imap = IMAPClient(self.imap_server, port=self.imap_port, ssl=True)
+            self._imap = imaplib.IMAP4_SSL(self.imap_server, self.imap_port)
             self._imap.login(self.email_addr, self.auth_code)
             self._connected = True
         except Exception as e:
@@ -81,25 +81,40 @@ class NekoMailClient:
         self._ensure_connected()
         
         try:
-            folders = self._imap.list_folders()
-            result = []
+            status, folder_data = self._imap.list()
+            if status != 'OK':
+                return []
             
-            for flags, delimiter, name in folders:
+            result = []
+            for folder_line in folder_data:
+                if folder_line is None:
+                    continue
+                
+                # 解析文件夹信息: (flags) "delimiter" "name"
+                folder_str = folder_line.decode('utf-8') if isinstance(folder_line, bytes) else str(folder_line)
+                
+                # 提取文件夹名称
+                import re
+                match = re.search(r'"([^"]*)"$', folder_str)
+                if not match:
+                    continue
+                name = match.group(1)
+                
                 # 跳过忽略的文件夹
                 if any(ign.lower() in name.lower() for ign in self.ignore_folders):
                     continue
                 
-                # 跳过特殊文件夹(如 [Gmail] 系统文件夹)
-                if name.startswith('[') or '\\Noselect' in str(flags):
+                # 跳过特殊文件夹
+                if name.startswith('[') or '\\Noselect' in folder_str:
                     continue
                 
                 try:
-                    self._imap.select_folder(name, readonly=True)
-                    messages = self._imap.search(['UNSEEN'])
-                    unread_count = len(messages)
+                    self._imap.select(name, readonly=True)
+                    status, messages = self._imap.search(None, 'UNSEEN')
+                    unread_count = len(messages[0].split()) if status == 'OK' and messages[0] else 0
                     
-                    all_messages = self._imap.search(['ALL'])
-                    total_count = len(all_messages)
+                    status, all_messages = self._imap.search(None, 'ALL')
+                    total_count = len(all_messages[0].split()) if status == 'OK' and all_messages[0] else 0
                     
                     result.append(FolderInfo(
                         name=name,
@@ -107,7 +122,6 @@ class NekoMailClient:
                         total_count=total_count,
                     ))
                 except Exception:
-                    # 某些文件夹可能无法访问,跳过
                     continue
             
             return result
@@ -120,11 +134,13 @@ class NekoMailClient:
         self._ensure_connected()
         
         try:
-            self._imap.select_folder(folder, readonly=True)
-            uids = self._imap.search(['UNSEEN'])
+            self._imap.select(folder, readonly=True)
+            status, messages = self._imap.search(None, 'UNSEEN')
             
-            if not uids:
+            if status != 'OK' or not messages[0]:
                 return []
+            
+            uids = messages[0].split()
             
             # 取最新的 limit 封
             uids = uids[-limit:]
@@ -148,20 +164,21 @@ class NekoMailClient:
         self._ensure_connected()
         
         try:
-            self._imap.select_folder(folder, readonly=True)
+            self._imap.select(folder, readonly=True)
             
             # IMAP 搜索: 主题、发件人、正文
             criteria = [
-                ['SUBJECT', keyword],
-                ['FROM', keyword],
-                ['BODY', keyword],
+                f'(SUBJECT "{keyword}")',
+                f'(FROM "{keyword}")',
+                f'(BODY "{keyword}")',
             ]
             
             all_uids = set()
             for crit in criteria:
                 try:
-                    uids = self._imap.search(crit)
-                    all_uids.update(uids)
+                    status, messages = self._imap.search(None, crit)
+                    if status == 'OK' and messages[0]:
+                        all_uids.update(messages[0].split())
                 except Exception:
                     continue
             
@@ -169,7 +186,7 @@ class NekoMailClient:
                 return []
             
             # 取最新的 limit 封
-            uids = sorted(all_uids)[-limit:]
+            uids = sorted(all_uids, key=lambda x: int(x))[-limit:]
             
             emails = []
             for uid in uids:
@@ -190,15 +207,17 @@ class NekoMailClient:
         self._ensure_connected()
         
         try:
-            self._imap.select_folder(folder, readonly=True)
+            self._imap.select(folder, readonly=True)
             
             today = date.today()
             since_str = today.strftime("%d-%b-%Y")
             
-            uids = self._imap.search(['SINCE', since_str])
+            status, messages = self._imap.search(None, f'(SINCE {since_str})')
             
-            if not uids:
+            if status != 'OK' or not messages[0]:
                 return []
+            
+            uids = messages[0].split()
             
             emails = []
             for uid in uids:
@@ -214,17 +233,22 @@ class NekoMailClient:
             self._reconnect()
             raise RuntimeError(f"获取今日邮件失败: {e}")
     
-    def _fetch_email(self, uid: int, folder: str) -> Optional[EmailMessage]:
+    def _fetch_email(self, uid: bytes, folder: str) -> Optional[EmailMessage]:
         """获取单封邮件详情"""
         try:
-            data = self._imap.fetch([uid], ['ENVELOPE', 'BODY[]', 'FLAGS', 'RFC822.SIZE'])
+            status, data = self._imap.fetch(uid, '(RFC822 FLAGS)')
             
-            if uid not in data:
+            if status != 'OK' or not data or not data[0]:
                 return None
             
-            msg_data = data[uid]
-            raw_email = msg_data[b'BODY[]']
-            flags = msg_data.get(b'FLAGS', [])
+            # data[0] 是一个元组: (b'1 (FLAGS (...))', b'邮件内容')
+            raw_email = data[0][1]
+            
+            # 解析 FLAGS
+            flags_str = data[0][0].decode('utf-8') if isinstance(data[0][0], bytes) else str(data[0][0])
+            import re
+            flags_match = re.search(r'FLAGS \(([^)]*)\)', flags_str)
+            flags = flags_match.group(1).split() if flags_match else []
             
             # 解析邮件
             msg = email.message_from_bytes(raw_email)
@@ -339,8 +363,8 @@ class NekoMailClient:
         self._ensure_connected()
         
         try:
-            self._imap.select_folder(folder)
-            self._imap.add_flags([int(uid)], [b'\\Seen'])
+            self._imap.select(folder)
+            self._imap.store(uid.encode(), '+FLAGS', '\\Seen')
             return True
         except Exception as e:
             self._reconnect()
