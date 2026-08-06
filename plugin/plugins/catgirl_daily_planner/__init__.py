@@ -647,12 +647,15 @@ class CatgirlDailyPlannerPlugin(NekoPluginBase):
                     is_delayed_reminder = True
                 except Exception:
                     pass
-            tm = _parse_hhmm(t.get("time", ""))
-            if tm is None:
-                continue
-            task_min = tm.hour * 60 + tm.minute
-            if now_min < task_min:
-                continue
+            
+            # 检查任务时间（延迟提醒时跳过此检查）
+            if not is_delayed_reminder:
+                tm = _parse_hhmm(t.get("time", ""))
+                if tm is None:
+                    continue
+                task_min = tm.hour * 60 + tm.minute
+                if now_min < task_min:
+                    continue
             last = t.get("local_fired_at")
             if last:
                 try:
@@ -886,7 +889,7 @@ class CatgirlDailyPlannerPlugin(NekoPluginBase):
 
     @llm_tool(
         name="catgirl_planner_add_task",
-        description="为主人的每日计划添加一条任务。指定时间、标题，可选描述、分类、优先级。猫娘会自动安排提醒。",
+        description="为主人的每日计划添加一条任务。指定时间、标题，可选描述、分类、优先级、提前提醒分钟数。猫娘会自动安排提醒。",
         parameters={
             "type": "object",
             "properties": {
@@ -897,6 +900,7 @@ class CatgirlDailyPlannerPlugin(NekoPluginBase):
                 "catgirl_message": {"type": "string"},
                 "category":        {"type": "string", "enum": list(_CATEGORIES.keys())},
                 "priority":        {"type": "integer", "enum": [1, 2, 3]},
+                "advance_minutes": {"type": "integer", "description": "提前提醒分钟数，如5表示提前5分钟提醒，0表示准时提醒", "minimum": 0, "maximum": 1440},
             },
             "required": ["time", "title"],
         },
@@ -905,7 +909,7 @@ class CatgirlDailyPlannerPlugin(NekoPluginBase):
     @plugin_entry(
         id="add_task",
         name="添加任务",
-        description="为指定日期(默认今天)添加一条任务,会自动创建定时提醒 + 本地备份 ticker。",
+        description="为指定日期(默认今天)添加一条任务,会自动创建定时提醒 + 本地备份 ticker。支持提前提醒。",
         input_schema={
             "type": "object",
             "properties": {
@@ -916,6 +920,7 @@ class CatgirlDailyPlannerPlugin(NekoPluginBase):
                 "catgirl_message": {"type": "string"},
                 "category":        {"type": "string", "enum": list(_CATEGORIES.keys())},
                 "priority":        {"type": "integer", "enum": [1, 2, 3]},
+                "advance_minutes": {"type": "integer", "description": "提前提醒分钟数，如5表示提前5分钟提醒，0表示准时提醒", "minimum": 0, "maximum": 1440},
             },
             "required": ["time", "title"],
         },
@@ -930,6 +935,7 @@ class CatgirlDailyPlannerPlugin(NekoPluginBase):
         catgirl_message: str = "",
         category: str = "",
         priority: int = PRIORITY_MEDIUM,
+        advance_minutes: int = 0,
         **_,
     ):
         tm = _parse_hhmm(time)
@@ -944,9 +950,21 @@ class CatgirlDailyPlannerPlugin(NekoPluginBase):
                 return Err(SdkError(f"date 无法解析: {date!r}"))
             date = parsed
 
+        # 计算实际提醒时间（提前提醒）
+        task_time = tm.strftime("%H:%M")
+        reminder_time = task_time
+        reminder_date = date
+        if advance_minutes > 0:
+            task_dt = datetime.combine(datetime.now(self._tz).date(), tm, tzinfo=self._tz)
+            reminder_dt = task_dt - timedelta(minutes=advance_minutes)
+            reminder_time = reminder_dt.strftime("%H:%M")
+            if reminder_dt.date() < task_dt.date():
+                prev_date = datetime.strptime(date, "%Y-%m-%d").date() - timedelta(days=1)
+                reminder_date = prev_date.strftime("%Y-%m-%d")
+
         task = {
             "id": uuid.uuid4().hex[:10],
-            "time": tm.strftime("%H:%M"),
+            "time": task_time,
             "title": title.strip(),
             "description": description.strip(),
             "catgirl_message": catgirl_message.strip(),
@@ -955,6 +973,7 @@ class CatgirlDailyPlannerPlugin(NekoPluginBase):
             "status": _STATUS_PENDING,
             "reminder_id": None,
             "local_fired_at": None,
+            "advance_minutes": advance_minutes if advance_minutes > 0 else None,
         }
 
         plan = self._load_plan(date)
@@ -966,12 +985,12 @@ class CatgirlDailyPlannerPlugin(NekoPluginBase):
         with self._lock:
             self._push_history_unlocked(date)
 
-        # memo_reminder 提醒(主通道)
+        # memo_reminder 提醒(主通道) - 使用计算后的提醒时间
         msg = _make_task_reminder(task, self._catgirl_name, self._master_name)
         try:
             res = await self.ctx.plugins.call_entry(
                 "memo_reminder:add_reminder",
-                {"time": f"{date} {task['time']}", "message": msg, "repeat": "once"},
+                {"time": f"{reminder_date} {reminder_time}", "message": msg, "repeat": "once"},
             )
             if isinstance(res, dict):
                 rid = res.get("reminder_id")
