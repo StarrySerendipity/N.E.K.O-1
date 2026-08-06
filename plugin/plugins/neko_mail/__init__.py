@@ -167,12 +167,13 @@ class NekoMailPluginEntry(NekoPluginBase):
 
     @llm_tool(
         name="neko_mail_get_unread",
-        description="获取未读邮件列表。返回邮件的详细信息,包括主题、发件人、正文预览、优先级等。",
+        description="获取未读邮件列表。返回邮件的详细信息,包括主题、发件人、正文预览、优先级等。支持分页。",
         parameters={
             "type": "object",
             "properties": {
                 "folder": {"type": "string", "description": "文件夹名称,默认 INBOX"},
-                "limit": {"type": "integer", "description": "最多返回几封,默认 50"},
+                "limit": {"type": "integer", "description": "每页数量,默认 100"},
+                "offset": {"type": "integer", "description": "偏移量,用于加载更多,默认 0"},
             },
             "required": [],
         },
@@ -181,36 +182,38 @@ class NekoMailPluginEntry(NekoPluginBase):
     @plugin_entry(
         id="get_unread",
         name="获取未读邮件",
-        description="获取未读邮件列表",
+        description="获取未读邮件列表,支持分页",
         input_schema={
             "type": "object",
             "properties": {
                 "folder": {"type": "string"},
                 "limit": {"type": "integer"},
+                "offset": {"type": "integer"},
             },
             "required": [],
         },
-        llm_result_fields=["emails"],
+        llm_result_fields=["emails", "total", "offset", "count"],
     )
-    async def get_unread(self, folder: str = "INBOX", limit: int = 50, **_):
-        """获取未读邮件"""
+    async def get_unread(self, folder: str = "INBOX", limit: int = 100, offset: int = 0, **_):
+        """获取未读邮件，支持分页"""
         try:
             plugin = self._get_plugin()
-            result = plugin.get_unread(folder=folder, limit=limit)
+            result = plugin.get_unread(folder=folder, limit=limit, offset=offset)
             if isinstance(result, dict) and "error" in result:
                 return Err(SdkError(result["error"]))
-            return Ok({"emails": result, "count": len(result)})
+            return Ok(result)
         except Exception as e:
             return Err(SdkError(f"获取未读邮件失败: {e}"))
 
     @llm_tool(
         name="neko_mail_get_all_emails",
-        description="获取所有邮件列表(已读+未读)。返回邮件的详细信息,包括主题、发件人、时间、优先级等。",
+        description="获取所有邮件列表(已读+未读)。返回邮件的详细信息,包括主题、发件人、时间、优先级等。支持分页。",
         parameters={
             "type": "object",
             "properties": {
                 "folder": {"type": "string", "description": "文件夹名称,默认 INBOX"},
-                "limit": {"type": "integer", "description": "最多返回几封,默认 50"},
+                "limit": {"type": "integer", "description": "每页数量,默认 100"},
+                "offset": {"type": "integer", "description": "偏移量,用于加载更多,默认 0"},
             },
             "required": [],
         },
@@ -219,25 +222,26 @@ class NekoMailPluginEntry(NekoPluginBase):
     @plugin_entry(
         id="get_all_emails",
         name="获取所有邮件",
-        description="获取所有邮件列表(已读+未读)",
+        description="获取所有邮件列表(已读+未读),支持分页",
         input_schema={
             "type": "object",
             "properties": {
                 "folder": {"type": "string"},
                 "limit": {"type": "integer"},
+                "offset": {"type": "integer"},
             },
             "required": [],
         },
-        llm_result_fields=["emails"],
+        llm_result_fields=["emails", "total", "offset", "count"],
     )
-    async def get_all_emails(self, folder: str = "INBOX", limit: int = 50, **_):
-        """获取所有邮件(已读+未读)"""
+    async def get_all_emails(self, folder: str = "INBOX", limit: int = 100, offset: int = 0, **_):
+        """获取所有邮件(已读+未读)，支持分页"""
         try:
             plugin = self._get_plugin()
-            result = plugin.get_all_emails(folder=folder, limit=limit)
+            result = plugin.get_all_emails(folder=folder, limit=limit, offset=offset)
             if isinstance(result, dict) and "error" in result:
                 return Err(SdkError(result["error"]))
-            return Ok({"emails": result, "count": len(result)})
+            return Ok(result)
         except Exception as e:
             return Err(SdkError(f"获取所有邮件失败: {e}"))
 

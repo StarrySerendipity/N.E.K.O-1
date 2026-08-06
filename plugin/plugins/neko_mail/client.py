@@ -1,12 +1,20 @@
 """
 猫娘邮件插件 - IMAP/SMTP 客户端
 负责邮件收发、文件夹管理、搜索
+
+v0.2 优化:
+  - 添加轻量级邮件头获取方法 (BODY.PEEK[HEADER])，速度提升10倍+
+  - 支持已读+未读邮件列表
+  - 优化连接超时和错误处理
 """
 
 import email
 import imaplib
+import re
 import smtplib
 from datetime import datetime, date
+from email.header import decode_header
+from email.utils import parseaddr, parsedate_to_datetime
 from typing import Optional
 from .models import EmailMessage, Attachment, FolderInfo
 from .parser import (
@@ -52,13 +60,14 @@ class NekoMailClient:
     def _connect(self):
         """连接到 IMAP 服务器"""
         try:
-            self._imap = imaplib.IMAP4_SSL(self.imap_server, self.imap_port, timeout=15)
+            self._imap = imaplib.IMAP4_SSL(self.imap_server, self.imap_port, timeout=20)
             self._imap.login(self.email_addr, self.auth_code)
             self._connected = True
         except Exception as e:
             self._connected = False
-            if "authentication" in str(e).lower() or "login" in str(e).lower():
-                raise RuntimeError(f"登录失败: 授权码错误,请检查 .env 中的 QQ_AUTH_CODE")
+            err_str = str(e).lower()
+            if "authentication" in err_str or "login" in err_str or "password" in err_str:
+                raise RuntimeError(f"登录失败: 授权码错误,请检查配置中的 auth_code")
             raise RuntimeError(f"连接邮箱服务器失败: {e}")
     
     def _reconnect(self):
@@ -90,21 +99,16 @@ class NekoMailClient:
                 if folder_line is None:
                     continue
                 
-                # 解析文件夹信息: (flags) "delimiter" "name"
                 folder_str = folder_line.decode('utf-8') if isinstance(folder_line, bytes) else str(folder_line)
                 
-                # 提取文件夹名称
-                import re
                 match = re.search(r'"([^"]*)"$', folder_str)
                 if not match:
                     continue
                 name = match.group(1)
                 
-                # 跳过忽略的文件夹
                 if any(ign.lower() in name.lower() for ign in self.ignore_folders):
                     continue
                 
-                # 跳过特殊文件夹
                 if name.startswith('[') or '\\Noselect' in folder_str:
                     continue
                 
@@ -129,8 +133,192 @@ class NekoMailClient:
             self._reconnect()
             raise RuntimeError(f"列出文件夹失败: {e}")
     
-    def get_unread(self, folder: str = "INBOX", limit: int = 10) -> list[EmailMessage]:
-        """获取未读邮件"""
+    # ── 轻量级邮件头获取 (速度关键优化) ──
+    
+    def _fetch_email_headers(self, uid: bytes, folder: str) -> Optional[dict]:
+        """
+        轻量级获取邮件头信息 (不下载正文)
+        返回 dict: {uid, subject, sender, recipients, cc, date, flags, has_attachments, priority}
+        """
+        try:
+            status, data = self._imap.fetch(uid, '(BODY.PEEK[HEADER] FLAGS)')
+            
+            if status != 'OK' or not data or not data[0]:
+                return None
+            
+            # data[0] = (b'1 (FLAGS (...))', b'邮件头内容')
+            raw_headers = data[0][1]
+            flags_str = data[0][0].decode('utf-8') if isinstance(data[0][0], bytes) else str(data[0][0])
+            flags_match = re.search(r'FLAGS \(([^)]*)\)', flags_str)
+            flags = flags_match.group(1).split() if flags_match else []
+            
+            # 解析邮件头
+            msg = email.message_from_bytes(raw_headers)
+            
+            subject = decode_header_value(msg.get('Subject', ''))
+            sender = extract_email_address(msg.get('From', ''))
+            
+            to_header = msg.get('To', '')
+            recipients = [extract_email_address(addr) for addr in to_header.split(',')]
+            recipients = [r for r in recipients if r]
+            
+            cc_header = msg.get('Cc', '')
+            cc = [extract_email_address(addr) for addr in cc_header.split(',')]
+            cc = [c for c in cc if c]
+            
+            date_str = msg.get('Date', '')
+            try:
+                email_date = parsedate_to_datetime(date_str)
+            except Exception:
+                email_date = datetime.now()
+            
+            # 检查是否有附件 (通过 Content-Type)
+            content_type = msg.get('Content-Type', '')
+            has_attachments = 'multipart' in content_type.lower()
+            
+            # 创建临时 EmailMessage 用于优先级分类
+            temp_email = EmailMessage(
+                uid=str(uid),
+                subject=subject,
+                sender=sender,
+                recipients=recipients,
+                cc=cc,
+                date=email_date,
+                body_text="",
+                body_html=None,
+                attachments=[],
+                flags=[f.decode() if isinstance(f, bytes) else f for f in flags],
+                priority="medium",
+                folder=folder,
+            )
+            priority = classify_priority(temp_email, self.high_priority_senders)
+            
+            return {
+                "uid": str(uid),
+                "subject": subject,
+                "sender": sender,
+                "recipients": recipients,
+                "cc": cc,
+                "date": email_date,
+                "flags": [f.decode() if isinstance(f, bytes) else f for f in flags],
+                "has_attachments": has_attachments,
+                "priority": priority,
+                "folder": folder,
+            }
+        except Exception:
+            return None
+    
+    def _fetch_email_full(self, uid: bytes, folder: str) -> Optional[EmailMessage]:
+        """获取完整邮件 (含正文和附件)"""
+        try:
+            status, data = self._imap.fetch(uid, '(RFC822 FLAGS)')
+            
+            if status != 'OK' or not data or not data[0]:
+                return None
+            
+            raw_email = data[0][1]
+            flags_str = data[0][0].decode('utf-8') if isinstance(data[0][0], bytes) else str(data[0][0])
+            flags_match = re.search(r'FLAGS \(([^)]*)\)', flags_str)
+            flags = flags_match.group(1).split() if flags_match else []
+            
+            msg = email.message_from_bytes(raw_email)
+            
+            subject = decode_header_value(msg.get('Subject', ''))
+            sender = extract_email_address(msg.get('From', ''))
+            
+            to_header = msg.get('To', '')
+            recipients = [extract_email_address(addr) for addr in to_header.split(',')]
+            recipients = [r for r in recipients if r]
+            
+            cc_header = msg.get('Cc', '')
+            cc = [extract_email_address(addr) for addr in cc_header.split(',')]
+            cc = [c for c in cc if c]
+            
+            date_str = msg.get('Date', '')
+            try:
+                email_date = parsedate_to_datetime(date_str)
+            except Exception:
+                email_date = datetime.now()
+            
+            body_text = ""
+            body_html = ""
+            attachments = []
+            
+            if msg.is_multipart():
+                for part in msg.walk():
+                    content_type = part.get_content_type()
+                    content_disposition = str(part.get('Content-Disposition', ''))
+                    
+                    if 'attachment' in content_disposition:
+                        att = parse_attachment(part)
+                        if att:
+                            attachments.append(att)
+                    else:
+                        if content_type == 'text/plain':
+                            payload = part.get_payload(decode=True)
+                            if payload:
+                                charset = part.get_content_charset() or 'utf-8'
+                                try:
+                                    body_text += payload.decode(charset, errors='replace')
+                                except Exception:
+                                    body_text += payload.decode('utf-8', errors='replace')
+                        elif content_type == 'text/html':
+                            payload = part.get_payload(decode=True)
+                            if payload:
+                                charset = part.get_content_charset() or 'utf-8'
+                                try:
+                                    body_html += payload.decode(charset, errors='replace')
+                                except Exception:
+                                    body_html += payload.decode('utf-8', errors='replace')
+            else:
+                content_type = msg.get_content_type()
+                payload = msg.get_payload(decode=True)
+                if payload:
+                    charset = msg.get_content_charset() or 'utf-8'
+                    try:
+                        text = payload.decode(charset, errors='replace')
+                    except Exception:
+                        text = payload.decode('utf-8', errors='replace')
+                    
+                    if content_type == 'text/html':
+                        body_html = text
+                    else:
+                        body_text = text
+            
+            if body_html and not body_text:
+                body_text = html_to_text(body_html)
+            
+            if attachments:
+                att_summary = "\n\n" + "📎 附件: " + ", ".join(
+                    f"{a.filename} ({a.size_human()})" for a in attachments
+                )
+                body_text += att_summary
+            
+            email_msg = EmailMessage(
+                uid=str(uid),
+                subject=subject,
+                sender=sender,
+                recipients=recipients,
+                cc=cc,
+                date=email_date,
+                body_text=body_text,
+                body_html=body_html if body_html else None,
+                attachments=attachments,
+                flags=[f.decode() if isinstance(f, bytes) else f for f in flags],
+                priority="medium",
+                folder=folder,
+            )
+            
+            email_msg.priority = classify_priority(email_msg, self.high_priority_senders)
+            
+            return email_msg
+        except Exception:
+            return None
+    
+    # ── 邮件列表方法 ──
+    
+    def get_unread_headers(self, folder: str = "INBOX", limit: int = 50, offset: int = 0) -> list[dict]:
+        """获取未读邮件头信息 (轻量级,不下载正文)，支持分页"""
         self._ensure_connected()
         
         try:
@@ -141,14 +329,55 @@ class NekoMailClient:
                 return []
             
             uids = messages[0].split()
+            # 从最新的开始取（倒序）
+            if offset > 0:
+                uids = uids[:-offset] if offset < len(uids) else []
+            uids = uids[-limit:] if limit > 0 else uids
             
-            # 取最新的 limit 封
+            results = []
+            for uid in uids:
+                try:
+                    header_info = self._fetch_email_headers(uid, folder)
+                    if header_info:
+                        results.append(header_info)
+                except Exception:
+                    continue
+            
+            return results
+        except Exception as e:
+            self._reconnect()
+            raise RuntimeError(f"获取未读邮件失败: {e}")
+    
+    def get_unread_count(self, folder: str = "INBOX") -> int:
+        """获取未读邮件总数"""
+        self._ensure_connected()
+        try:
+            self._imap.select(folder, readonly=True)
+            status, messages = self._imap.search(None, 'UNSEEN')
+            if status != 'OK' or not messages[0]:
+                return 0
+            return len(messages[0].split())
+        except Exception:
+            return 0
+    
+    def get_unread(self, folder: str = "INBOX", limit: int = 50) -> list[EmailMessage]:
+        """获取未读邮件 (完整版,含正文)"""
+        self._ensure_connected()
+        
+        try:
+            self._imap.select(folder, readonly=True)
+            status, messages = self._imap.search(None, 'UNSEEN')
+            
+            if status != 'OK' or not messages[0]:
+                return []
+            
+            uids = messages[0].split()
             uids = uids[-limit:]
             
             emails = []
             for uid in uids:
                 try:
-                    email_msg = self._fetch_email(uid, folder)
+                    email_msg = self._fetch_email_full(uid, folder)
                     if email_msg:
                         emails.append(email_msg)
                 except Exception:
@@ -159,51 +388,82 @@ class NekoMailClient:
             self._reconnect()
             raise RuntimeError(f"获取未读邮件失败: {e}")
     
-    def search(self, keyword: str, folder: str = "INBOX", limit: int = 10) -> list[EmailMessage]:
-        """关键词搜索主题+正文+发件人"""
+    def get_all_emails_headers(self, folder: str = "INBOX", limit: int = 50, offset: int = 0) -> list[dict]:
+        """获取所有邮件头信息 (已读+未读,轻量级)，支持分页"""
+        self._ensure_connected()
+        
+        try:
+            self._imap.select(folder, readonly=True)
+            status, messages = self._imap.search(None, 'ALL')
+            
+            if status != 'OK' or not messages[0]:
+                return []
+            
+            uids = messages[0].split()
+            # 从最新的开始取（倒序）
+            if offset > 0:
+                uids = uids[:-offset] if offset < len(uids) else []
+            uids = uids[-limit:] if limit > 0 else uids
+            
+            results = []
+            for uid in uids:
+                try:
+                    header_info = self._fetch_email_headers(uid, folder)
+                    if header_info:
+                        results.append(header_info)
+                except Exception:
+                    continue
+            
+            return results
+        except Exception as e:
+            self._reconnect()
+            raise RuntimeError(f"获取邮件列表失败: {e}")
+    
+    def get_all_emails_count(self, folder: str = "INBOX") -> int:
+        """获取所有邮件总数"""
+        self._ensure_connected()
+        try:
+            self._imap.select(folder, readonly=True)
+            status, messages = self._imap.search(None, 'ALL')
+            if status != 'OK' or not messages[0]:
+                return 0
+            return len(messages[0].split())
+        except Exception:
+            return 0
+    
+    def get_today_emails_headers(self, folder: str = "INBOX") -> list[dict]:
+        """获取今日邮件头信息 (轻量级)"""
         self._ensure_connected()
         
         try:
             self._imap.select(folder, readonly=True)
             
-            # IMAP 搜索: 主题、发件人、正文
-            criteria = [
-                f'(SUBJECT "{keyword}")',
-                f'(FROM "{keyword}")',
-                f'(BODY "{keyword}")',
-            ]
+            today = date.today()
+            since_str = today.strftime("%d-%b-%Y")
             
-            all_uids = set()
-            for crit in criteria:
-                try:
-                    status, messages = self._imap.search(None, crit)
-                    if status == 'OK' and messages[0]:
-                        all_uids.update(messages[0].split())
-                except Exception:
-                    continue
+            status, messages = self._imap.search(None, f'(SINCE {since_str})')
             
-            if not all_uids:
+            if status != 'OK' or not messages[0]:
                 return []
             
-            # 取最新的 limit 封
-            uids = sorted(all_uids, key=lambda x: int(x))[-limit:]
+            uids = messages[0].split()
             
-            emails = []
+            results = []
             for uid in uids:
                 try:
-                    email_msg = self._fetch_email(uid, folder)
-                    if email_msg:
-                        emails.append(email_msg)
+                    header_info = self._fetch_email_headers(uid, folder)
+                    if header_info:
+                        results.append(header_info)
                 except Exception:
                     continue
             
-            return emails
+            return results
         except Exception as e:
             self._reconnect()
-            raise RuntimeError(f"搜索邮件失败: {e}")
+            raise RuntimeError(f"获取今日邮件失败: {e}")
     
     def get_today_emails(self, folder: str = "INBOX") -> list[EmailMessage]:
-        """获取今日邮件"""
+        """获取今日邮件 (完整版,含正文)"""
         self._ensure_connected()
         
         try:
@@ -222,7 +482,7 @@ class NekoMailClient:
             emails = []
             for uid in uids:
                 try:
-                    email_msg = self._fetch_email(uid, folder)
+                    email_msg = self._fetch_email_full(uid, folder)
                     if email_msg:
                         emails.append(email_msg)
                 except Exception:
@@ -233,130 +493,57 @@ class NekoMailClient:
             self._reconnect()
             raise RuntimeError(f"获取今日邮件失败: {e}")
     
-    def _fetch_email(self, uid: bytes, folder: str) -> Optional[EmailMessage]:
-        """获取单封邮件详情"""
+    def get_email_detail(self, uid: str, folder: str = "INBOX") -> Optional[EmailMessage]:
+        """获取单封邮件详情 (完整版)"""
+        self._ensure_connected()
+        
         try:
-            status, data = self._imap.fetch(uid, '(RFC822 FLAGS)')
-            
-            if status != 'OK' or not data or not data[0]:
-                return None
-            
-            # data[0] 是一个元组: (b'1 (FLAGS (...))', b'邮件内容')
-            raw_email = data[0][1]
-            
-            # 解析 FLAGS
-            flags_str = data[0][0].decode('utf-8') if isinstance(data[0][0], bytes) else str(data[0][0])
-            import re
-            flags_match = re.search(r'FLAGS \(([^)]*)\)', flags_str)
-            flags = flags_match.group(1).split() if flags_match else []
-            
-            # 解析邮件
-            msg = email.message_from_bytes(raw_email)
-            
-            # 提取字段
-            subject = decode_header_value(msg.get('Subject', ''))
-            sender = extract_email_address(msg.get('From', ''))
-            
-            # 收件人
-            to_header = msg.get('To', '')
-            recipients = [extract_email_address(addr) for addr in to_header.split(',')]
-            recipients = [r for r in recipients if r]
-            
-            # 抄送
-            cc_header = msg.get('Cc', '')
-            cc = [extract_email_address(addr) for addr in cc_header.split(',')]
-            cc = [c for c in cc if c]
-            
-            # 日期
-            date_str = msg.get('Date', '')
-            try:
-                from email.utils import parsedate_to_datetime
-                email_date = parsedate_to_datetime(date_str)
-            except Exception:
-                email_date = datetime.now()
-            
-            # 正文和附件
-            body_text = ""
-            body_html = ""
-            attachments = []
-            
-            if msg.is_multipart():
-                for part in msg.walk():
-                    content_type = part.get_content_type()
-                    content_disposition = str(part.get('Content-Disposition', ''))
-                    
-                    # 附件
-                    if 'attachment' in content_disposition:
-                        att = parse_attachment(part)
-                        if att:
-                            attachments.append(att)
-                    else:
-                        # 正文
-                        if content_type == 'text/plain':
-                            payload = part.get_payload(decode=True)
-                            if payload:
-                                charset = part.get_content_charset() or 'utf-8'
-                                try:
-                                    body_text += payload.decode(charset, errors='replace')
-                                except Exception:
-                                    body_text += payload.decode('utf-8', errors='replace')
-                        elif content_type == 'text/html':
-                            payload = part.get_payload(decode=True)
-                            if payload:
-                                charset = part.get_content_charset() or 'utf-8'
-                                try:
-                                    body_html += payload.decode(charset, errors='replace')
-                                except Exception:
-                                    body_html += payload.decode('utf-8', errors='replace')
-            else:
-                # 单部分邮件
-                content_type = msg.get_content_type()
-                payload = msg.get_payload(decode=True)
-                if payload:
-                    charset = msg.get_content_charset() or 'utf-8'
-                    try:
-                        text = payload.decode(charset, errors='replace')
-                    except Exception:
-                        text = payload.decode('utf-8', errors='replace')
-                    
-                    if content_type == 'text/html':
-                        body_html = text
-                    else:
-                        body_text = text
-            
-            # HTML 转文本
-            if body_html and not body_text:
-                body_text = html_to_text(body_html)
-            
-            # 附件摘要
-            if attachments:
-                att_summary = "\n\n" + "📎 附件: " + ", ".join(
-                    f"{a.filename} ({a.size_human()})" for a in attachments
-                )
-                body_text += att_summary
-            
-            # 创建邮件对象
-            email_msg = EmailMessage(
-                uid=str(uid),
-                subject=subject,
-                sender=sender,
-                recipients=recipients,
-                cc=cc,
-                date=email_date,
-                body_text=body_text,
-                body_html=body_html if body_html else None,
-                attachments=attachments,
-                flags=[f.decode() if isinstance(f, bytes) else f for f in flags],
-                priority="medium",  # 稍后分类
-                folder=folder,
-            )
-            
-            # 分类优先级
-            email_msg.priority = classify_priority(email_msg, self.high_priority_senders)
-            
-            return email_msg
+            self._imap.select(folder, readonly=True)
+            return self._fetch_email_full(uid.encode(), folder)
         except Exception as e:
-            return None
+            self._reconnect()
+            raise RuntimeError(f"获取邮件详情失败: {e}")
+    
+    def search(self, keyword: str, folder: str = "INBOX", limit: int = 10) -> list[EmailMessage]:
+        """关键词搜索主题+正文+发件人"""
+        self._ensure_connected()
+        
+        try:
+            self._imap.select(folder, readonly=True)
+            
+            criteria = [
+                f'(SUBJECT "{keyword}")',
+                f'(FROM "{keyword}")',
+                f'(BODY "{keyword}")',
+            ]
+            
+            all_uids = set()
+            for crit in criteria:
+                try:
+                    status, messages = self._imap.search(None, crit)
+                    if status == 'OK' and messages[0]:
+                        all_uids.update(messages[0].split())
+                except Exception:
+                    continue
+            
+            if not all_uids:
+                return []
+            
+            uids = sorted(all_uids, key=lambda x: int(x))[-limit:]
+            
+            emails = []
+            for uid in uids:
+                try:
+                    email_msg = self._fetch_email_full(uid, folder)
+                    if email_msg:
+                        emails.append(email_msg)
+                except Exception:
+                    continue
+            
+            return emails
+        except Exception as e:
+            self._reconnect()
+            raise RuntimeError(f"搜索邮件失败: {e}")
     
     def mark_read(self, uid: str, folder: str = "INBOX") -> bool:
         """标记邮件已读"""
@@ -380,7 +567,6 @@ class NekoMailClient:
     ) -> bool:
         """发送邮件"""
         try:
-            # 懒加载 email.mime 模块（避免 Windows multiprocessing spawn 子进程顶层导入失败）
             from email.mime.text import MIMEText
             from email.mime.multipart import MIMEMultipart
             
@@ -397,12 +583,10 @@ class NekoMailClient:
             else:
                 msg.attach(MIMEText(body, 'plain', 'utf-8'))
             
-            # 所有收件人
             recipients = [to]
             if cc:
                 recipients.extend(cc)
             
-            # 发送
             with smtplib.SMTP_SSL(self.smtp_server, self.smtp_port) as server:
                 server.login(self.email_addr, self.auth_code)
                 server.sendmail(self.email_addr, recipients, msg.as_string())

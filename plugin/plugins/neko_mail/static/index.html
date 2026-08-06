@@ -669,12 +669,23 @@
 
 <script>
 const PLUGIN_ID = 'neko_mail';
+const PAGE_SIZE = 100; // 每页加载100封
+
 let CURRENT_FILTER = '';
 let ALL_FILTER = '';
 let CURRENT_MODAL_EMAIL = null;
 let CURRENT_MODAL_UID = null;
+
+// 分页状态
 let UNREAD_CACHE = [];
+let UNREAD_OFFSET = 0;
+let UNREAD_TOTAL = 0;
+let UNREAD_LOADING = false;
+
 let ALL_CACHE = [];
+let ALL_OFFSET = 0;
+let ALL_TOTAL = 0;
+let ALL_LOADING = false;
 
 // ── API ──
 async function callPlugin(entry, args) {
@@ -870,21 +881,57 @@ async function loadSummary() {
 
 // ── Unread ──
 async function loadUnread() {
+  if (UNREAD_LOADING) return;
+  UNREAD_LOADING = true;
+  
   const list = document.getElementById('unreadList');
   list.innerHTML = '<li class="loading"><span class="spinner"></span></li>';
   document.getElementById('unreadHint').textContent = '加载中...';
 
   try {
-    const data = await api('get_unread', {limit: 50});
+    UNREAD_CACHE = [];
+    UNREAD_OFFSET = 0;
+    
+    const data = await api('get_unread', {limit: PAGE_SIZE, offset: 0});
     const emails = data.emails || [];
+    UNREAD_TOTAL = data.total || emails.length;
     UNREAD_CACHE = emails;
-    document.getElementById('unreadHint').textContent = '共 ' + emails.length + ' 封未读';
-    document.getElementById('unreadTabCount').textContent = emails.length;
-    document.getElementById('emailBadge').textContent = emails.length;
+    UNREAD_OFFSET = emails.length;
+    
+    document.getElementById('unreadHint').textContent = `已加载 ${emails.length} / ${UNREAD_TOTAL} 封未读`;
+    document.getElementById('unreadTabCount').textContent = UNREAD_TOTAL;
+    document.getElementById('emailBadge').textContent = UNREAD_TOTAL;
     renderUnreadFilteredList();
   } catch (e) {
     document.getElementById('unreadHint').textContent = '加载失败';
     list.innerHTML = '<li class="empty"><span class="empty-icon">❌</span>加载失败: ' + esc(e.message) + '</li>';
+  } finally {
+    UNREAD_LOADING = false;
+  }
+}
+
+async function loadMoreUnread() {
+  if (UNREAD_LOADING || UNREAD_OFFSET >= UNREAD_TOTAL) return;
+  UNREAD_LOADING = true;
+  
+  const loadMoreBtn = document.getElementById('loadMoreUnreadBtn');
+  if (loadMoreBtn) {
+    loadMoreBtn.textContent = '加载中...';
+    loadMoreBtn.disabled = true;
+  }
+  
+  try {
+    const data = await api('get_unread', {limit: PAGE_SIZE, offset: UNREAD_OFFSET});
+    const emails = data.emails || [];
+    UNREAD_CACHE = UNREAD_CACHE.concat(emails);
+    UNREAD_OFFSET += emails.length;
+    
+    document.getElementById('unreadHint').textContent = `已加载 ${UNREAD_CACHE.length} / ${UNREAD_TOTAL} 封未读`;
+    renderUnreadFilteredList();
+  } catch (e) {
+    showToast('加载更多失败: ' + e.message, 'error');
+  } finally {
+    UNREAD_LOADING = false;
   }
 }
 
@@ -895,7 +942,17 @@ function renderUnreadFilteredList() {
     filtered = filtered.filter(e => (e.priority || 'medium') === CURRENT_FILTER);
   }
   if (filtered.length > 0) {
-    list.innerHTML = filtered.map(e => renderEmail(e, true)).join('');
+    let html = filtered.map(e => renderEmail(e, true)).join('');
+    // 添加"加载更多"按钮
+    if (UNREAD_OFFSET < UNREAD_TOTAL) {
+      const remaining = UNREAD_TOTAL - UNREAD_OFFSET;
+      html += `<li class="load-more-container" style="text-align:center;padding:20px;">
+        <button id="loadMoreUnreadBtn" class="ghost" onclick="loadMoreUnread()">
+          📬 加载更多 (还有 ${remaining} 封)
+        </button>
+      </li>`;
+    }
+    list.innerHTML = html;
   } else if (CURRENT_FILTER) {
     list.innerHTML = '<li class="empty"><span class="empty-icon">🔍</span>该分类下没有邮件~</li>';
   } else {
@@ -914,20 +971,56 @@ document.querySelectorAll('#unreadFilter .filter-chip').forEach(chip => {
 
 // ── All Emails ──
 async function loadAllEmails() {
+  if (ALL_LOADING) return;
+  ALL_LOADING = true;
+  
   const list = document.getElementById('allList');
   list.innerHTML = '<li class="loading"><span class="spinner"></span></li>';
   document.getElementById('allHint').textContent = '加载中...';
 
   try {
-    const data = await api('get_all_emails', {limit: 50});
+    ALL_CACHE = [];
+    ALL_OFFSET = 0;
+    
+    const data = await api('get_all_emails', {limit: PAGE_SIZE, offset: 0});
     const emails = data.emails || [];
+    ALL_TOTAL = data.total || emails.length;
     ALL_CACHE = emails;
-    document.getElementById('allHint').textContent = '共 ' + emails.length + ' 封邮件';
-    document.getElementById('allTabCount').textContent = emails.length;
+    ALL_OFFSET = emails.length;
+    
+    document.getElementById('allHint').textContent = `已加载 ${emails.length} / ${ALL_TOTAL} 封邮件`;
+    document.getElementById('allTabCount').textContent = ALL_TOTAL;
     renderAllFilteredList();
   } catch (e) {
     document.getElementById('allHint').textContent = '加载失败';
     list.innerHTML = '<li class="empty"><span class="empty-icon">❌</span>加载失败: ' + esc(e.message) + '</li>';
+  } finally {
+    ALL_LOADING = false;
+  }
+}
+
+async function loadMoreAllEmails() {
+  if (ALL_LOADING || ALL_OFFSET >= ALL_TOTAL) return;
+  ALL_LOADING = true;
+  
+  const loadMoreBtn = document.getElementById('loadMoreAllBtn');
+  if (loadMoreBtn) {
+    loadMoreBtn.textContent = '加载中...';
+    loadMoreBtn.disabled = true;
+  }
+  
+  try {
+    const data = await api('get_all_emails', {limit: PAGE_SIZE, offset: ALL_OFFSET});
+    const emails = data.emails || [];
+    ALL_CACHE = ALL_CACHE.concat(emails);
+    ALL_OFFSET += emails.length;
+    
+    document.getElementById('allHint').textContent = `已加载 ${ALL_CACHE.length} / ${ALL_TOTAL} 封邮件`;
+    renderAllFilteredList();
+  } catch (e) {
+    showToast('加载更多失败: ' + e.message, 'error');
+  } finally {
+    ALL_LOADING = false;
   }
 }
 
@@ -938,7 +1031,17 @@ function renderAllFilteredList() {
     filtered = filtered.filter(e => (e.priority || 'medium') === ALL_FILTER);
   }
   if (filtered.length > 0) {
-    list.innerHTML = filtered.map(e => renderEmail(e, !isRead(e), true)).join('');
+    let html = filtered.map(e => renderEmail(e, !isRead(e), true)).join('');
+    // 添加"加载更多"按钮
+    if (ALL_OFFSET < ALL_TOTAL) {
+      const remaining = ALL_TOTAL - ALL_OFFSET;
+      html += `<li class="load-more-container" style="text-align:center;padding:20px;">
+        <button id="loadMoreAllBtn" class="ghost" onclick="loadMoreAllEmails()">
+          📥 加载更多 (还有 ${remaining} 封)
+        </button>
+      </li>`;
+    }
+    list.innerHTML = html;
   } else if (ALL_FILTER) {
     list.innerHTML = '<li class="empty"><span class="empty-icon">🔍</span>该分类下没有邮件~</li>';
   } else {

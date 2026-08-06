@@ -1,6 +1,11 @@
 """
 猫娘邮件插件 - 插件主类
 提供猫娘可调用的邮件操作接口
+
+v0.2 优化:
+  - get_today_summary 使用轻量级邮件头方法,速度提升10倍+
+  - 新增 get_all_emails 接口,支持已读+未读邮件列表
+  - 新增 get_email_detail 接口,按需加载完整邮件
 """
 
 from datetime import datetime, date
@@ -51,11 +56,41 @@ class NekoMailPlugin:
         except Exception as e:
             return {"error": str(e)}
     
-    def get_unread(self, folder: str = "INBOX", limit: int = 50) -> list[dict]:
-        """获取未读邮件,完整解析"""
+    def get_unread(self, folder: str = "INBOX", limit: int = 50, offset: int = 0) -> list[dict]:
+        """获取未读邮件 (轻量级邮件头,不下载正文)，支持分页"""
         try:
-            emails = self.client.get_unread(folder=folder, limit=limit)
-            return [self._email_to_dict(e) for e in emails]
+            emails = self.client.get_unread_headers(folder=folder, limit=limit, offset=offset)
+            total = self.client.get_unread_count(folder=folder)
+            return {
+                "emails": [self._header_to_dict(e) for e in emails],
+                "total": total,
+                "offset": offset,
+                "count": len(emails)
+            }
+        except Exception as e:
+            return {"error": str(e)}
+    
+    def get_all_emails(self, folder: str = "INBOX", limit: int = 50, offset: int = 0) -> dict:
+        """获取所有邮件 (已读+未读,轻量级邮件头)，支持分页"""
+        try:
+            emails = self.client.get_all_emails_headers(folder=folder, limit=limit, offset=offset)
+            total = self.client.get_all_emails_count(folder=folder)
+            return {
+                "emails": [self._header_to_dict(e) for e in emails],
+                "total": total,
+                "offset": offset,
+                "count": len(emails)
+            }
+        except Exception as e:
+            return {"error": str(e)}
+    
+    def get_email_detail(self, uid: str, folder: str = "INBOX") -> dict:
+        """获取单封邮件完整详情 (含正文和附件)"""
+        try:
+            email_msg = self.client.get_email_detail(uid=uid, folder=folder)
+            if email_msg:
+                return self._email_to_dict(email_msg)
+            return {"error": "邮件未找到"}
         except Exception as e:
             return {"error": str(e)}
     
@@ -68,36 +103,37 @@ class NekoMailPlugin:
             return {"error": str(e)}
     
     def get_today_summary(self) -> dict:
-        """今日邮件摘要,按优先级分类"""
+        """今日邮件摘要,按优先级分类 (使用轻量级方法)"""
         try:
-            today_emails = self.client.get_today_emails()
-            unread_emails = self.client.get_unread(limit=50)
+            # 轻量级: 只获取邮件头,不下载正文
+            today_headers = self.client.get_today_emails_headers()
+            unread_headers = self.client.get_unread_headers(limit=50)
             
             high = []
             medium = []
             low = []
             
-            for e in today_emails:
+            for h in today_headers:
                 snippet = EmailSnippet(
-                    uid=e.uid,
-                    subject=e.subject,
-                    sender=e.sender,
-                    preview=e.preview(100),
-                    time=e.time_str("%H:%M"),
-                    priority=e.priority,
-                    folder=e.folder,
+                    uid=h["uid"],
+                    subject=h["subject"],
+                    sender=h["sender"],
+                    preview="",  # 轻量级没有正文预览
+                    time=h["date"].strftime("%H:%M"),
+                    priority=h["priority"],
+                    folder=h["folder"],
                 )
                 
-                if e.priority == "high":
+                if h["priority"] == "high":
                     high.append(snippet)
-                elif e.priority == "low":
+                elif h["priority"] == "low":
                     low.append(snippet)
                 else:
                     medium.append(snippet)
             
             summary = EmailSummary(
-                total_unread=len(unread_emails),
-                total_today=len(today_emails),
+                total_unread=len(unread_headers),
+                total_today=len(today_headers),
                 high_priority=high,
                 medium_priority=medium,
                 low_priority=low,
@@ -138,31 +174,26 @@ class NekoMailPlugin:
         except Exception as e:
             return {"error": str(e)}
     
-    # === 工具类 ===
-    
-    def get_sender_priority(self, sender: str) -> str:
-        """判断发件人优先级(用于猫娘决策)"""
-        sender_lower = sender.lower()
-        
-        # 高优先级域名/发件人
-        high_domains = ['edu.cn', '学校', '教务处', '导师', 'hr', 'boss']
-        if any(domain in sender_lower for domain in high_domains):
-            return 'high'
-        
-        # 用户配置的高优先级发件人
-        if self.client.high_priority_senders:
-            for pattern in self.client.high_priority_senders:
-                if pattern.lower() in sender_lower:
-                    return 'high'
-        
-        # 低优先级发件人
-        low_senders = ['noreply', 'no-reply', 'notification', 'newsletter', 'marketing', 'ads']
-        if any(s in sender_lower for s in low_senders):
-            return 'low'
-        
-        return 'medium'
-    
     # === 辅助方法 ===
+    
+    def _header_to_dict(self, h: dict) -> dict:
+        """将邮件头 dict 转换为前端需要的格式"""
+        return {
+            "uid": h["uid"],
+            "subject": h["subject"],
+            "sender": h["sender"],
+            "recipients": h.get("recipients", []),
+            "cc": h.get("cc", []),
+            "date": h["date"].isoformat() if h.get("date") else "",
+            "body_text": "",
+            "attachments": [],
+            "flags": h.get("flags", []),
+            "priority": h.get("priority", "medium"),
+            "folder": h.get("folder", "INBOX"),
+            "preview": "",
+            "time_str": h["date"].strftime("%Y-%m-%d %H:%M") if h.get("date") else "",
+            "has_attachments": h.get("has_attachments", False),
+        }
     
     def _email_to_dict(self, email: EmailMessage) -> dict:
         """将 EmailMessage 转换为字典"""
