@@ -27,9 +27,9 @@ enabled = false
 
 [neko_mail]
 # QQ 邮箱地址
-email_addr = ""
+email_addr = "2987293848@qq.com"
 # QQ 邮箱授权码(16位,在 QQ 邮箱设置中生成)
-auth_code = ""
+auth_code = "fgbnvkwbqtlzdcjg"
 # IMAP 服务器
 imap_server = "imap.qq.com"
 imap_port = 993

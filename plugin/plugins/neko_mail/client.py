@@ -6,8 +6,6 @@
 import email
 import smtplib
 from datetime import datetime, date
-from email.mime.text import MIMEText
-from email.mime.multipart import MIMEMultipart
 from typing import Optional
 from imapclient import IMAPClient
 from .models import EmailMessage, Attachment, FolderInfo
@@ -358,6 +356,10 @@ class NekoMailClient:
     ) -> bool:
         """发送邮件"""
         try:
+            # 懒加载 email.mime 模块（避免 Windows multiprocessing spawn 子进程顶层导入失败）
+            from email.mime.text import MIMEText
+            from email.mime.multipart import MIMEMultipart
+            
             msg = MIMEMultipart()
             msg['From'] = self.email_addr
             msg['To'] = to
