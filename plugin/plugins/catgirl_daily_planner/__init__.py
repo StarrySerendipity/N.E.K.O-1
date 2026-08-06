@@ -654,7 +654,12 @@ class CatgirlDailyPlannerPlugin(NekoPluginBase):
                 if tm is None:
                     continue
                 task_min = tm.hour * 60 + tm.minute
-                if now_min < task_min:
+                # v0.5: 支持提前提醒 - 减去 advance_minutes 作为实际触发时间
+                advance = int(t.get("advance_minutes") or 0)
+                trigger_min = task_min - advance
+                if trigger_min < 0:
+                    trigger_min = 0  # 防呆:不会跨天,当天0点触发
+                if now_min < trigger_min:
                     continue
             last = t.get("local_fired_at")
             if last:
