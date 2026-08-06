@@ -5,691 +5,422 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>📧 猫娘邮件秘书</title>
 <style>
-  * { box-sizing: border-box; margin: 0; padding: 0; }
+  * { box-sizing: border-box; }
   :root {
-    --pink: #ff9ec6;
+    --pink: #ff8db4;
     --blue: #7ec8e3;
-    --blue-light: #b8e4f0;
-    --pink-soft: #ffe4f0;
+    --pink-soft: #ffe4ec;
     --blue-soft: #e6f4f9;
-    --white: #ffffff;
-    --ink: #4a5568;
-    --ink-soft: #718096;
-    --line: #e2e8f0;
-    --bg: linear-gradient(135deg, #ffe4f0 0%, #e6f4f9 50%, #ffffff 100%);
-    --card: rgba(255, 255, 255, 0.92);
+    --ink: #4a3a3a;
+    --ink-soft: #8a7070;
+    --line: #ffd1e0;
+    --line-soft: #ffe1ec;
+    --bg: linear-gradient(135deg, #ffe4ec 0%, #e6f4f9 100%);
+    --card: rgba(255, 255, 255, 0.86);
     --card-solid: #ffffff;
     --accent: #d4638a;
-    --accent-blue: #5ba3c4;
-    --good: #68d391;
-    --warn: #f6ad55;
-    --bad: #fc8181;
-    --shadow: 0 8px 32px rgba(255, 158, 198, 0.15);
-    --shadow-hover: 0 12px 40px rgba(255, 158, 198, 0.25);
+    --good: #7ec890;
+    --warn: #f0a23a;
+    --bad: #ff6b6b;
+    --shadow: 0 6px 24px rgba(255, 128, 168, 0.18);
   }
   body {
     font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
+    margin: 0; padding: 24px;
     background: var(--bg);
     color: var(--ink);
     min-height: 100vh;
-    padding: 24px;
-    line-height: 1.6;
   }
-  
-  /* 头部 */
-  .header {
-    text-align: center;
-    margin-bottom: 32px;
-    animation: fadeInDown 0.6s ease-out;
+  h1 { margin: 0 0 4px 0; font-size: 26px; display: flex; align-items: center; gap: 8px; }
+  h1 .badge {
+    font-size: 13px; color: var(--accent);
+    background: var(--pink-soft); padding: 4px 10px;
+    border-radius: 999px; font-weight: 500;
   }
-  .header h1 {
-    font-size: 32px;
-    font-weight: 700;
-    background: linear-gradient(135deg, var(--pink) 0%, var(--blue) 100%);
-    -webkit-background-clip: text;
-    -webkit-text-fill-color: transparent;
-    background-clip: text;
-    margin-bottom: 8px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    gap: 12px;
-  }
-  .header .subtitle {
-    color: var(--ink-soft);
-    font-size: 14px;
-    font-style: italic;
-  }
-  .header .status {
-    display: inline-flex;
-    align-items: center;
-    gap: 6px;
-    margin-top: 12px;
-    padding: 6px 16px;
-    background: var(--card);
-    border-radius: 20px;
-    font-size: 13px;
-    box-shadow: var(--shadow);
+  .sub { color: var(--ink-soft); font-size: 13px; margin-bottom: 18px; }
+  .status-bar {
+    display: inline-flex; align-items: center; gap: 6px;
+    padding: 4px 12px; border-radius: 999px;
+    font-size: 12px; font-weight: 600;
+    background: var(--card); box-shadow: var(--shadow);
+    margin-bottom: 16px;
   }
   .status-dot {
-    width: 8px;
-    height: 8px;
-    border-radius: 50%;
-    background: var(--good);
-    animation: pulse 2s infinite;
+    width: 8px; height: 8px; border-radius: 50%;
+    background: var(--good); animation: pulse 2s infinite;
   }
   .status-dot.error { background: var(--bad); }
-  
-  /* 标签页 */
+  @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.5} }
+
   .tabs {
-    display: flex;
-    gap: 8px;
-    justify-content: center;
-    margin-bottom: 24px;
-    flex-wrap: wrap;
-    animation: fadeIn 0.8s ease-out;
+    display: flex; gap: 4px; flex-wrap: wrap;
+    background: var(--card);
+    border-radius: 14px; padding: 6px;
+    box-shadow: var(--shadow);
+    margin-bottom: 18px;
   }
   .tab {
-    padding: 10px 20px;
-    background: var(--card);
-    border: 2px solid transparent;
-    border-radius: 24px;
-    cursor: pointer;
-    font-size: 14px;
-    font-weight: 600;
+    cursor: pointer; padding: 8px 14px;
+    border-radius: 10px; font-size: 13px; font-weight: 600;
     color: var(--ink-soft);
-    transition: all 0.3s ease;
-    box-shadow: var(--shadow);
+    transition: all 0.15s;
+    user-select: none;
   }
-  .tab:hover {
-    transform: translateY(-2px);
-    box-shadow: var(--shadow-hover);
-    border-color: var(--pink);
-    color: var(--accent);
-  }
+  .tab:hover { background: var(--pink-soft); color: var(--accent); }
   .tab.active {
-    background: linear-gradient(135deg, var(--pink) 0%, var(--blue) 100%);
-    color: white;
-    border-color: transparent;
+    background: linear-gradient(135deg, var(--pink), var(--blue));
+    color: white; box-shadow: 0 2px 8px rgba(255,128,168,0.4);
   }
-  
-  /* 面板 */
+
   .panel {
     background: var(--card);
-    border-radius: 20px;
-    padding: 24px;
-    margin-bottom: 20px;
-    box-shadow: var(--shadow);
-    backdrop-filter: blur(10px);
-    animation: fadeInUp 0.5s ease-out;
-  }
-  .panel-title {
-    font-size: 18px;
-    font-weight: 700;
-    color: var(--accent);
-    margin-bottom: 16px;
-    display: flex;
-    align-items: center;
-    gap: 8px;
-  }
-  
-  /* 统计卡片 */
-  .stats-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
-    gap: 16px;
-    margin-bottom: 24px;
-  }
-  .stat-card {
-    background: linear-gradient(135deg, var(--pink-soft) 0%, var(--blue-soft) 100%);
     border-radius: 16px;
     padding: 20px;
-    text-align: center;
-    transition: all 0.3s ease;
-    border: 2px solid transparent;
+    margin-bottom: 18px;
+    box-shadow: var(--shadow);
   }
-  .stat-card:hover {
-    transform: translateY(-4px);
-    box-shadow: var(--shadow-hover);
-    border-color: var(--pink);
+  .panel-head {
+    display: flex; align-items: center; justify-content: space-between;
+    margin-bottom: 14px; flex-wrap: wrap; gap: 8px;
   }
-  .stat-card .number {
-    font-size: 36px;
-    font-weight: 800;
-    background: linear-gradient(135deg, var(--accent) 0%, var(--accent-blue) 100%);
-    -webkit-background-clip: text;
-    -webkit-text-fill-color: transparent;
-    background-clip: text;
-    line-height: 1.2;
+  .panel-head h3 { margin: 0; font-size: 16px; }
+  .panel-head .hint { font-size: 12px; color: var(--ink-soft); }
+
+  .stats-grid {
+    display: grid; gap: 12px; margin-bottom: 18px;
+    grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
   }
-  .stat-card .label {
-    font-size: 13px;
-    color: var(--ink-soft);
-    margin-top: 4px;
-    font-weight: 500;
+  .stat {
+    background: var(--card-solid);
+    border-radius: 14px; padding: 14px 16px;
+    box-shadow: var(--shadow);
+    position: relative; overflow: hidden;
   }
-  .stat-card.high { background: linear-gradient(135deg, #ffe4e4 0%, #fff0e4 100%); }
-  .stat-card.high .number { background: linear-gradient(135deg, #e53e3e 0%, #dd6b20 100%); -webkit-background-clip: text; background-clip: text; }
-  
-  /* 邮件列表 */
-  .email-list {
-    display: flex;
-    flex-direction: column;
-    gap: 12px;
-  }
+  .stat .num { font-size: 26px; font-weight: 700; color: var(--accent); line-height: 1.1; }
+  .stat .lbl { font-size: 12px; color: var(--ink-soft); margin-top: 4px; }
+  .stat.warn .num { color: var(--warn); }
+  .stat.good .num { color: var(--good); }
+
+  .email-list { list-style: none; padding: 0; margin: 0; }
   .email-item {
-    background: var(--card-solid);
-    border-radius: 14px;
-    padding: 16px;
+    display: flex; align-items: flex-start; gap: 12px;
+    padding: 12px 14px; margin-bottom: 8px;
+    background: var(--card-solid); border-radius: 10px;
     border-left: 4px solid var(--blue);
-    transition: all 0.2s ease;
-    cursor: pointer;
+    transition: opacity 0.2s, transform 0.1s;
   }
-  .email-item:hover {
-    transform: translateX(4px);
-    box-shadow: var(--shadow-hover);
-  }
-  .email-item.high { border-left-color: #e53e3e; }
+  .email-item:hover { transform: translateX(2px); }
+  .email-item.high { border-left-color: var(--bad); }
   .email-item.medium { border-left-color: var(--blue); }
-  .email-item.low { border-left-color: #a0aec0; }
-  .email-item.unread { background: linear-gradient(135deg, #fff 0%, var(--blue-soft) 100%); }
-  
-  .email-header {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    margin-bottom: 8px;
-    flex-wrap: wrap;
-    gap: 8px;
+  .email-item.low { border-left-color: #ccc; }
+  .email-item .body { flex: 1; min-width: 0; }
+  .email-item .body .title { font-weight: 600; word-break: break-word; font-size: 14px; }
+  .email-item .body .meta { font-size: 12px; color: var(--ink-soft); margin-top: 2px; display: flex; gap: 8px; flex-wrap: wrap; }
+  .email-item .body .preview { font-size: 12px; color: var(--ink-soft); margin-top: 4px; line-height: 1.5;
+    display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+  .email-item .actions { display: flex; gap: 4px; flex-shrink: 0; }
+
+  .tag {
+    display: inline-block; padding: 2px 8px;
+    border-radius: 999px; font-size: 11px; font-weight: 600;
   }
-  .email-subject {
-    font-size: 15px;
-    font-weight: 600;
-    color: var(--ink);
-    flex: 1;
-    min-width: 0;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-  }
-  .email-priority {
-    padding: 3px 10px;
-    border-radius: 12px;
-    font-size: 11px;
-    font-weight: 700;
-    text-transform: uppercase;
-  }
-  .priority-high { background: #fed7d7; color: #c53030; }
-  .priority-medium { background: #bee3f8; color: #2c5282; }
-  .priority-low { background: #e2e8f0; color: #4a5568; }
-  
-  .email-meta {
-    display: flex;
-    align-items: center;
-    gap: 12px;
-    font-size: 13px;
-    color: var(--ink-soft);
-    margin-bottom: 8px;
-    flex-wrap: wrap;
-  }
-  .email-sender { font-weight: 600; color: var(--accent); }
-  .email-time { font-family: "SF Mono", Consolas, monospace; font-size: 12px; }
-  
-  .email-preview {
-    font-size: 13px;
-    color: var(--ink-soft);
-    line-height: 1.5;
-    display: -webkit-box;
-    -webkit-line-clamp: 2;
-    -webkit-box-orient: vertical;
-    overflow: hidden;
-  }
-  
-  .email-attachments {
-    margin-top: 8px;
-    font-size: 12px;
-    color: var(--accent-blue);
-    font-weight: 600;
-  }
-  
-  /* 表单 */
-  .form-group {
-    margin-bottom: 16px;
-  }
-  .form-label {
-    display: block;
-    font-size: 13px;
-    font-weight: 600;
-    color: var(--ink);
-    margin-bottom: 6px;
-  }
-  .form-input, .form-textarea {
-    width: 100%;
-    padding: 10px 14px;
-    border: 2px solid var(--line);
-    border-radius: 10px;
-    font-size: 14px;
-    font-family: inherit;
-    transition: all 0.2s ease;
-    background: var(--white);
-  }
-  .form-input:focus, .form-textarea:focus {
-    outline: none;
-    border-color: var(--pink);
-    box-shadow: 0 0 0 3px rgba(255, 158, 198, 0.1);
-  }
-  .form-textarea {
-    resize: vertical;
-    min-height: 120px;
-  }
-  
-  /* 按钮 */
+  .tag.prio-high { background: #ffd6d6; color: #c44444; }
+  .tag.prio-medium { background: #bee3f8; color: #2c5282; }
+  .tag.prio-low { background: #e2e8f0; color: #4a5568; }
+
   button {
-    cursor: pointer;
-    border: none;
-    border-radius: 12px;
-    padding: 10px 20px;
-    font-size: 14px;
-    font-weight: 600;
+    cursor: pointer; border: none; border-radius: 10px;
+    padding: 8px 16px; font-size: 14px; font-weight: 600;
+    background: linear-gradient(135deg, var(--pink), var(--blue));
+    color: white; transition: transform 0.1s, box-shadow 0.1s;
     font-family: inherit;
-    transition: all 0.2s ease;
   }
-  .btn-primary {
-    background: linear-gradient(135deg, var(--pink) 0%, var(--blue) 100%);
-    color: white;
-    box-shadow: 0 4px 12px rgba(255, 158, 198, 0.3);
+  button:hover { transform: translateY(-1px); box-shadow: 0 4px 12px rgba(255,128,168,0.4); }
+  button:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
+  button.ghost { background: #f4dde4; color: #8a4a5e; }
+  button.ghost:hover { background: #ecc5d2; }
+  button.tiny { padding: 4px 10px; font-size: 12px; }
+
+  .row { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; margin-bottom: 10px; }
+  .row input, .row textarea {
+    padding: 8px 12px; border: 1px solid var(--line); border-radius: 8px;
+    font-size: 14px; background: #fff; font-family: inherit;
   }
-  .btn-primary:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 6px 20px rgba(255, 158, 198, 0.4);
-  }
-  .btn-secondary {
-    background: var(--card-solid);
-    color: var(--ink);
-    border: 2px solid var(--line);
-  }
-  .btn-secondary:hover {
-    border-color: var(--pink);
-    color: var(--accent);
-  }
-  .btn-small {
-    padding: 6px 12px;
-    font-size: 12px;
-    border-radius: 8px;
-  }
-  
-  /* 搜索框 */
-  .search-box {
-    display: flex;
-    gap: 8px;
-    margin-bottom: 16px;
-  }
-  .search-box input {
-    flex: 1;
-  }
-  
-  /* 空状态 */
-  .empty-state {
-    text-align: center;
-    padding: 48px 24px;
-    color: var(--ink-soft);
-  }
-  .empty-state .icon {
-    font-size: 48px;
-    margin-bottom: 12px;
-    opacity: 0.5;
-  }
-  .empty-state .text {
+  .row input { flex: 1; min-width: 160px; }
+  .row textarea { width: 100%; resize: vertical; min-height: 80px; }
+
+  .empty {
+    text-align: center; color: #b89a9a; padding: 40px 20px;
     font-size: 14px;
   }
-  
-  /* Toast */
   .toast {
-    position: fixed;
-    bottom: 24px;
-    left: 50%;
-    transform: translateX(-50%) translateY(100px);
-    background: rgba(74, 85, 104, 0.95);
-    color: white;
-    padding: 12px 24px;
-    border-radius: 24px;
-    font-size: 14px;
-    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
-    opacity: 0;
-    transition: all 0.3s ease;
-    pointer-events: none;
-    z-index: 1000;
+    position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%) translateY(20px);
+    background: rgba(74,58,58,0.94); color: white;
+    padding: 10px 20px; border-radius: 24px; font-size: 13px;
+    opacity: 0; transition: opacity 0.3s, transform 0.3s;
+    pointer-events: none; z-index: 200;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.2);
   }
-  .toast.show {
-    opacity: 1;
-    transform: translateX(-50%) translateY(0);
+  .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+  .toast.error { background: rgba(255,107,107,0.95); }
+  .toast.success { background: rgba(126,200,144,0.95); }
+
+  .loading { text-align: center; padding: 40px; color: var(--ink-soft); }
+  .spinner {
+    display: inline-block; width: 28px; height: 28px;
+    border: 3px solid var(--line); border-top-color: var(--pink);
+    border-radius: 50%; animation: spin 0.8s linear infinite;
   }
-  .toast.error { background: rgba(252, 129, 129, 0.95); }
-  .toast.success { background: rgba(104, 211, 145, 0.95); }
-  
-  /* 加载动画 */
-  .loading {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    padding: 40px;
-  }
-  .loading-spinner {
-    width: 40px;
-    height: 40px;
-    border: 4px solid var(--line);
-    border-top-color: var(--pink);
-    border-radius: 50%;
-    animation: spin 0.8s linear infinite;
-  }
-  
-  /* 动画 */
-  @keyframes fadeIn {
-    from { opacity: 0; }
-    to { opacity: 1; }
-  }
-  @keyframes fadeInDown {
-    from { opacity: 0; transform: translateY(-20px); }
-    to { opacity: 1; transform: translateY(0); }
-  }
-  @keyframes fadeInUp {
-    from { opacity: 0; transform: translateY(20px); }
-    to { opacity: 1; transform: translateY(0); }
-  }
-  @keyframes pulse {
-    0%, 100% { opacity: 1; }
-    50% { opacity: 0.5; }
-  }
-  @keyframes spin {
-    to { transform: rotate(360deg); }
-  }
-  
-  /* 响应式 */
-  @media (max-width: 640px) {
-    body { padding: 16px; }
-    .header h1 { font-size: 24px; }
-    .stats-grid { grid-template-columns: repeat(2, 1fr); }
-    .tab { padding: 8px 16px; font-size: 13px; }
-  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  .hidden { display: none !important; }
 </style>
 </head>
 <body>
 
-<div class="header">
-  <h1>📧 猫娘邮件秘书</h1>
-  <div class="subtitle">「主人,让喵喵帮您管理邮件吧~」</div>
-  <div class="status">
-    <span class="status-dot" id="statusDot"></span>
-    <span id="statusText">连接中...</span>
-  </div>
+<h1>
+  <span id="headerIcon">📧</span> 猫娘邮件秘书
+  <span class="badge" id="emailBadge">--</span>
+</h1>
+<div class="sub" id="greeting">主人~让喵喵帮您管理邮件吧~ 喵呜~</div>
+<div class="status-bar">
+  <span class="status-dot" id="statusDot"></span>
+  <span id="statusText">连接中...</span>
 </div>
 
 <div class="tabs">
   <div class="tab active" data-tab="summary">📊 今日摘要</div>
   <div class="tab" data-tab="unread">📬 未读邮件</div>
-  <div class="tab" data-tab="search">🔍 搜索邮件</div>
-  <div class="tab" data-tab="send">✉️ 发送邮件</div>
+  <div class="tab" data-tab="search">🔍 搜索</div>
+  <div class="tab" data-tab="send">✉️ 发送</div>
 </div>
 
 <!-- 今日摘要 -->
 <div class="panel" id="panel-summary">
-  <div class="panel-title">🌸 今日邮件概览</div>
+  <div class="panel-head"><h3>📊 今日邮件概览</h3></div>
   <div class="stats-grid" id="statsGrid">
-    <div class="stat-card">
-      <div class="number" id="statUnread">-</div>
-      <div class="label">未读邮件</div>
-    </div>
-    <div class="stat-card">
-      <div class="number" id="statToday">-</div>
-      <div class="label">今日邮件</div>
-    </div>
-    <div class="stat-card high">
-      <div class="number" id="statHigh">-</div>
-      <div class="label">高优先级</div>
-    </div>
+    <div class="stat"><div class="num" id="statUnread">-</div><div class="lbl">未读邮件</div></div>
+    <div class="stat"><div class="num" id="statToday">-</div><div class="lbl">今日邮件</div></div>
+    <div class="stat warn"><div class="num" id="statHigh">-</div><div class="lbl">高优先级</div></div>
   </div>
-  
-  <div class="panel-title" style="margin-top: 24px;">🔥 高优先级邮件</div>
-  <div class="email-list" id="highPriorityList">
-    <div class="loading"><div class="loading-spinner"></div></div>
-  </div>
+  <div class="panel-head"><h3>🔥 高优先级邮件</h3></div>
+  <ul class="email-list" id="highList">
+    <li class="loading"><span class="spinner"></span></li>
+  </ul>
 </div>
 
 <!-- 未读邮件 -->
-<div class="panel" id="panel-unread" style="display: none;">
-  <div class="panel-title">📬 未读邮件列表</div>
-  <div class="email-list" id="unreadList">
-    <div class="loading"><div class="loading-spinner"></div></div>
+<div class="panel hidden" id="panel-unread">
+  <div class="panel-head">
+    <h3>📬 未读邮件 <span class="hint" id="unreadHint"></span></h3>
+    <button class="ghost tiny" onclick="loadUnread()">🔄 刷新</button>
   </div>
+  <ul class="email-list" id="unreadList">
+    <li class="loading"><span class="spinner"></span></li>
+  </ul>
 </div>
 
-<!-- 搜索邮件 -->
-<div class="panel" id="panel-search" style="display: none;">
-  <div class="panel-title">🔍 搜索邮件</div>
-  <div class="search-box">
-    <input type="text" class="form-input" id="searchInput" placeholder="输入关键词搜索主题、发件人、正文..." />
-    <button class="btn-primary" onclick="doSearch()">搜索</button>
+<!-- 搜索 -->
+<div class="panel hidden" id="panel-search">
+  <div class="panel-head"><h3>🔍 搜索邮件</h3></div>
+  <div class="row">
+    <input type="text" id="searchInput" placeholder="输入关键词..." onkeydown="if(event.key==='Enter')doSearch()" />
+    <button onclick="doSearch()">搜索</button>
   </div>
-  <div class="email-list" id="searchResults">
-    <div class="empty-state">
-      <div class="icon">🔍</div>
-      <div class="text">输入关键词开始搜索</div>
-    </div>
-  </div>
+  <ul class="email-list" id="searchList"></ul>
 </div>
 
-<!-- 发送邮件 -->
-<div class="panel" id="panel-send" style="display: none;">
-  <div class="panel-title">✉️ 发送邮件</div>
-  <div class="form-group">
-    <label class="form-label">收件人</label>
-    <input type="email" class="form-input" id="sendTo" placeholder="example@qq.com" />
-  </div>
-  <div class="form-group">
-    <label class="form-label">主题</label>
-    <input type="text" class="form-input" id="sendSubject" placeholder="邮件主题" />
-  </div>
-  <div class="form-group">
-    <label class="form-label">正文</label>
-    <textarea class="form-textarea" id="sendBody" placeholder="写点什么吧~"></textarea>
-  </div>
-  <button class="btn-primary" onclick="doSend()">📨 发送邮件</button>
+<!-- 发送 -->
+<div class="panel hidden" id="panel-send">
+  <div class="panel-head"><h3>✉️ 发送邮件</h3></div>
+  <div class="row"><input type="email" id="sendTo" placeholder="收件人邮箱" /></div>
+  <div class="row"><input type="text" id="sendSubject" placeholder="邮件主题" /></div>
+  <div class="row"><textarea id="sendBody" placeholder="邮件正文"></textarea></div>
+  <div class="row"><button onclick="doSend()">📤 发送</button></div>
 </div>
 
 <div class="toast" id="toast"></div>
 
 <script>
-// API 调用
-async function callAPI(method, params = {}) {
+const PLUGIN_ID = 'neko_mail';
+
+async function callPlugin(entry, args) {
   try {
-    const resp = await fetch('/api/plugin/neko_mail/' + method, {
+    const r = await fetch('/runs', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(params),
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({plugin_id: PLUGIN_ID, entry_id: entry, args: args || {}}),
     });
-    const data = await resp.json();
-    if (data.error) {
-      throw new Error(data.error);
+    if (!r.ok) return {ok: false, error: 'HTTP ' + r.status};
+    const cd = await r.json();
+    const runId = cd.run_id;
+    if (!runId) return {ok: false, error: '未拿到 run_id'};
+    for (let i = 0; i < 300; i++) {
+      await new Promise(r => setTimeout(r, 200));
+      const sr = await fetch('/runs/' + runId);
+      if (!sr.ok) continue;
+      const sd = await sr.json();
+      if (sd.status === 'succeeded') {
+        const er = await fetch('/runs/' + runId + '/export');
+        if (er.ok) {
+          try {
+            const ed = await er.json();
+            if (ed.items && ed.items.length > 0) {
+              const ti = ed.items.find(x => x.label === 'trigger_response');
+              if (ti && ti.json) {
+                const j = ti.json;
+                if (j && j.success) return {ok: true, value: j.data !== undefined ? j.data : null};
+                const errObj = j && j.error || {};
+                return {ok: false, error: String(errObj.message || errObj.code || '插件返回失败')};
+              }
+            }
+          } catch (_) {}
+        }
+        return {ok: true, value: null};
+      } else if (['failed','canceled','timeout'].includes(sd.status)) {
+        const errObj = sd.error || {};
+        return {ok: false, error: String(errObj.message || errObj.code || 'run ' + sd.status)};
+      }
     }
-    return data;
+    return {ok: false, error: '轮询超时'};
   } catch (e) {
-    showToast(e.message, 'error');
-    throw e;
+    return {ok: false, error: String(e && e.message || e)};
   }
 }
 
-// Toast 提示
-function showToast(msg, type = 'info') {
-  const toast = document.getElementById('toast');
-  toast.textContent = msg;
-  toast.className = 'toast show ' + type;
-  setTimeout(() => {
-    toast.className = 'toast';
-  }, 3000);
+async function callAPI(method, params = {}) {
+  const result = await callPlugin(method, params);
+  if (!result.ok) { showToast(result.error, 'error'); throw new Error(result.error); }
+  return result.value || {};
 }
 
-// 标签页切换
+function showToast(msg, type = 'info') {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.className = 'toast show ' + type;
+  setTimeout(() => { t.className = 'toast'; }, 3000);
+}
+
+function esc(s) { if (!s) return ''; const d = document.createElement('div'); d.textContent = s; return d.innerHTML; }
+
+function renderEmail(e, showActions = false) {
+  const p = e.priority || 'medium';
+  const pLabel = {high:'🔥 紧急', medium:'⭐ 一般', low:'🌿 普通'}[p] || '⭐ 一般';
+  let html = '<li class="email-item ' + p + '">';
+  html += '<div class="body">';
+  html += '<div class="title">' + esc(e.subject || '(无主题)') + '</div>';
+  html += '<div class="meta"><span>📮 ' + esc(e.sender || '') + '</span><span>🕐 ' + esc(e.time_str || '') + '</span>';
+  html += '<span class="tag prio-' + p + '">' + pLabel + '</span></div>';
+  if (e.preview) html += '<div class="preview">' + esc(e.preview) + '</div>';
+  if (e.has_attachments || (e.attachments && e.attachments.length > 0)) {
+    const n = (e.attachments || []).length;
+    html += '<div class="meta">📎 ' + n + ' 个附件</div>';
+  }
+  html += '</div>';
+  if (showActions) {
+    html += '<div class="actions"><button class="ghost tiny" onclick="markRead(\'' + esc(e.uid) + '\')">✅ 已读</button></div>';
+  }
+  html += '</li>';
+  return html;
+}
+
+// Tab 切换
 document.querySelectorAll('.tab').forEach(tab => {
   tab.addEventListener('click', () => {
     document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
     tab.classList.add('active');
-    
-    const tabName = tab.dataset.tab;
-    document.querySelectorAll('.panel').forEach(p => p.style.display = 'none');
-    document.getElementById('panel-' + tabName).style.display = 'block';
-    
-    // 加载对应数据
-    if (tabName === 'summary') loadSummary();
-    else if (tabName === 'unread') loadUnread();
+    const name = tab.dataset.tab;
+    document.querySelectorAll('.panel').forEach(p => p.classList.add('hidden'));
+    document.getElementById('panel-' + name).classList.remove('hidden');
+    if (name === 'summary') loadSummary();
+    else if (name === 'unread') loadUnread();
   });
 });
 
-// 加载摘要
 async function loadSummary() {
   try {
     const data = await callAPI('get_summary');
-    
-    document.getElementById('statUnread').textContent = data.total_unread || 0;
-    document.getElementById('statToday').textContent = data.total_today || 0;
-    document.getElementById('statHigh').textContent = data.high_priority?.length || 0;
-    
-    const list = document.getElementById('highPriorityList');
+    document.getElementById('statUnread').textContent = data.total_unread ?? '-';
+    document.getElementById('statToday').textContent = data.total_today ?? '-';
+    document.getElementById('statHigh').textContent = (data.high_priority && data.high_priority.length) || 0;
+    document.getElementById('emailBadge').textContent = data.total_unread ?? '--';
+
+    const list = document.getElementById('highList');
     if (data.high_priority && data.high_priority.length > 0) {
-      list.innerHTML = data.high_priority.map(renderEmail).join('');
+      list.innerHTML = data.high_priority.map(e => renderEmail(e)).join('');
     } else {
-      list.innerHTML = '<div class="empty-state"><div class="icon">🎉</div><div class="text">没有高优先级邮件喵~</div></div>';
+      list.innerHTML = '<li class="empty">🎉 没有高优先级邮件喵~ 主人可以放心啦!</li>';
     }
-    
     document.getElementById('statusDot').className = 'status-dot';
     document.getElementById('statusText').textContent = '已连接';
+    document.getElementById('greeting').textContent = '主人~喵喵已经帮您整理好邮件啦~ 喵呜~';
   } catch (e) {
     document.getElementById('statusDot').className = 'status-dot error';
-    document.getElementById('statusText').textContent = '连接失败';
+    document.getElementById('statusText').textContent = '连接失败: ' + e.message;
+    document.getElementById('greeting').textContent = '呜呜~连接失败了,请检查配置喵...';
   }
 }
 
-// 加载未读
 async function loadUnread() {
   const list = document.getElementById('unreadList');
-  list.innerHTML = '<div class="loading"><div class="loading-spinner"></div></div>';
-  
+  list.innerHTML = '<li class="loading"><span class="spinner"></span></li>';
+  document.getElementById('unreadHint').textContent = '加载中...';
   try {
-    const data = await callAPI('get_unread', { limit: 20 });
-    
-    if (data.emails && data.emails.length > 0) {
-      list.innerHTML = data.emails.map(e => renderEmail(e, true)).join('');
+    const data = await callAPI('get_unread', {limit: 50});
+    const emails = data.emails || [];
+    document.getElementById('unreadHint').textContent = '共 ' + emails.length + ' 封未读';
+    if (emails.length > 0) {
+      list.innerHTML = emails.map(e => renderEmail(e, true)).join('');
     } else {
-      list.innerHTML = '<div class="empty-state"><div class="icon">📭</div><div class="text">没有未读邮件</div></div>';
+      list.innerHTML = '<li class="empty">📭 没有未读邮件~ 主人可以放心休息啦!</li>';
     }
   } catch (e) {
-    list.innerHTML = '<div class="empty-state"><div class="icon">❌</div><div class="text">加载失败: ' + e.message + '</div></div>';
+    document.getElementById('unreadHint').textContent = '加载失败';
+    list.innerHTML = '<li class="empty">❌ 加载失败: ' + esc(e.message) + '</li>';
   }
 }
 
-// 搜索
 async function doSearch() {
-  const keyword = document.getElementById('searchInput').value.trim();
-  if (!keyword) {
-    showToast('请输入搜索关键词', 'error');
-    return;
-  }
-  
-  const list = document.getElementById('searchResults');
-  list.innerHTML = '<div class="loading"><div class="loading-spinner"></div></div>';
-  
+  const kw = document.getElementById('searchInput').value.trim();
+  if (!kw) { showToast('请输入关键词', 'error'); return; }
+  const list = document.getElementById('searchList');
+  list.innerHTML = '<li class="loading"><span class="spinner"></span></li>';
   try {
-    const data = await callAPI('search', { keyword, limit: 20 });
-    
+    const data = await callAPI('search', {keyword: kw, limit: 20});
     if (data.emails && data.emails.length > 0) {
-      list.innerHTML = data.emails.map(renderEmail).join('');
+      list.innerHTML = data.emails.map(e => renderEmail(e)).join('');
     } else {
-      list.innerHTML = '<div class="empty-state"><div class="icon">🔍</div><div class="text">没有找到相关邮件</div></div>';
+      list.innerHTML = '<li class="empty">🔍 没有找到相关邮件~</li>';
     }
   } catch (e) {
-    list.innerHTML = '<div class="empty-state"><div class="icon">❌</div><div class="text">搜索失败: ' + e.message + '</div></div>';
+    list.innerHTML = '<li class="empty">❌ 搜索失败: ' + esc(e.message) + '</li>';
   }
 }
 
-// 发送
 async function doSend() {
   const to = document.getElementById('sendTo').value.trim();
   const subject = document.getElementById('sendSubject').value.trim();
   const body = document.getElementById('sendBody').value.trim();
-  
-  if (!to || !subject || !body) {
-    showToast('请填写完整的收件人、主题和正文', 'error');
-    return;
-  }
-  
+  if (!to || !subject || !body) { showToast('请填写完整信息', 'error'); return; }
   try {
-    await callAPI('send', { to, subject, body });
-    showToast('邮件发送成功喵~', 'success');
+    await callAPI('send', {to, subject, body});
+    showToast('✅ 发送成功喵~', 'success');
     document.getElementById('sendTo').value = '';
     document.getElementById('sendSubject').value = '';
     document.getElementById('sendBody').value = '';
-  } catch (e) {
-    // error already shown by callAPI
-  }
+  } catch (e) {}
 }
 
-// 渲染邮件
-function renderEmail(email, showActions = false) {
-  const priorityClass = email.priority === 'high' ? 'high' : email.priority === 'low' ? 'low' : 'medium';
-  const priorityLabel = email.priority === 'high' ? '紧急' : email.priority === 'low' ? '普通' : '一般';
-  const unreadClass = email.flags && !email.flags.includes('\\Seen') ? 'unread' : '';
-  
-  let html = `
-    <div class="email-item ${priorityClass} ${unreadClass}" data-uid="${email.uid}">
-      <div class="email-header">
-        <div class="email-subject">${escapeHtml(email.subject)}</div>
-        <span class="email-priority priority-${priorityClass}">${priorityLabel}</span>
-      </div>
-      <div class="email-meta">
-        <span class="email-sender">${escapeHtml(email.sender)}</span>
-        <span class="email-time">${email.time_str || ''}</span>
-      </div>
-      <div class="email-preview">${escapeHtml(email.preview || '')}</div>
-  `;
-  
-  if (email.has_attachments || (email.attachments && email.attachments.length > 0)) {
-    const atts = email.attachments || [];
-    html += `<div class="email-attachments">📎 ${atts.length} 个附件</div>`;
-  }
-  
-  if (showActions) {
-    html += `
-      <div style="margin-top: 12px; display: flex; gap: 8px;">
-        <button class="btn-secondary btn-small" onclick="markRead('${email.uid}')">标记已读</button>
-      </div>
-    `;
-  }
-  
-  html += '</div>';
-  return html;
-}
-
-// 标记已读
 async function markRead(uid) {
   try {
-    await callAPI('mark_read', { uid });
-    showToast('已标记为已读', 'success');
+    await callAPI('mark_read', {uid});
+    showToast('✅ 已标记为已读', 'success');
     loadUnread();
-  } catch (e) {
-    // error already shown
-  }
+  } catch (e) {}
 }
 
-// HTML 转义
-function escapeHtml(text) {
-  if (!text) return '';
-  const div = document.createElement('div');
-  div.textContent = text;
-  return div.innerHTML;
-}
-
-// 初始加载
+// 启动
 loadSummary();
 </script>
-
 </body>
 </html>
