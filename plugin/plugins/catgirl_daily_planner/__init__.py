@@ -635,13 +635,16 @@ class CatgirlDailyPlannerPlugin(NekoPluginBase):
                 continue
             # v0.3/v0.4: 检查延迟提醒时间
             next_reminder = t.get("next_reminder_at")
+            is_delayed_reminder = False
             if next_reminder:
                 try:
                     next_dt = datetime.fromisoformat(next_reminder)
                     if now < next_dt:
                         continue  # 还没到延迟时间
-                    # 到了延迟时间,清除该字段,避免重复触发
+                    # 到了延迟时间,清除该字段和 local_fired_at,让提醒能够触发
                     t["next_reminder_at"] = None
+                    t["local_fired_at"] = None
+                    is_delayed_reminder = True
                 except Exception:
                     pass
             tm = _parse_hhmm(t.get("time", ""))
