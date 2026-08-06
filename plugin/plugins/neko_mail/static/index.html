@@ -285,6 +285,28 @@
   .tag.attach { background: var(--peach-soft); color: #b07700; }
   .tag.read { background: #e8f5e9; color: #2e7d32; }
   .tag.unread { background: #fff3e0; color: #ef6c00; }
+  
+  /* ── Category Tags ── */
+  .tag.cat-verification { background: linear-gradient(135deg, #fff3cd, #ffe69c); color: #856404; }
+  .tag.cat-assignment { background: linear-gradient(135deg, #d1ecf1, #bee5eb); color: #0c5460; }
+  .tag.cat-security { background: linear-gradient(135deg, #f8d7da, #f5c6cb); color: #721c24; }
+  .tag.cat-subscription { background: linear-gradient(135deg, #e2e3e5, #d6d8db); color: #383d41; }
+  .tag.cat-project { background: linear-gradient(135deg, #d4edda, #c3e6cb); color: #155724; }
+  .tag.cat-finance { background: linear-gradient(135deg, #fff5ba, #ffe69c); color: #856404; }
+  .tag.cat-social { background: linear-gradient(135deg, #e7d9ff, #d4c5f9); color: #5a2d82; }
+  .tag.cat-general { background: linear-gradient(135deg, #f8f9fa, #e9ecef); color: #495057; }
+  
+  /* ── Catgirl Hint ── */
+  .catgirl-hint {
+    margin-top: 8px;
+    padding: 8px 12px;
+    background: linear-gradient(135deg, rgba(255, 228, 236, 0.6), rgba(230, 244, 249, 0.6));
+    border-radius: 10px;
+    font-size: 12px;
+    color: var(--accent);
+    font-style: italic;
+    border-left: 3px solid var(--pink);
+  }
 
   /* ── Buttons ── */
   button {
@@ -800,6 +822,9 @@ function renderEmail(e, showActions = false, showReadStatus = false) {
   const hasAtt = e.has_attachments || (e.attachments && e.attachments.length > 0);
   const attCount = hasAtt ? (e.attachments || []).length : 0;
   const read = isRead(e);
+  const category = e.category || 'general';
+  const categoryLabel = e.category_label || '普通邮件';
+  const catgirlHint = e.catgirl_hint || '';
 
   let html = '<li class="email-item ' + p + '" onclick="showEmailDetail(\'' + esc(e.uid) + '\')">';
   html += '<div class="avatar ' + p + '">' + esc(initial) + '</div>';
@@ -810,6 +835,7 @@ function renderEmail(e, showActions = false, showReadStatus = false) {
     if (read) html += ' <span class="tag read">已读</span>';
     else html += ' <span class="tag unread">未读</span>';
   }
+  html += ' <span class="tag cat-' + category + '">' + categoryLabel + '</span>';
   html += '</div>';
   html += '<div class="meta">';
   html += '<span>📮 ' + esc(e.sender || '') + '</span>';
@@ -817,6 +843,7 @@ function renderEmail(e, showActions = false, showReadStatus = false) {
   html += '<span class="tag prio-' + p + '">' + pLabel + '</span>';
   html += '</div>';
   if (e.preview) html += '<div class="preview">' + esc(e.preview) + '</div>';
+  if (catgirlHint) html += '<div class="catgirl-hint">🐱 ' + esc(catgirlHint) + '</div>';
   html += '</div>';
   if (showActions && !read) {
     html += '<div class="actions" onclick="event.stopPropagation()">';
@@ -831,16 +858,23 @@ function renderEmailSmall(e) {
   const p = e.priority || 'medium';
   const pLabel = {high:'🔥 紧急', medium:'⭐ 一般', low:'🌿 普通'}[p] || '⭐ 一般';
   const initial = getInitial(e.sender);
+  const category = e.category || 'general';
+  const categoryLabel = e.category_label || '普通邮件';
+  const catgirlHint = e.catgirl_hint || '';
+  
   let html = '<li class="email-item ' + p + '" onclick="showEmailDetail(\'' + esc(e.uid) + '\')">';
   html += '<div class="avatar ' + p + '">' + esc(initial) + '</div>';
   html += '<div class="body">';
-  html += '<div class="title">' + esc(e.subject || '(无主题)') + '</div>';
+  html += '<div class="title">' + esc(e.subject || '(无主题)');
+  html += ' <span class="tag cat-' + category + '">' + categoryLabel + '</span>';
+  html += '</div>';
   html += '<div class="meta">';
   html += '<span>' + esc(e.sender || '') + '</span>';
   html += '<span>' + esc(e.time || '') + '</span>';
   html += '<span class="tag prio-' + p + '">' + pLabel + '</span>';
   html += '</div>';
   if (e.preview) html += '<div class="preview">' + esc(e.preview) + '</div>';
+  if (catgirlHint) html += '<div class="catgirl-hint">🐱 ' + esc(catgirlHint) + '</div>';
   html += '</div></li>';
   return html;
 }

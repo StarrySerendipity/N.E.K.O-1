@@ -12,6 +12,7 @@ from datetime import datetime, date
 from typing import Optional
 from .client import NekoMailClient
 from .models import EmailMessage, EmailSummary, EmailSnippet, FolderInfo
+from .parser import classify_email_type
 
 
 class NekoMailPlugin:
@@ -200,6 +201,25 @@ class NekoMailPlugin:
     
     def _header_to_dict(self, h: dict) -> dict:
         """将邮件头 dict 转换为前端需要的格式"""
+        # 创建临时 EmailMessage 用于分类
+        temp_email = EmailMessage(
+            uid=h["uid"],
+            subject=h["subject"],
+            sender=h["sender"],
+            recipients=h.get("recipients", []),
+            cc=h.get("cc", []),
+            date=h["date"] if h.get("date") else datetime.now(),
+            body_text="",  # 轻量级模式没有正文
+            body_html=None,
+            attachments=[],
+            flags=h.get("flags", []),
+            priority=h.get("priority", "medium"),
+            folder=h.get("folder", "INBOX"),
+        )
+        
+        # 智能分类（基于主题和发件人）
+        classification = classify_email_type(temp_email)
+        
         return {
             "uid": h["uid"],
             "subject": h["subject"],
@@ -215,10 +235,17 @@ class NekoMailPlugin:
             "preview": "",
             "time_str": h["date"].strftime("%Y-%m-%d %H:%M") if h.get("date") else "",
             "has_attachments": h.get("has_attachments", False),
+            # 新增分类信息
+            "category": classification["category"],
+            "category_label": classification["category_label"],
+            "catgirl_hint": classification["catgirl_hint"],
         }
     
     def _email_to_dict(self, email: EmailMessage) -> dict:
         """将 EmailMessage 转换为字典"""
+        # 智能分类
+        classification = classify_email_type(email)
+        
         return {
             "uid": email.uid,
             "subject": email.subject,
@@ -242,6 +269,11 @@ class NekoMailPlugin:
             "preview": email.preview(200),
             "time_str": email.time_str(),
             "has_attachments": email.has_attachments(),
+            # 新增分类信息
+            "category": classification["category"],
+            "category_label": classification["category_label"],
+            "key_info": classification["key_info"],
+            "catgirl_hint": classification["catgirl_hint"],
         }
     
     def close(self):
