@@ -153,11 +153,16 @@ class NekoMailPluginEntry(NekoPluginBase):
         """获取今日邮件摘要"""
         try:
             plugin = self._get_plugin()
+            self.logger.info("get_summary: calling get_today_summary...")
             result = plugin.get_today_summary()
-            if "error" in result:
+            self.logger.info("get_summary: result = {}", result)
+            if isinstance(result, dict) and "error" in result:
+                self.logger.error("get_summary: backend returned error = {}", result["error"])
                 return Err(SdkError(result["error"]))
+            self.logger.info("get_summary: returning Ok")
             return Ok(result)
         except Exception as e:
+            self.logger.exception("get_summary: exception")
             return Err(SdkError(f"获取邮件摘要失败: {e}"))
 
     @llm_tool(

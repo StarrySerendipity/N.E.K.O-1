@@ -52,7 +52,7 @@ class NekoMailClient:
     def _connect(self):
         """连接到 IMAP 服务器"""
         try:
-            self._imap = imaplib.IMAP4_SSL(self.imap_server, self.imap_port)
+            self._imap = imaplib.IMAP4_SSL(self.imap_server, self.imap_port, timeout=15)
             self._imap.login(self.email_addr, self.auth_code)
             self._connected = True
         except Exception as e:

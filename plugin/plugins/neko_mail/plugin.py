@@ -71,7 +71,7 @@ class NekoMailPlugin:
         """今日邮件摘要,按优先级分类"""
         try:
             today_emails = self.client.get_today_emails()
-            unread_emails = self.client.get_unread(limit=100)
+            unread_emails = self.client.get_unread(limit=50)
             
             high = []
             medium = []
