@@ -1031,7 +1031,7 @@ class CatgirlDailyPlannerPlugin(NekoPluginBase):
 
     @llm_tool(
         name="catgirl_planner_set_task_meta",
-        description="更新已有任务的分类、优先级、描述或猫娘提醒话术,不影响时间和状态。",
+        description="更新已有任务的分类、优先级、描述、猫娘提醒话术、时间或提前提醒分钟数。修改时间或提前量会自动重新注册提醒定时器。",
         parameters={
             "type": "object",
             "properties": {
@@ -1041,15 +1041,17 @@ class CatgirlDailyPlannerPlugin(NekoPluginBase):
                 "priority":        {"type": "integer", "enum": [1, 2, 3]},
                 "description":     {"type": "string"},
                 "catgirl_message": {"type": "string"},
+                "time":            {"type": "string", "description": "HH:MM,修改任务时间"},
+                "advance_minutes": {"type": "integer", "description": "提前提醒分钟数,0-1440", "minimum": 0, "maximum": 1440},
             },
             "required": ["task_id"],
         },
-        timeout=10.0,
+        timeout=15.0,
     )
     @plugin_entry(
         id="set_task_meta",
         name="更新任务属性",
-        description="更新任务的分类/优先级/描述/猫娘话(不影响时间和状态)。",
+        description="更新任务的分类/优先级/描述/猫娘话/时间/提前量。修改时间或提前量会重新注册提醒。",
         input_schema={
             "type": "object",
             "properties": {
@@ -1059,6 +1061,8 @@ class CatgirlDailyPlannerPlugin(NekoPluginBase):
                 "priority":        {"type": "integer", "enum": [1, 2, 3]},
                 "description":     {"type": "string"},
                 "catgirl_message": {"type": "string"},
+                "time":            {"type": "string", "description": "HH:MM"},
+                "advance_minutes": {"type": "integer", "description": "提前提醒分钟数", "minimum": 0, "maximum": 1440},
             },
             "required": ["task_id"],
         },
@@ -1072,6 +1076,8 @@ class CatgirlDailyPlannerPlugin(NekoPluginBase):
         priority: Optional[int] = None,
         description: Optional[str] = None,
         catgirl_message: Optional[str] = None,
+        time: Optional[str] = None,
+        advance_minutes: Optional[int] = None,
         **_,
     ):
         if not date:
@@ -1089,6 +1095,10 @@ class CatgirlDailyPlannerPlugin(NekoPluginBase):
                 break
         if target is None:
             return Err(SdkError(f"未找到任务: {task_id}"))
+        
+        # 标记是否需要重新注册提醒
+        need_reschedule = False
+        
         if category is not None:
             target["category"] = _coerce_category(category)
         if priority is not None:
@@ -1097,6 +1107,69 @@ class CatgirlDailyPlannerPlugin(NekoPluginBase):
             target["description"] = str(description).strip()
         if catgirl_message is not None:
             target["catgirl_message"] = str(catgirl_message).strip()
+        
+        # 处理时间修改
+        if time is not None:
+            tm = _parse_hhmm(time)
+            if tm is None:
+                return Err(SdkError(f"time 格式错误: {time!r}"))
+            target["time"] = tm.strftime("%H:%M")
+            need_reschedule = True
+        
+        # 处理提前提醒修改
+        if advance_minutes is not None:
+            target["advance_minutes"] = max(0, min(1440, int(advance_minutes)))
+            need_reschedule = True
+        
+        # 如果需要重新注册提醒
+        if need_reschedule:
+            # 清除旧的提醒记录,让本地 ticker 重新触发
+            target["local_fired_at"] = None
+            target["next_reminder_at"] = None
+            
+            # 重新注册 memo_reminder
+            old_rid = target.get("reminder_id")
+            if old_rid:
+                try:
+                    await self.ctx.plugins.call_entry(
+                        "memo_reminder:remove_reminder",
+                        {"reminder_id": old_rid},
+                    )
+                except Exception as e:
+                    self.logger.warning("remove old reminder failed: {}", e)
+            
+            # 计算新的提醒时间
+            task_time = target["time"]
+            advance = int(target.get("advance_minutes") or 0)
+            reminder_time = task_time
+            reminder_date = date
+            if advance > 0:
+                tm = _parse_hhmm(task_time)
+                task_dt = datetime.combine(datetime.now(self._tz).date(), tm, tzinfo=self._tz)
+                reminder_dt = task_dt - timedelta(minutes=advance)
+                reminder_time = reminder_dt.strftime("%H:%M")
+                if reminder_dt.date() < task_dt.date():
+                    prev_date = datetime.strptime(date, "%Y-%m-%d").date() - timedelta(days=1)
+                    reminder_date = prev_date.strftime("%Y-%m-%d")
+            
+            # 注册新提醒
+            msg = _make_task_reminder(target, self._catgirl_name, self._master_name)
+            try:
+                res = await self.ctx.plugins.call_entry(
+                    "memo_reminder:add_reminder",
+                    {"time": f"{reminder_date} {reminder_time}", "message": msg, "repeat": "once"},
+                )
+                if isinstance(res, dict):
+                    rid = res.get("reminder_id")
+                    if rid:
+                        target["reminder_id"] = rid
+                    else:
+                        self.logger.warning("reschedule reminder missing reminder_id: {}", res)
+                else:
+                    self.logger.warning("reschedule reminder returned non-dict: {}", type(res).__name__)
+            except Exception as e:
+                self.logger.warning("reschedule reminder failed: {}", e)
+        
         self._save_plan(date, plan)
         return Ok({"updated": True, "task": target})
 
