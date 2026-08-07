@@ -256,6 +256,7 @@ class NekoMailAgentlyEntry(NekoPluginBase):
         self.polling_interval = 300
         self._polling_task = None
         self._last_check_time = None
+        self._seen_email_ids: set = set()
 
     @lifecycle(id="startup")
     async def on_startup(self, **_):
@@ -316,7 +317,7 @@ class NekoMailAgentlyEntry(NekoPluginBase):
             self.logger.info("邮件轮询已停止")
 
     async def _check_new_emails(self):
-        """检查新邮件"""
+        """检查新邮件并通知"""
         try:
             result = await run_agently_command(
                 ["message", "+list", "--dir", "inbox", "--is-unread", "--limit", "10"],
@@ -325,8 +326,52 @@ class NekoMailAgentlyEntry(NekoPluginBase):
             )
             if result.get("exit_code") == 0:
                 emails = result.get("data", {}).get("data", [])
-                if emails:
-                    self.logger.info(f"发现 {len(emails)} 封未读邮件")
+                if not emails:
+                    return
+
+                # 找出新邮件（之前没见过的）
+                new_emails = [e for e in emails if e.get("message_id") not in self._seen_email_ids]
+                if not new_emails:
+                    return
+
+                # 更新已见集合
+                for e in new_emails:
+                    self._seen_email_ids.add(e.get("message_id"))
+                # 只保留最近 200 个 ID，防内存膨胀
+                if len(self._seen_email_ids) > 200:
+                    self._seen_email_ids = set(list(self._seen_email_ids)[-200:])
+
+                self.logger.info(f"发现 {len(new_emails)} 封新邮件")
+
+                # 逐封通知猫娘
+                for email in new_emails:
+                    sender = email.get("from", {})
+                    sender_email = sender.get("email", "未知") if isinstance(sender, dict) else str(sender)
+                    subject = email.get("subject", "(无主题)")
+                    snippet = email.get("snippet", "")
+                    has_att = email.get("has_attachments", False)
+                    mid = email.get("message_id", "")
+
+                    attach_hint = " 📎有附件" if has_att else ""
+                    text = f"📧 新邮件来自 {sender_email}\n主题: {subject}{attach_hint}\n{snippet[:80]}..."
+
+                    try:
+                        self.ctx.push_message(
+                            source="neko_mail_agently",
+                            visibility=[],
+                            ai_behavior="respond",
+                            parts=[{"type": "text", "text": text}],
+                            priority=7,
+                            metadata={
+                                "event_type": "new_email",
+                                "message_id": mid,
+                                "sender": sender_email,
+                                "subject": subject,
+                            },
+                        )
+                    except Exception as e:
+                        self.logger.warning(f"推送通知失败: {e}")
+
         except Exception as e:
             self.logger.error(f"检查新邮件失败: {e}")
 
