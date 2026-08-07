@@ -52,7 +52,7 @@ def parse_agently_output(stdout: str, stderr: str) -> Dict[str, Any]:
         return {"error": f"JSON 解析失败: {str(e)}", "stdout": stdout, "stderr": stderr}
 
 
-async def run_agently_command(args: List[str], cli_path: str = "agently-cli") -> Dict[str, Any]:
+async def run_agently_command(args: List[str], cli_path: str = "agently-cli", cwd: str = None) -> Dict[str, Any]:
     """异步执行 Agently CLI 命令"""
     try:
         # Windows 下 .cmd 文件需要通过 cmd /c 执行
@@ -61,14 +61,16 @@ async def run_agently_command(args: List[str], cli_path: str = "agently-cli") ->
             process = await asyncio.create_subprocess_shell(
                 cmd_str,
                 stdout=asyncio.subprocess.PIPE,
-                stderr=asyncio.subprocess.PIPE
+                stderr=asyncio.subprocess.PIPE,
+                cwd=cwd
             )
         else:
             cmd = [cli_path] + args
             process = await asyncio.create_subprocess_exec(
                 *cmd,
                 stdout=asyncio.subprocess.PIPE,
-                stderr=asyncio.subprocess.PIPE
+                stderr=asyncio.subprocess.PIPE,
+                cwd=cwd
             )
         stdout, stderr = await process.communicate()
 
@@ -274,12 +276,12 @@ class NekoMailAgentlyEntry(NekoPluginBase):
         """检查新邮件"""
         try:
             result = await run_agently_command(
-                ["message", "+list", "--dir", "INBOX", "--is-unread", "--limit", "10"],
+                ["message", "+list", "--dir", "inbox", "--is-unread", "--limit", "10"],
                 self.cli_path
             )
 
             if result.get("exit_code") == 0:
-                emails = result.get("data", {}).get("messages", [])
+                emails = result.get("data", {}).get("data", [])
                 if emails:
                     self.logger.info(f"发现 {len(emails)} 封未读邮件")
                     # 这里可以推送通知到主系统
@@ -368,8 +370,8 @@ class NekoMailAgentlyEntry(NekoPluginBase):
             "properties": {
                 "folder": {
                     "type": "string",
-                    "description": "邮箱文件夹，默认 INBOX（收件箱）。可选：INBOX, SENT, DRAFTS, TRASH, SPAM",
-                    "default": "INBOX"
+                    "description": "邮箱文件夹，默认 inbox（收件箱）。可选：inbox, sent, drafts, trash, spam",
+                    "default": "inbox"
                 },
                 "unread_only": {
                     "type": "boolean",
@@ -398,7 +400,7 @@ class NekoMailAgentlyEntry(NekoPluginBase):
         input_schema={
             "type": "object",
             "properties": {
-                "folder": {"type": "string", "default": "INBOX"},
+                "folder": {"type": "string", "default": "inbox"},
                 "unread_only": {"type": "boolean", "default": False},
                 "limit": {"type": "integer", "default": 20},
                 "has_attachments": {"type": "boolean", "default": False}
@@ -408,7 +410,7 @@ class NekoMailAgentlyEntry(NekoPluginBase):
     )
     async def list_emails(
         self,
-        folder: str = "INBOX",
+        folder: str = "inbox",
         unread_only: bool = False,
         limit: int = 20,
         has_attachments: bool = False,
@@ -426,7 +428,7 @@ class NekoMailAgentlyEntry(NekoPluginBase):
 
         if result.get("exit_code") == 0:
             data = result.get("data", {})
-            emails = data.get("messages", [])
+            emails = data.get("data", [])
             total = data.get("total", len(emails))
 
             formatted_list = format_email_list(emails, limit)
@@ -517,7 +519,7 @@ class NekoMailAgentlyEntry(NekoPluginBase):
                 },
                 "folder": {
                     "type": "string",
-                    "description": "在哪个文件夹搜索，默认 INBOX"
+                    "description": "在哪个文件夹搜索，默认 inbox"
                 },
                 "after": {
                     "type": "string",
@@ -589,7 +591,7 @@ class NekoMailAgentlyEntry(NekoPluginBase):
 
         if result.get("exit_code") == 0:
             data = result.get("data", {})
-            emails = data.get("messages", [])
+            emails = data.get("data", [])
             total = data.get("total", len(emails))
 
             formatted_list = format_email_list(emails, limit)
@@ -683,27 +685,15 @@ class NekoMailAgentlyEntry(NekoPluginBase):
         **_
     ) -> Dict[str, Any]:
         """发送邮件"""
-        # 如果提供了附件路径，自动上传获取 file_id
-        attachment_file_id = ""
+        # 附件路径处理：agently-cli 的 --attachment 也需要相对路径
+        attachment_file_name = ""
+        attachment_cwd = None
         if attachment:
             if not os.path.exists(attachment):
                 return Err(SdkError(f"附件文件不存在: {attachment}"))
-
-            self.logger.info(f"自动上传附件: {attachment}")
-            upload_result = await run_agently_command(
-                ["attachment", "+upload", "--file", attachment],
-                self.cli_path
-            )
-            if upload_result.get("exit_code") != 0:
-                error_msg = handle_agently_error(upload_result)
-                return Err(SdkError(f"附件上传失败: {error_msg}"))
-
-            attachment_file_id = upload_result.get("data", {}).get("file_id",
-                                upload_result.get("data", {}).get("id", ""))
-            if not attachment_file_id:
-                return Err(SdkError("附件上传成功但未返回 file_id"))
-
-            self.logger.info(f"附件已上传，file_id: {attachment_file_id}")
+            abs_path = os.path.abspath(attachment)
+            attachment_cwd = os.path.dirname(abs_path)
+            attachment_file_name = os.path.basename(abs_path)
 
         # 构建命令参数
         args = ["message", "+send", "--to", to, "--subject", subject, "--body", body]
@@ -712,8 +702,8 @@ class NekoMailAgentlyEntry(NekoPluginBase):
             args.extend(["--cc", cc])
         if bcc:
             args.extend(["--bcc", bcc])
-        if attachment_file_id:
-            args.extend(["--attachment", attachment_file_id])
+        if attachment_file_name:
+            args.extend(["--attachment", attachment_file_name])
 
         # 两阶段确认处理
         if self.two_factor_confirm and not confirmed:
@@ -721,45 +711,51 @@ class NekoMailAgentlyEntry(NekoPluginBase):
                 # 使用确认令牌完成发送
                 args.extend(["--confirmation-token", confirmation_token])
             else:
-                # 首次调用，获取确认令牌
-                args.append("--dry-run")
+                # 首次调用，不带确认令牌，获取确认令牌
+                result = await run_agently_command(args, self.cli_path, cwd=attachment_cwd)
 
-                result = await run_agently_command(args, self.cli_path)
-
-                if result.get("exit_code") == AgentlyExitCode.TWO_FACTOR:
-                    ctk = result.get("data", {}).get("confirmation_token", "")
+                # 检查是否需要确认
+                data = result.get("data", {})
+                if data.get("confirmation_required") or result.get("exit_code") == AgentlyExitCode.TWO_FACTOR:
+                    ctk = data.get("confirmation_token", "")
                     if ctk:
                         confirmation_tokens[ctk] = {
                             "args": args,
+                            "cwd": attachment_cwd,
                             "created_at": datetime.now().isoformat()
                         }
-                        attach_info = f"\n附件: {os.path.basename(attachment)}" if attachment else ""
+                        attach_info = f"\n附件: {attachment_file_name}" if attachment_file_name else ""
                         return Ok({
                             "status": "pending_confirmation",
                             "confirmation_token": ctk,
                             "summary": f"📧 即将发送邮件\n收件人: {to}\n主题: {subject}{attach_info}\n正文: {body[:100]}...",
                             "message": f"📧 请确认发送邮件：\n收件人: {to}\n主题: {subject}{attach_info}\n\n确认令牌: {ctk}\n\n请再次调用 send_email 并传入 confirmation_token 参数确认发送。"
                         })
-                else:
-                    pass
+                elif result.get("exit_code") == 0:
+                    # 不需要确认，直接成功
+                    attach_info = f"\n附件: {attachment_file_name}" if attachment_file_name else ""
+                    return Ok({
+                        "success": True,
+                        "status": "queued",
+                        "message": f"✅ 邮件已加入发送队列\n收件人: {to}\n主题: {subject}{attach_info}"
+                    })
 
-        # 执行发送
-        result = await run_agently_command(args, self.cli_path)
+        # 执行发送（带确认令牌）
+        result = await run_agently_command(args, self.cli_path, cwd=attachment_cwd)
 
         if result.get("exit_code") == 0:
             data = result.get("data", result)
-            msg_id = data.get("message_id", data.get("id", ""))
 
             # 清理确认令牌
             if confirmation_token and confirmation_token in confirmation_tokens:
                 del confirmation_tokens[confirmation_token]
 
-            attach_info = f"\n附件: {os.path.basename(attachment)}" if attachment else ""
+            # 发送成功返回的是 queued: true，没有 message_id
+            attach_info = f"\n附件: {attachment_file_name}" if attachment_file_name else ""
             return Ok({
                 "success": True,
-                "message_id": msg_id,
-                "status": "sent",
-                "message": f"✅ 邮件已发送\n收件人: {to}\n主题: {subject}{attach_info}\n消息ID: {msg_id}"
+                "status": "queued",
+                "message": f"✅ 邮件已加入发送队列\n收件人: {to}\n主题: {subject}{attach_info}"
             })
         else:
             error_msg = handle_agently_error(result)
@@ -843,6 +839,16 @@ class NekoMailAgentlyEntry(NekoPluginBase):
         **_
     ) -> Dict[str, Any]:
         """回复邮件"""
+        # 附件路径处理
+        attachment_file_name = ""
+        attachment_cwd = None
+        if attachment:
+            if not os.path.exists(attachment):
+                return Err(SdkError(f"附件文件不存在: {attachment}"))
+            abs_path = os.path.abspath(attachment)
+            attachment_cwd = os.path.dirname(abs_path)
+            attachment_file_name = os.path.basename(abs_path)
+
         args = ["message", "+reply", "--id", message_id, "--body", body]
 
         if reply_all:
@@ -851,8 +857,8 @@ class NekoMailAgentlyEntry(NekoPluginBase):
             args.extend(["--cc", cc])
         if bcc:
             args.extend(["--bcc", bcc])
-        if attachment:
-            args.extend(["--attachment", attachment])
+        if attachment_file_name:
+            args.extend(["--attachment", attachment_file_name])
 
         # 两阶段确认处理
         if self.two_factor_confirm and not confirmed:
@@ -873,7 +879,7 @@ class NekoMailAgentlyEntry(NekoPluginBase):
                     "message": f"📧 请确认回复邮件：\n原邮件: {email_subject}\n回复内容: {body[:100]}...\n\n请再次调用 reply_email 并传入 confirmation_token 参数确认回复。"
                 })
 
-        result = await run_agently_command(args, self.cli_path)
+        result = await run_agently_command(args, self.cli_path, cwd=attachment_cwd)
 
         if result.get("exit_code") == 0:
             return Ok({
@@ -1085,9 +1091,15 @@ class NekoMailAgentlyEntry(NekoPluginBase):
         if not os.path.exists(file_path):
             return Err(SdkError(f"文件不存在: {file_path}"))
 
+        # agently-cli 的 --file 参数必须是相对路径，所以 cwd 设为文件所在目录
+        abs_path = os.path.abspath(file_path)
+        file_dir = os.path.dirname(abs_path)
+        file_name = os.path.basename(abs_path)
+
         result = await run_agently_command(
-            ["attachment", "+upload", "--file", file_path],
-            self.cli_path
+            ["attachment", "+upload", "--file", file_name],
+            self.cli_path,
+            cwd=file_dir
         )
 
         if result.get("exit_code") == 0:
