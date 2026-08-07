@@ -33,41 +33,73 @@ confirmation_tokens: Dict[str, Dict[str, Any]] = {}
 
 
 def parse_agently_output(stdout: str, stderr: str) -> Dict[str, Any]:
-    """解析 Agently CLI 的 JSON 输出"""
+    """解析 Agently CLI 的 JSON 输出，支持单行、多行、带前缀提示的格式"""
+    text = stdout.strip()
+    if not text:
+        return {"error": "无输出", "stdout": stdout, "stderr": stderr}
+
+    # 策略1：直接尝试解析整个输出
     try:
-        # Agently CLI 输出可能是多行，找到 JSON 部分
-        lines = stdout.strip().split('\n')
-        json_line = None
+        return json.loads(text)
+    except json.JSONDecodeError:
+        pass
+
+    # 策略2：找到第一个 { 或 [ 开始的位置，截取到末尾的配对 } 或 ]
+    for i, ch in enumerate(text):
+        if ch in ('{', '['):
+            # 从这个位置开始尝试解析剩余内容
+            candidate = text[i:]
+            # 逐层缩短，找到合法的 JSON
+            closing = '}' if ch == '{' else ']'
+            depth = 0
+            for j in range(len(candidate) - 1, -1, -1):
+                if candidate[j] == closing:
+                    depth += 1
+                elif candidate[j] == ch:
+                    depth -= 1
+                if depth == 0:
+                    try:
+                        return json.loads(candidate[:j + 1])
+                    except json.JSONDecodeError:
+                        break
+            # 如果配对没找到，直接尝试整段
+            try:
+                return json.loads(candidate)
+            except json.JSONDecodeError:
+                pass
+
+    # 策略3：逐行查找独立的 JSON 对象
+    try:
+        lines = text.split('\n')
         for line in lines:
             line = line.strip()
             if line.startswith('{') or line.startswith('['):
-                json_line = line
-                break
+                try:
+                    return json.loads(line)
+                except json.JSONDecodeError:
+                    continue
+    except Exception:
+        pass
 
-        if json_line:
-            return json.loads(json_line)
-        else:
-            return {"error": "无法解析输出", "stdout": stdout, "stderr": stderr}
-    except json.JSONDecodeError as e:
-        return {"error": f"JSON 解析失败: {str(e)}", "stdout": stdout, "stderr": stderr}
+    return {"error": "无法解析输出", "stdout": stdout, "stderr": stderr}
 
 
 async def run_agently_command(args: List[str], cli_path: str = "agently-cli", cwd: str = None) -> Dict[str, Any]:
     """异步执行 Agently CLI 命令"""
     try:
-        # Windows 下 .cmd 文件需要通过 cmd /c 执行
+        # Windows 下 .cmd 文件需要通过 cmd /c 执行，用列表参数避免 shell 转义问题
         if cli_path.lower().endswith('.cmd'):
-            cmd_str = f'cmd /c "{cli_path}" ' + ' '.join(f'"{a}"' if ' ' in a else a for a in args)
-            process = await asyncio.create_subprocess_shell(
-                cmd_str,
+            cmd_list = ["cmd", "/c", cli_path] + args
+            process = await asyncio.create_subprocess_exec(
+                *cmd_list,
                 stdout=asyncio.subprocess.PIPE,
                 stderr=asyncio.subprocess.PIPE,
                 cwd=cwd
             )
         else:
-            cmd = [cli_path] + args
+            cmd_list = [cli_path] + args
             process = await asyncio.create_subprocess_exec(
-                *cmd,
+                *cmd_list,
                 stdout=asyncio.subprocess.PIPE,
                 stderr=asyncio.subprocess.PIPE,
                 cwd=cwd
