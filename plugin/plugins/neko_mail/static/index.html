@@ -654,6 +654,227 @@
     transform: translateY(-1px);
     box-shadow: 0 4px 12px rgba(255,141,180,0.2);
   }
+
+  /* ── New Email Notification ── */
+  .new-email-toast {
+    position: fixed; top: 20px; right: 20px;
+    background: linear-gradient(135deg, rgba(255,228,236,0.97), rgba(230,244,249,0.97));
+    border: 2px solid var(--pink);
+    border-radius: 18px; padding: 16px 20px;
+    box-shadow: 0 8px 32px rgba(255,141,180,0.35);
+    z-index: 500; max-width: 360px;
+    transform: translateX(120%); transition: transform 0.4s cubic-bezier(0.34,1.56,0.64,1);
+    backdrop-filter: blur(10px);
+  }
+  .new-email-toast.show { transform: translateX(0); }
+  .new-email-toast .toast-header {
+    display: flex; align-items: center; gap: 8px;
+    font-weight: 700; font-size: 14px; color: var(--accent);
+    margin-bottom: 8px;
+  }
+  .new-email-toast .toast-body { font-size: 13px; color: var(--ink); line-height: 1.6; }
+  .new-email-toast .toast-close {
+    position: absolute; top: 8px; right: 12px;
+    background: none; border: none; color: var(--ink-muted);
+    font-size: 18px; cursor: pointer; padding: 0; box-shadow: none;
+  }
+  .new-email-toast .toast-close:hover { color: var(--accent); }
+  .new-email-toast .toast-close::before { content: ''; margin: 0; }
+
+  /* ── Sort Bar ── */
+  .sort-bar {
+    display: flex; gap: 7px; align-items: center; flex-wrap: wrap;
+    margin-bottom: 12px; padding: 8px 12px;
+    background: linear-gradient(135deg, rgba(255,228,236,0.4), rgba(230,244,249,0.4));
+    border-radius: 12px; border: 1px solid rgba(255,209,224,0.3);
+  }
+  .sort-bar label { font-size: 12px; color: var(--ink-soft); font-weight: 600; }
+  .sort-bar select {
+    padding: 5px 10px; border-radius: 8px; border: 1px solid var(--line-soft);
+    font-size: 12px; background: white; color: var(--ink);
+    font-family: inherit; cursor: pointer;
+  }
+
+  /* ── Batch Action Bar ── */
+  .batch-bar {
+    display: none; align-items: center; gap: 10px;
+    padding: 10px 16px; margin-bottom: 12px;
+    background: linear-gradient(135deg, var(--pink-soft), var(--blue-soft));
+    border-radius: 14px; border: 1px solid rgba(255,209,224,0.5);
+    animation: slideDown 0.3s ease;
+  }
+  .batch-bar.show { display: flex; }
+  @keyframes slideDown {
+    from { opacity: 0; transform: translateY(-10px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+  .batch-bar .count { font-weight: 700; color: var(--accent); font-size: 13px; }
+
+  /* ── Email Checkbox ── */
+  .email-checkbox {
+    width: 18px; height: 18px; border-radius: 5px;
+    border: 2px solid var(--line); background: white;
+    cursor: pointer; flex-shrink: 0; margin-top: 2px;
+    appearance: none; -webkit-appearance: none;
+    transition: all 0.2s; position: relative;
+  }
+  .email-checkbox:checked {
+    background: linear-gradient(135deg, var(--pink), var(--blue));
+    border-color: var(--pink);
+  }
+  .email-checkbox:checked::after {
+    content: '✓'; position: absolute; top: 50%; left: 50%;
+    transform: translate(-50%, -50%); color: white;
+    font-size: 12px; font-weight: 700;
+  }
+
+  /* ── Attachment Alert ── */
+  .att-alert {
+    display: inline-flex; align-items: center; gap: 5px;
+    padding: 4px 10px; border-radius: 8px;
+    background: linear-gradient(135deg, #fff3cd, #ffe69c);
+    color: #856404; font-size: 11px; font-weight: 600;
+    margin-top: 6px; cursor: pointer;
+    transition: all 0.2s;
+  }
+  .att-alert:hover { transform: scale(1.05); box-shadow: 0 2px 8px rgba(255,193,7,0.3); }
+
+  /* ── Poetic Floating Petals ── */
+  .petal {
+    position: fixed; pointer-events: none; z-index: 0;
+    opacity: 0.12; font-size: 24px;
+    animation: petalFall linear infinite;
+  }
+  @keyframes petalFall {
+    0% { transform: translateY(-10vh) rotate(0deg); opacity: 0; }
+    10% { opacity: 0.12; }
+    90% { opacity: 0.12; }
+    100% { transform: translateY(110vh) rotate(360deg); opacity: 0; }
+  }
+
+  /* ── Email Item with checkbox layout ── */
+  .email-item { position: relative; }
+  .email-item .email-checkbox { margin-right: 4px; }
+
+  /* ── Monitoring Status ── */
+  .monitor-status {
+    display: inline-flex; align-items: center; gap: 5px;
+    padding: 4px 12px; border-radius: 999px;
+    font-size: 11px; font-weight: 600;
+    background: rgba(107,196,138,0.15); color: var(--good);
+    border: 1px solid rgba(107,196,138,0.3);
+  }
+  .monitor-status .dot {
+    width: 6px; height: 6px; border-radius: 50%;
+    background: var(--good); animation: pulse 2s infinite;
+  }
+
+  /* ── Timeline ── */
+  .timeline { list-style: none; padding: 0; margin: 0; }
+  .timeline-item {
+    display: flex; gap: 12px; padding: 12px 14px;
+    margin-bottom: 6px; border-radius: 12px;
+    background: var(--card-solid); border: 1px solid rgba(255,255,255,0.6);
+    transition: all 0.2s; position: relative;
+  }
+  .timeline-item:hover {
+    transform: translateX(3px);
+    box-shadow: 0 4px 14px rgba(212,99,138,0.1);
+  }
+  .timeline-icon {
+    width: 36px; height: 36px; border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 16px; flex-shrink: 0;
+    background: linear-gradient(135deg, var(--pink-soft), var(--blue-soft));
+  }
+  .timeline-content { flex: 1; min-width: 0; }
+  .timeline-content .desc { font-size: 13px; color: var(--ink); line-height: 1.5; }
+  .timeline-content .time { font-size: 11px; color: var(--ink-muted); margin-top: 3px; }
+  .timeline-content .detail {
+    font-size: 12px; color: var(--ink-soft); margin-top: 4px;
+    padding: 6px 10px; background: var(--pink-soft); border-radius: 8px;
+    display: none;
+  }
+  .timeline-item.expanded .detail { display: block; }
+  .timeline-item { cursor: pointer; }
+
+  /* ── Important Email Log ── */
+  .important-item {
+    display: flex; align-items: flex-start; gap: 12px;
+    padding: 12px 14px; margin-bottom: 6px;
+    background: var(--card-solid); border-radius: 12px;
+    border-left: 3px solid var(--bad);
+    transition: all 0.2s;
+  }
+  .important-item:hover {
+    transform: translateX(3px);
+    box-shadow: 0 4px 14px rgba(212,99,138,0.1);
+  }
+  .important-item .imp-badge {
+    padding: 3px 8px; border-radius: 8px; font-size: 11px; font-weight: 700;
+    background: linear-gradient(135deg, #ffd6d6, #ffbebe); color: #c44444;
+    white-space: nowrap; flex-shrink: 0;
+  }
+  .important-item .imp-body { flex: 1; min-width: 0; }
+  .important-item .imp-subject { font-weight: 600; font-size: 13px; color: var(--ink); }
+  .important-item .imp-meta { font-size: 11px; color: var(--ink-soft); margin-top: 3px; }
+  .important-item .imp-keyinfo {
+    margin-top: 6px; padding: 6px 10px;
+    background: linear-gradient(135deg, #fff3cd, #ffe69c);
+    border-radius: 8px; font-size: 12px; color: #856404;
+  }
+
+  /* ── Category Stats Bars ── */
+  .cat-bar-container { padding: 8px 0; }
+  .cat-bar-row {
+    display: flex; align-items: center; gap: 10px;
+    margin-bottom: 10px; padding: 0 4px;
+  }
+  .cat-bar-label {
+    width: 80px; font-size: 12px; font-weight: 600;
+    color: var(--ink-soft); text-align: right; flex-shrink: 0;
+  }
+  .cat-bar-track {
+    flex: 1; height: 22px; background: var(--pink-soft);
+    border-radius: 11px; overflow: hidden; position: relative;
+  }
+  .cat-bar-fill {
+    height: 100%; border-radius: 11px;
+    transition: width 0.6s cubic-bezier(0.4, 0, 0.2, 1);
+    display: flex; align-items: center; padding-left: 8px;
+    font-size: 11px; font-weight: 700; color: white;
+    min-width: 28px;
+  }
+  .cat-bar-fill.verification { background: linear-gradient(135deg, #f6d365, #fda085); }
+  .cat-bar-fill.assignment { background: linear-gradient(135deg, #a8edea, #7ec8e3); }
+  .cat-bar-fill.security { background: linear-gradient(135deg, #ff9a9e, #fecfef); }
+  .cat-bar-fill.subscription { background: linear-gradient(135deg, #a18cd1, #fbc2eb); }
+  .cat-bar-fill.project { background: linear-gradient(135deg, #84fab0, #8fd3f4); }
+  .cat-bar-fill.finance { background: linear-gradient(135deg, #ffecd2, #fcb69f); }
+  .cat-bar-fill.social { background: linear-gradient(135deg, #e0c3fc, #8ec5fc); }
+  .cat-bar-fill.general { background: linear-gradient(135deg, #c3cfe2, #f5f7fa); color: var(--ink-soft); }
+  .cat-bar-count {
+    width: 40px; font-size: 12px; font-weight: 700;
+    color: var(--ink); text-align: left; flex-shrink: 0;
+  }
+
+  /* ── Pending Items ── */
+  .pending-item {
+    display: flex; align-items: center; gap: 12px;
+    padding: 12px 14px; margin-bottom: 6px;
+    background: var(--card-solid); border-radius: 12px;
+    border-left: 3px solid var(--warn);
+    transition: all 0.2s;
+  }
+  .pending-item:hover {
+    transform: translateX(3px);
+    box-shadow: 0 4px 14px rgba(212,99,138,0.1);
+  }
+  .pending-item .pend-icon { font-size: 20px; flex-shrink: 0; }
+  .pending-item .pend-body { flex: 1; min-width: 0; }
+  .pending-item .pend-subject { font-weight: 600; font-size: 13px; color: var(--ink); }
+  .pending-item .pend-desc { font-size: 12px; color: var(--ink-soft); margin-top: 3px; }
+  .pending-item .pend-actions { flex-shrink: 0; }
 </style>
 </head>
 <body>
@@ -677,7 +898,18 @@
   <div class="status-bar">
     <span class="status-dot loading" id="statusDot"></span>
     <span id="statusText">连接中...</span>
+    <span class="monitor-status" id="monitorStatus" style="margin-left: 8px;">
+      <span class="dot"></span>
+      <span>监听中</span>
+    </span>
   </div>
+</div>
+
+<!-- New Email Notification Toast -->
+<div class="new-email-toast" id="newEmailToast">
+  <button class="toast-close" onclick="hideNewEmailToast()">×</button>
+  <div class="toast-header">🐱 新邮件提醒喵~</div>
+  <div class="toast-body" id="newEmailToastBody"></div>
 </div>
 
 <!-- Tabs -->
@@ -688,6 +920,7 @@
   <div class="tab" data-tab="folders">📁 文件夹</div>
   <div class="tab" data-tab="search">🔍 搜索</div>
   <div class="tab" data-tab="send">✉️ 发送</div>
+  <div class="tab" data-tab="monitor">📊 监控面板</div>
 </div>
 
 <!-- ====== 今日摘要 ====== -->
@@ -730,6 +963,20 @@
       <h3>📬 未读邮件 <span class="hint" id="unreadHint"></span></h3>
       <button class="ghost tiny" onclick="loadUnread()">🔄 刷新</button>
     </div>
+    <div class="sort-bar">
+      <label>排序：</label>
+      <select id="unreadSort" onchange="renderUnreadFilteredList()">
+        <option value="time_desc">时间 ↓</option>
+        <option value="time_asc">时间 ↑</option>
+        <option value="priority">优先级</option>
+        <option value="sender">发件人</option>
+      </select>
+    </div>
+    <div class="batch-bar" id="unreadBatchBar">
+      <input type="checkbox" class="email-checkbox" id="unreadSelectAll" onchange="selectAllUnreadEmails()" />
+      <span class="count">已选 <span id="unreadSelectedCount">0</span> 封</span>
+      <button class="ghost tiny" onclick="batchMarkReadUnread()">✅ 批量标记已读</button>
+    </div>
     <div class="filter-bar" id="unreadFilter">
       <span class="filter-chip on" data-prio="">全部</span>
       <span class="filter-chip" data-prio="high">🔥 紧急</span>
@@ -748,6 +995,21 @@
     <div class="panel-head">
       <h3>📥 全部邮件 <span class="hint" id="allHint"></span></h3>
       <button class="ghost tiny" onclick="loadAllEmails()">🔄 刷新</button>
+    </div>
+    <div class="sort-bar">
+      <label>排序：</label>
+      <select id="allSort" onchange="renderAllFilteredList()">
+        <option value="time_desc">时间 ↓</option>
+        <option value="time_asc">时间 ↑</option>
+        <option value="priority">优先级</option>
+        <option value="sender">发件人</option>
+      </select>
+    </div>
+    <div class="batch-bar" id="allBatchBar">
+      <input type="checkbox" class="email-checkbox" id="allSelectAll" onchange="selectAllEmails()" />
+      <span class="count">已选 <span id="allSelectedCount">0</span> 封</span>
+      <button class="ghost tiny" onclick="batchMarkRead()">✅ 批量标记已读</button>
+      <button class="ghost tiny" onclick="markAllRead()">📬 全部标记已读</button>
     </div>
     <div class="filter-bar" id="allFilter">
       <span class="filter-chip on" data-prio="">全部</span>
@@ -823,6 +1085,61 @@
   </div>
 </div>
 
+<!-- ====== 监控面板 ====== -->
+<div class="tabpane hidden" data-pane="monitor">
+  <!-- 今日概览 -->
+  <div class="stats-grid" id="monitorStatsGrid">
+    <div class="stat pink"><div class="num" id="monStatTotal">-</div><div class="lbl">今日操作</div></div>
+    <div class="stat blue"><div class="num" id="monStatAutoRead">-</div><div class="lbl">自动已读</div></div>
+    <div class="stat warn"><div class="num" id="monStatImportant">-</div><div class="lbl">重要邮件</div></div>
+    <div class="stat good"><div class="num" id="monStatPending">-</div><div class="lbl">待处理</div></div>
+  </div>
+
+  <!-- 操作时间线 -->
+  <div class="panel">
+    <div class="panel-head">
+      <h3>📝 操作时间线</h3>
+      <button class="ghost tiny" onclick="loadOperationLogs()">🔄 刷新</button>
+    </div>
+    <div id="operationTimeline">
+      <li class="loading"><span class="spinner"></span></li>
+    </div>
+  </div>
+
+  <!-- 重要邮件日志 -->
+  <div class="panel">
+    <div class="panel-head">
+      <h3>⭐ 重要邮件日志</h3>
+      <button class="ghost tiny" onclick="loadImportantEmails()">🔄 刷新</button>
+    </div>
+    <div id="importantEmailsLog">
+      <li class="loading"><span class="spinner"></span></li>
+    </div>
+  </div>
+
+  <!-- 邮件分类统计 -->
+  <div class="panel">
+    <div class="panel-head">
+      <h3>📊 邮件分类统计</h3>
+      <button class="ghost tiny" onclick="loadCategoryStats()">🔄 刷新</button>
+    </div>
+    <div id="categoryStatsChart">
+      <li class="loading"><span class="spinner"></span></li>
+    </div>
+  </div>
+
+  <!-- 待处理事项 -->
+  <div class="panel">
+    <div class="panel-head">
+      <h3>⏰ 待处理事项</h3>
+      <button class="ghost tiny" onclick="loadPendingItems()">🔄 刷新</button>
+    </div>
+    <div id="pendingItemsList">
+      <li class="loading"><span class="spinner"></span></li>
+    </div>
+  </div>
+</div>
+
 <!-- Email Detail Modal -->
 <div class="modal-mask" id="modalMask">
   <div class="modal" id="emailModal">
@@ -854,6 +1171,13 @@ let CURRENT_FILTER = '';
 let ALL_FILTER = '';
 let CURRENT_MODAL_EMAIL = null;
 let CURRENT_MODAL_UID = null;
+
+// 新邮件轮询状态
+let LAST_KNOWN_UID = null;
+let MONITOR_INTERVAL = 300000; // 5分钟检查一次
+let MONITOR_TIMER = null;
+let UNREAD_SELECTED = new Set();
+let ALL_SELECTED = new Set();
 
 // 分页状态
 let UNREAD_CACHE = [];
@@ -951,7 +1275,7 @@ function isRead(email) {
   return flags.some(f => f === '\\Seen' || f === 'Seen');
 }
 
-function renderEmail(e, showActions = false, showReadStatus = false) {
+function renderEmail(e, showActions = false, showReadStatus = false, showCheckbox = false) {
   const p = e.priority || 'medium';
   const pLabel = {high:'🔥 紧急', medium:'⭐ 一般', low:'🌿 普通'}[p] || '⭐ 一般';
   const initial = getInitial(e.sender);
@@ -963,6 +1287,9 @@ function renderEmail(e, showActions = false, showReadStatus = false) {
   const catgirlHint = e.catgirl_hint || '';
 
   let html = '<li class="email-item ' + p + '" onclick="showEmailDetail(\'' + esc(e.uid) + '\')">';
+  if (showCheckbox) {
+    html += '<input type="checkbox" class="email-checkbox" data-uid="' + esc(e.uid) + '" onclick="event.stopPropagation(); toggleEmailSelection(\'' + esc(e.uid) + '\', this)" />';
+  }
   html += '<div class="avatar ' + p + '">' + esc(initial) + '</div>';
   html += '<div class="body">';
   html += '<div class="title">' + esc(e.subject || '(无主题)');
@@ -980,6 +1307,9 @@ function renderEmail(e, showActions = false, showReadStatus = false) {
   html += '</div>';
   if (e.preview) html += '<div class="preview">' + esc(e.preview) + '</div>';
   if (catgirlHint) html += '<div class="catgirl-hint">🐱 ' + esc(catgirlHint) + '</div>';
+  if (hasAtt && attCount > 0) {
+    html += '<div class="att-alert" onclick="event.stopPropagation(); showAttachmentAlert(\'' + esc(e.uid) + '\')">📎 此邮件有 ' + attCount + ' 个附件,点击查看</div>';
+  }
   html += '</div>';
   if (showActions && !read) {
     html += '<div class="actions" onclick="event.stopPropagation()">';
@@ -988,6 +1318,26 @@ function renderEmail(e, showActions = false, showReadStatus = false) {
   }
   html += '</li>';
   return html;
+}
+
+function sortEmails(emails, sortBy) {
+  const sorted = [...emails];
+  switch(sortBy) {
+    case 'time_desc':
+      sorted.sort((a, b) => new Date(b.date || b.time_str) - new Date(a.date || a.time_str));
+      break;
+    case 'time_asc':
+      sorted.sort((a, b) => new Date(a.date || a.time_str) - new Date(b.date || b.time_str));
+      break;
+    case 'priority':
+      const prioOrder = {high: 0, medium: 1, low: 2};
+      sorted.sort((a, b) => prioOrder[a.priority || 'medium'] - prioOrder[b.priority || 'medium']);
+      break;
+    case 'sender':
+      sorted.sort((a, b) => (a.sender || '').localeCompare(b.sender || ''));
+      break;
+  }
+  return sorted;
 }
 
 function renderEmailSmall(e) {
@@ -1139,8 +1489,13 @@ function renderUnreadFilteredList() {
   if (CURRENT_FILTER) {
     filtered = filtered.filter(e => (e.priority || 'medium') === CURRENT_FILTER);
   }
+  
+  // 排序
+  const sortBy = document.getElementById('unreadSort')?.value || 'time_desc';
+  filtered = sortEmails(filtered, sortBy);
+  
   if (filtered.length > 0) {
-    let html = filtered.map(e => renderEmail(e, true)).join('');
+    let html = filtered.map(e => renderEmail(e, true, false, true)).join('');
     // 添加"加载更多"按钮
     if (UNREAD_OFFSET < UNREAD_TOTAL) {
       const remaining = UNREAD_TOTAL - UNREAD_OFFSET;
@@ -1155,6 +1510,69 @@ function renderUnreadFilteredList() {
     list.innerHTML = '<li class="empty"><span class="empty-icon">🔍</span>该分类下没有邮件~</li>';
   } else {
     list.innerHTML = '<li class="empty"><span class="empty-icon">📭</span>没有未读邮件~ 主人可以放心休息啦!</li>';
+  }
+  
+  updateUnreadBatchBar();
+}
+
+function updateUnreadBatchBar() {
+  const bar = document.getElementById('unreadBatchBar');
+  const countSpan = document.getElementById('unreadSelectedCount');
+  if (UNREAD_SELECTED.size > 0) {
+    bar.classList.add('show');
+    countSpan.textContent = UNREAD_SELECTED.size;
+  } else {
+    bar.classList.remove('show');
+  }
+}
+
+function toggleEmailSelection(uid, checkbox) {
+  const targetSet = checkbox.closest('.tabpane[data-pane="unread"]') ? UNREAD_SELECTED : ALL_SELECTED;
+  if (checkbox.checked) {
+    targetSet.add(uid);
+  } else {
+    targetSet.delete(uid);
+  }
+  if (targetSet === UNREAD_SELECTED) {
+    updateUnreadBatchBar();
+  } else {
+    updateAllBatchBar();
+  }
+}
+
+function selectAllUnreadEmails() {
+  const checkbox = document.getElementById('unreadSelectAll');
+  const checkboxes = document.querySelectorAll('[data-pane="unread"] .email-checkbox');
+  const allChecked = checkbox.checked;
+  
+  checkboxes.forEach(cb => {
+    cb.checked = allChecked;
+    const uid = cb.dataset.uid;
+    if (allChecked) {
+      UNREAD_SELECTED.add(uid);
+    } else {
+      UNREAD_SELECTED.delete(uid);
+    }
+  });
+  
+  updateUnreadBatchBar();
+}
+
+async function batchMarkReadUnread() {
+  if (UNREAD_SELECTED.size === 0) return;
+  
+  const uids = Array.from(UNREAD_SELECTED);
+  try {
+    await api('batch_mark_read', {uids});
+    showToast(`已标记 ${uids.length} 封邮件为已读`, 'success');
+    
+    // 从缓存中移除
+    UNREAD_CACHE = UNREAD_CACHE.filter(e => !uids.includes(e.uid));
+    UNREAD_SELECTED.clear();
+    document.getElementById('unreadSelectAll').checked = false;
+    renderUnreadFilteredList();
+  } catch (e) {
+    showToast('批量标记失败: ' + e.message, 'error');
   }
 }
 
@@ -1228,8 +1646,13 @@ function renderAllFilteredList() {
   if (ALL_FILTER) {
     filtered = filtered.filter(e => (e.priority || 'medium') === ALL_FILTER);
   }
+  
+  // 排序
+  const sortBy = document.getElementById('allSort')?.value || 'time_desc';
+  filtered = sortEmails(filtered, sortBy);
+  
   if (filtered.length > 0) {
-    let html = filtered.map(e => renderEmail(e, !isRead(e), true)).join('');
+    let html = filtered.map(e => renderEmail(e, !isRead(e), true, true)).join('');
     // 添加"加载更多"按钮
     if (ALL_OFFSET < ALL_TOTAL) {
       const remaining = ALL_TOTAL - ALL_OFFSET;
@@ -1245,56 +1668,46 @@ function renderAllFilteredList() {
   } else {
     list.innerHTML = '<li class="empty"><span class="empty-icon">📭</span>没有邮件~</li>';
   }
+  
+  updateAllBatchBar();
 }
 
-// ── 批量操作 ──
-let SELECTED_EMAILS = new Set();
-
-function toggleEmailSelection(uid, checkbox) {
-  if (checkbox.checked) {
-    SELECTED_EMAILS.add(uid);
+function updateAllBatchBar() {
+  const bar = document.getElementById('allBatchBar');
+  const countSpan = document.getElementById('allSelectedCount');
+  if (ALL_SELECTED.size > 0) {
+    bar.classList.add('show');
+    countSpan.textContent = ALL_SELECTED.size;
   } else {
-    SELECTED_EMAILS.delete(uid);
+    bar.classList.remove('show');
   }
-  updateBatchActionBar();
 }
 
 function selectAllEmails() {
-  const checkboxes = document.querySelectorAll('.email-checkbox');
-  const allChecked = Array.from(checkboxes).every(cb => cb.checked);
+  const checkbox = document.getElementById('allSelectAll');
+  const checkboxes = document.querySelectorAll('[data-pane="all"] .email-checkbox');
+  const allChecked = checkbox.checked;
   
   checkboxes.forEach(cb => {
-    cb.checked = !allChecked;
+    cb.checked = allChecked;
     const uid = cb.dataset.uid;
-    if (cb.checked) {
-      SELECTED_EMAILS.add(uid);
+    if (allChecked) {
+      ALL_SELECTED.add(uid);
     } else {
-      SELECTED_EMAILS.delete(uid);
+      ALL_SELECTED.delete(uid);
     }
   });
   
-  updateBatchActionBar();
-}
-
-function updateBatchActionBar() {
-  const actionBar = document.getElementById('batchActionBar');
-  const countSpan = document.getElementById('selectedCount');
-  
-  if (SELECTED_EMAILS.size > 0) {
-    actionBar.style.display = 'flex';
-    countSpan.textContent = SELECTED_EMAILS.size;
-  } else {
-    actionBar.style.display = 'none';
-  }
+  updateAllBatchBar();
 }
 
 async function batchMarkRead() {
-  if (SELECTED_EMAILS.size === 0) return;
+  if (ALL_SELECTED.size === 0) return;
   
-  const uids = Array.from(SELECTED_EMAILS);
+  const uids = Array.from(ALL_SELECTED);
   try {
-    const result = await api('batch_mark_read', {uids});
-    showToast(`已标记 ${result.success} 封邮件为已读`, 'success');
+    await api('batch_mark_read', {uids});
+    showToast(`已标记 ${uids.length} 封邮件为已读`, 'success');
     
     // 更新缓存
     ALL_CACHE = ALL_CACHE.map(e => {
@@ -1304,9 +1717,9 @@ async function batchMarkRead() {
       return e;
     });
     
-    SELECTED_EMAILS.clear();
+    ALL_SELECTED.clear();
+    document.getElementById('allSelectAll').checked = false;
     renderAllFilteredList();
-    updateBatchActionBar();
   } catch (e) {
     showToast('批量标记失败: ' + e.message, 'error');
   }
@@ -1644,8 +2057,220 @@ function setStatus(type, text) {
   document.getElementById('statusText').textContent = text;
 }
 
+// ── Monitor Panel ──
+async function loadMonitorPanel() {
+  // Load overview
+  try {
+    const overview = await api('get_overview');
+    document.getElementById('monStatTotal').textContent = overview.total_operations ?? 0;
+    document.getElementById('monStatAutoRead').textContent = overview.auto_mark_read_count ?? 0;
+    document.getElementById('monStatImportant').textContent = overview.important_emails_count ?? 0;
+    document.getElementById('monStatPending').textContent = overview.pending_items_count ?? 0;
+  } catch (e) {
+    console.error('load overview failed:', e);
+  }
+  // Load all sub-panels in parallel
+  loadOperationLogs();
+  loadImportantEmails();
+  loadCategoryStats();
+  loadPendingItems();
+}
+
+const OP_ICONS = {
+  mark_read: '✅', batch_mark_read: '📬', auto_mark_read: '🤖',
+  extract_code: '🔑', push_reminder: '🔔', send_email: '📤',
+  classify: '🏷️', check_new: '📥', batch_delete: '🗑️'
+};
+
+async function loadOperationLogs() {
+  const container = document.getElementById('operationTimeline');
+  container.innerHTML = '<li class="loading"><span class="spinner"></span></li>';
+  try {
+    const data = await api('get_operation_logs', {limit: 50});
+    const logs = data.logs || [];
+    if (logs.length === 0) {
+      container.innerHTML = '<li class="empty"><span class="empty-icon">📝</span>今天还没有操作记录喵~</li>';
+      return;
+    }
+    let html = '<ul class="timeline">';
+    for (const log of logs) {
+      const icon = OP_ICONS[log.type] || '📋';
+      const detailStr = log.details && Object.keys(log.details).length > 0
+        ? JSON.stringify(log.details, null, 2) : '';
+      html += '<li class="timeline-item" onclick="this.classList.toggle(\'expanded\')">';
+      html += '<div class="timeline-icon">' + icon + '</div>';
+      html += '<div class="timeline-content">';
+      html += '<div class="desc">' + esc(log.description) + '</div>';
+      html += '<div class="time">' + esc(log.time || '') + '</div>';
+      if (detailStr) {
+        html += '<div class="detail"><pre style="margin:0;white-space:pre-wrap;">' + esc(detailStr) + '</pre></div>';
+      }
+      html += '</div></li>';
+    }
+    html += '</ul>';
+    container.innerHTML = html;
+  } catch (e) {
+    container.innerHTML = '<li class="empty">❌ 加载失败: ' + esc(e.message) + '</li>';
+  }
+}
+
+async function loadImportantEmails() {
+  const container = document.getElementById('importantEmailsLog');
+  container.innerHTML = '<li class="loading"><span class="spinner"></span></li>';
+  try {
+    const data = await api('get_important_emails', {limit: 30});
+    const emails = data.emails || [];
+    if (emails.length === 0) {
+      container.innerHTML = '<li class="empty"><span class="empty-icon">⭐</span>还没有重要邮件记录喵~</li>';
+      return;
+    }
+    let html = '';
+    for (const em of emails) {
+      html += '<div class="important-item">';
+      html += '<span class="imp-badge">' + esc(em.category_label || '重要') + '</span>';
+      html += '<div class="imp-body">';
+      html += '<div class="imp-subject">' + esc(em.subject || '(无主题)') + '</div>';
+      html += '<div class="imp-meta">📮 ' + esc(em.sender || '') + ' · 🕐 ' + esc(em.time || '') + '</div>';
+      if (em.key_info && Object.keys(em.key_info).length > 0) {
+        const keyInfoStr = Object.entries(em.key_info).filter(([k,v]) => v).map(([k,v]) => k + ': ' + v).join(' · ');
+        if (keyInfoStr) {
+          html += '<div class="imp-keyinfo">🔑 ' + esc(keyInfoStr) + '</div>';
+        }
+      }
+      html += '</div></div>';
+    }
+    container.innerHTML = html;
+  } catch (e) {
+    container.innerHTML = '<li class="empty">❌ 加载失败: ' + esc(e.message) + '</li>';
+  }
+}
+
+const CAT_LABELS = {
+  verification: '验证码', assignment: '作业提交', security: '安全通知',
+  subscription: '订阅广告', project: '项目相关', finance: '财务通知',
+  social: '社交通知', general: '普通邮件'
+};
+
+async function loadCategoryStats() {
+  const container = document.getElementById('categoryStatsChart');
+  container.innerHTML = '<li class="loading"><span class="spinner"></span></li>';
+  try {
+    const data = await api('get_category_stats');
+    const stats = data.stats || {};
+    const entries = Object.entries(stats);
+    if (entries.length === 0) {
+      container.innerHTML = '<li class="empty"><span class="empty-icon">📊</span>还没有分类统计喵~</li>';
+      return;
+    }
+    const maxTotal = Math.max(...entries.map(([, v]) => v.total || 0), 1);
+    let html = '<div class="cat-bar-container">';
+    for (const [cat, info] of entries) {
+      const label = CAT_LABELS[cat] || cat;
+      const total = info.total || 0;
+      const pct = Math.round((total / maxTotal) * 100);
+      html += '<div class="cat-bar-row">';
+      html += '<span class="cat-bar-label">' + label + '</span>';
+      html += '<div class="cat-bar-track">';
+      html += '<div class="cat-bar-fill ' + cat + '" style="width:' + pct + '%">' + total + '</div>';
+      html += '</div>';
+      html += '<span class="cat-bar-count">' + total + '封</span>';
+      html += '</div>';
+    }
+    html += '</div>';
+    container.innerHTML = html;
+  } catch (e) {
+    container.innerHTML = '<li class="empty">❌ 加载失败: ' + esc(e.message) + '</li>';
+  }
+}
+
+async function loadPendingItems() {
+  const container = document.getElementById('pendingItemsList');
+  container.innerHTML = '<li class="loading"><span class="spinner"></span></li>';
+  try {
+    const data = await api('get_pending_items');
+    const items = data.items || [];
+    if (items.length === 0) {
+      container.innerHTML = '<li class="empty"><span class="empty-icon">🎉</span>没有待处理事项喵~ 主人可以放心啦!</li>';
+      return;
+    }
+    let html = '';
+    for (const item of items) {
+      const prioIcon = item.priority === 'high' ? '🔥' : item.priority === 'medium' ? '⭐' : '🌿';
+      html += '<div class="pending-item">';
+      html += '<span class="pend-icon">' + prioIcon + '</span>';
+      html += '<div class="pend-body">';
+      html += '<div class="pend-subject">' + esc(item.subject || '(无主题)') + '</div>';
+      html += '<div class="pend-desc">' + esc(item.description || '') + '</div>';
+      html += '</div>';
+      html += '<div class="pend-actions">';
+      html += '<button class="ghost tiny" onclick="showEmailDetail(\'' + esc(item.uid) + '\')">查看</button>';
+      html += '</div>';
+      html += '</div>';
+    }
+    container.innerHTML = html;
+  } catch (e) {
+    container.innerHTML = '<li class="empty">❌ 加载失败: ' + esc(e.message) + '</li>';
+  }
+}
+
+// ── New Email Polling ──
+async function pollNewEmails() {
+  try {
+    const data = await api('check_new_emails', {last_uid: LAST_KNOWN_UID, limit: 10});
+    if (data.latest_uid) {
+      LAST_KNOWN_UID = data.latest_uid;
+    }
+    if (data.has_new && data.new_emails && data.new_emails.length > 0) {
+      const count = data.count || data.new_emails.length;
+      const highCount = data.high_priority_count || 0;
+      let toastMsg = '🐱 收到 ' + count + ' 封新邮件喵~';
+      if (highCount > 0) {
+        toastMsg += ' 其中 ' + highCount + ' 封高优先级!';
+      }
+      if (data.auto_read_count > 0) {
+        toastMsg += ' 已自动处理 ' + data.auto_read_count + ' 封广告邮件~';
+      }
+      showNewEmailToast(toastMsg);
+      // Refresh summary badge
+      loadSummary();
+    }
+  } catch (e) {
+    console.error('poll new emails failed:', e);
+  }
+}
+
+function showNewEmailToast(msg) {
+  const toast = document.getElementById('newEmailToast');
+  document.getElementById('newEmailToastBody').textContent = msg;
+  toast.classList.add('show');
+  setTimeout(() => toast.classList.remove('show'), 8000);
+}
+
+function hideNewEmailToast() {
+  document.getElementById('newEmailToast').classList.remove('show');
+}
+
+function startMonitor() {
+  if (MONITOR_TIMER) clearInterval(MONITOR_TIMER);
+  // Initial check after 10s
+  setTimeout(() => pollNewEmails(), 10000);
+  // Then every 5 minutes
+  MONITOR_TIMER = setInterval(() => pollNewEmails(), MONITOR_INTERVAL);
+}
+
+// ── Tab Switch (extend) ──
+document.querySelectorAll('.tab').forEach(tab => {
+  const origHandler = tab.onclick;
+  tab.addEventListener('click', () => {
+    if (tab.dataset.tab === 'monitor') {
+      loadMonitorPanel();
+    }
+  });
+});
+
 // ── Init ──
 loadSummary();
+startMonitor();
 </script>
 </body>
 </html>

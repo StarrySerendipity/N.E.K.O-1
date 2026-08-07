@@ -53,9 +53,16 @@ class NekoMailClient:
         self._connected = False
     
     def _ensure_connected(self):
-        """确保 IMAP 连接可用"""
+        """确保 IMAP 连接可用，支持自动重连"""
         if self._imap is None or not self._connected:
             self._connect()
+        else:
+            # 检查连接是否仍然有效
+            try:
+                self._imap.noop()
+            except Exception:
+                # 连接已断开，尝试重连
+                self._reconnect()
     
     def _connect(self):
         """连接到 IMAP 服务器"""
@@ -177,8 +184,9 @@ class NekoMailClient:
             has_attachments = 'multipart' in content_type.lower()
             
             # 创建临时 EmailMessage 用于优先级分类
+            uid_str = uid.decode('utf-8') if isinstance(uid, bytes) else str(uid)
             temp_email = EmailMessage(
-                uid=str(uid),
+                uid=uid_str,
                 subject=subject,
                 sender=sender,
                 recipients=recipients,
@@ -194,7 +202,7 @@ class NekoMailClient:
             priority = classify_priority(temp_email, self.high_priority_senders)
             
             return {
-                "uid": str(uid),
+                "uid": uid_str,
                 "subject": subject,
                 "sender": sender,
                 "recipients": recipients,
@@ -294,8 +302,9 @@ class NekoMailClient:
                 )
                 body_text += att_summary
             
+            uid_str = uid.decode('utf-8') if isinstance(uid, bytes) else str(uid)
             email_msg = EmailMessage(
-                uid=str(uid),
+                uid=uid_str,
                 subject=subject,
                 sender=sender,
                 recipients=recipients,
@@ -509,8 +518,10 @@ class NekoMailClient:
         self._ensure_connected()
         
         try:
+            # 重新选择文件夹以确保获取最新邮件
             self._imap.select(folder, readonly=True)
             
+            # 构建搜索条件
             criteria = [
                 f'(SUBJECT "{keyword}")',
                 f'(FROM "{keyword}")',
@@ -637,6 +648,36 @@ class NekoMailClient:
             self._reconnect()
             return {"success": 0, "error": str(e)}
     
+    def batch_delete(self, uids: list[str], folder: str = "INBOX") -> dict:
+        """批量删除邮件"""
+        self._ensure_connected()
+        
+        try:
+            self._imap.select(folder)
+            success_count = 0
+            failed_uids = []
+            
+            for uid in uids:
+                try:
+                    # 标记为删除
+                    self._imap.store(uid.encode(), '+FLAGS', '\\Deleted')
+                    success_count += 1
+                except Exception:
+                    failed_uids.append(uid)
+            
+            # 执行删除操作
+            if success_count > 0:
+                self._imap.expunge()
+            
+            return {
+                "success": success_count,
+                "failed": len(failed_uids),
+                "failed_uids": failed_uids
+            }
+        except Exception as e:
+            self._reconnect()
+            return {"success": 0, "failed": len(uids), "error": str(e)}
+    
     def send(
         self,
         to: str,
@@ -674,3 +715,72 @@ class NekoMailClient:
             return True
         except Exception as e:
             raise RuntimeError(f"发送邮件失败: {e}")
+    
+    # ── 新邮件监听 ──
+    
+    def get_latest_uid(self, folder: str = "INBOX") -> Optional[str]:
+        """获取文件夹中最新的邮件 UID"""
+        self._ensure_connected()
+        
+        try:
+            self._imap.select(folder, readonly=True)
+            status, messages = self._imap.search(None, 'ALL')
+            
+            if status != 'OK' or not messages[0]:
+                return None
+            
+            uids = messages[0].split()
+            if not uids:
+                return None
+            
+            # 返回最新的 UID
+            return uids[-1].decode('utf-8') if isinstance(uids[-1], bytes) else uids[-1]
+        except Exception:
+            return None
+    
+    def get_new_emails_since_uid(self, last_uid: str, folder: str = "INBOX", limit: int = 20) -> list[dict]:
+        """获取自上次 UID 之后的新邮件（轻量级邮件头）"""
+        self._ensure_connected()
+        
+        try:
+            self._imap.select(folder, readonly=True)
+            status, messages = self._imap.search(None, 'ALL')
+            
+            if status != 'OK' or not messages[0]:
+                return []
+            
+            all_uids = messages[0].split()
+            if not all_uids:
+                return []
+            
+            # 找到 last_uid 之后的邮件
+            new_uids = []
+            found_last = False
+            for uid in all_uids:
+                uid_str = uid.decode('utf-8') if isinstance(uid, bytes) else uid
+                if uid_str == last_uid:
+                    found_last = True
+                    continue
+                if found_last:
+                    new_uids.append(uid)
+            
+            # 如果没有找到 last_uid，说明是新连接，返回最新的几封
+            if not found_last:
+                new_uids = all_uids[-limit:] if len(all_uids) > limit else all_uids
+            
+            # 限制数量
+            new_uids = new_uids[-limit:]
+            
+            results = []
+            for uid in new_uids:
+                try:
+                    header_info = self._fetch_email_headers(uid, folder)
+                    if header_info:
+                        results.append(header_info)
+                except Exception:
+                    continue
+            
+            return results
+        except Exception as e:
+            self._reconnect()
+            raise RuntimeError(f"获取新邮件失败: {e}")

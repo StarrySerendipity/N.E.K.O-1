@@ -514,3 +514,376 @@ class NekoMailPluginEntry(NekoPluginBase):
             return Ok({"folders": result})
         except Exception as e:
             return Err(SdkError(f"列出文件夹失败: {e}"))
+
+    @llm_tool(
+        name="neko_mail_check_new",
+        description="检查新邮件。传入上次检查时记录的 latest_uid，返回新增的邮件列表。猫娘可以用这个功能定时检查是否有新邮件到达。",
+        parameters={
+            "type": "object",
+            "properties": {
+                "last_uid": {"type": "string", "description": "上次检查时记录的最新邮件 UID，首次调用可不传"},
+                "folder": {"type": "string", "description": "文件夹名称,默认 INBOX"},
+                "limit": {"type": "integer", "description": "最多返回的新邮件数量,默认 20"},
+            },
+            "required": [],
+        },
+        timeout=30.0,
+    )
+    @plugin_entry(
+        id="check_new_emails",
+        name="检查新邮件",
+        description="检查自上次 UID 之后的新邮件",
+        input_schema={
+            "type": "object",
+            "properties": {
+                "last_uid": {"type": "string"},
+                "folder": {"type": "string"},
+                "limit": {"type": "integer"},
+            },
+            "required": [],
+        },
+        llm_result_fields=["new_emails", "latest_uid", "has_new", "count", "high_priority_count", "high_priority_emails"],
+    )
+    async def check_new_emails(self, last_uid: Optional[str] = None, folder: str = "INBOX", limit: int = 20, **_):
+        """检查新邮件"""
+        try:
+            plugin = self._get_plugin()
+            result = plugin.check_new_emails(last_uid=last_uid, folder=folder, limit=limit)
+            if isinstance(result, dict) and "error" in result:
+                return Err(SdkError(result["error"]))
+            return Ok(result)
+        except Exception as e:
+            return Err(SdkError(f"检查新邮件失败: {e}"))
+
+    @llm_tool(
+        name="neko_mail_batch_delete",
+        description="批量删除邮件。可以传入多个邮件 UID 一次性删除。",
+        parameters={
+            "type": "object",
+            "properties": {
+                "uids": {
+                    "type": "array",
+                    "items": {"type": "string"},
+                    "description": "邮件 UID 列表",
+                },
+                "folder": {"type": "string", "description": "文件夹名称,默认 INBOX"},
+            },
+            "required": ["uids"],
+        },
+        timeout=30.0,
+    )
+    @plugin_entry(
+        id="batch_delete",
+        name="批量删除邮件",
+        description="批量删除多封邮件",
+        input_schema={
+            "type": "object",
+            "properties": {
+                "uids": {"type": "array", "items": {"type": "string"}},
+                "folder": {"type": "string"},
+            },
+            "required": ["uids"],
+        },
+        llm_result_fields=["success", "failed", "failed_uids"],
+    )
+    async def batch_delete(self, uids: list[str], folder: str = "INBOX", **_):
+        """批量删除邮件"""
+        try:
+            plugin = self._get_plugin()
+            result = plugin.batch_delete(uids=uids, folder=folder)
+            if "error" in result:
+                return Err(SdkError(result["error"]))
+            return Ok(result)
+        except Exception as e:
+            return Err(SdkError(f"批量删除失败: {e}"))
+
+    @llm_tool(
+        name="neko_mail_get_daily_briefing",
+        description="获取每日邮件简报数据,供早安播报插件调用。返回今日收件总数、自动处理数、重要邮件摘要、待处理事项等。",
+        parameters={
+            "type": "object",
+            "properties": {
+                "target_date": {"type": "string", "description": "目标日期,格式YYYY-MM-DD,默认今天"},
+            },
+            "required": [],
+        },
+        timeout=15.0,
+    )
+    @plugin_entry(
+        id="get_daily_briefing",
+        name="获取每日邮件简报",
+        description="获取每日邮件简报数据,供其他插件联动调用",
+        input_schema={
+            "type": "object",
+            "properties": {
+                "target_date": {"type": "string"},
+            },
+            "required": [],
+        },
+        llm_result_fields=["date", "total_received", "auto_processed", "important_unread", "highlights", "pending_items"],
+    )
+    async def get_daily_briefing(self, target_date: Optional[str] = None, **_):
+        """获取每日邮件简报"""
+        try:
+            plugin = self._get_plugin()
+            result = plugin.get_daily_briefing(target_date=target_date)
+            return Ok(result)
+        except Exception as e:
+            return Err(SdkError(f"获取每日简报失败: {e}"))
+
+    @llm_tool(
+        name="neko_mail_get_operation_logs",
+        description="获取今日操作日志。返回猫娘今天执行的所有邮箱操作记录,按时间倒序。",
+        parameters={
+            "type": "object",
+            "properties": {
+                "limit": {"type": "integer", "description": "最多返回条数,默认100"},
+            },
+            "required": [],
+        },
+        timeout=10.0,
+    )
+    @plugin_entry(
+        id="get_operation_logs",
+        name="获取操作日志",
+        description="获取今日猫娘邮箱操作日志",
+        input_schema={
+            "type": "object",
+            "properties": {
+                "limit": {"type": "integer"},
+            },
+            "required": [],
+        },
+        llm_result_fields=["logs"],
+    )
+    async def get_operation_logs(self, limit: int = 100, **_):
+        """获取操作日志"""
+        try:
+            plugin = self._get_plugin()
+            result = plugin.get_operation_logs(limit=limit)
+            return Ok({"logs": result})
+        except Exception as e:
+            return Err(SdkError(f"获取操作日志失败: {e}"))
+
+    @llm_tool(
+        name="neko_mail_get_category_stats",
+        description="获取邮件分类统计。返回今日各类邮件的数量和处理情况。",
+        parameters={
+            "type": "object",
+            "properties": {},
+            "required": [],
+        },
+        timeout=10.0,
+    )
+    @plugin_entry(
+        id="get_category_stats",
+        name="获取分类统计",
+        description="获取邮件分类统计数据",
+        input_schema={
+            "type": "object",
+            "properties": {},
+            "required": [],
+        },
+        llm_result_fields=["stats"],
+    )
+    async def get_category_stats(self, **_):
+        """获取分类统计"""
+        try:
+            plugin = self._get_plugin()
+            result = plugin.get_category_stats()
+            return Ok({"stats": result})
+        except Exception as e:
+            return Err(SdkError(f"获取分类统计失败: {e}"))
+
+    @llm_tool(
+        name="neko_mail_get_pending_items",
+        description="获取待处理事项列表。返回当前未处理的重要邮件,按优先级排序。",
+        parameters={
+            "type": "object",
+            "properties": {},
+            "required": [],
+        },
+        timeout=10.0,
+    )
+    @plugin_entry(
+        id="get_pending_items",
+        name="获取待处理事项",
+        description="获取当前待处理的重要邮件列表",
+        input_schema={
+            "type": "object",
+            "properties": {},
+            "required": [],
+        },
+        llm_result_fields=["items"],
+    )
+    async def get_pending_items(self, **_):
+        """获取待处理事项"""
+        try:
+            plugin = self._get_plugin()
+            result = plugin.get_pending_items()
+            return Ok({"items": result})
+        except Exception as e:
+            return Err(SdkError(f"获取待处理事项失败: {e}"))
+
+    @llm_tool(
+        name="neko_mail_get_important_emails",
+        description="获取重要邮件日志。返回被判定为高优先级并推送过的邮件记录。",
+        parameters={
+            "type": "object",
+            "properties": {
+                "limit": {"type": "integer", "description": "最多返回条数,默认50"},
+            },
+            "required": [],
+        },
+        timeout=10.0,
+    )
+    @plugin_entry(
+        id="get_important_emails",
+        name="获取重要邮件日志",
+        description="获取被判定为重要并推送过的邮件记录",
+        input_schema={
+            "type": "object",
+            "properties": {
+                "limit": {"type": "integer"},
+            },
+            "required": [],
+        },
+        llm_result_fields=["emails"],
+    )
+    async def get_important_emails(self, limit: int = 50, **_):
+        """获取重要邮件日志"""
+        try:
+            plugin = self._get_plugin()
+            result = plugin.get_important_emails(limit=limit)
+            return Ok({"emails": result})
+        except Exception as e:
+            return Err(SdkError(f"获取重要邮件日志失败: {e}"))
+
+    @llm_tool(
+        name="neko_mail_get_overview",
+        description="获取今日概览数据。返回今日操作总数、各类操作计数、重要邮件数、待处理事项数等。",
+        parameters={
+            "type": "object",
+            "properties": {},
+            "required": [],
+        },
+        timeout=10.0,
+    )
+    @plugin_entry(
+        id="get_overview",
+        name="获取今日概览",
+        description="获取今日猫娘邮箱操作概览数据",
+        input_schema={
+            "type": "object",
+            "properties": {},
+            "required": [],
+        },
+        llm_result_fields=["date", "total_operations", "mark_read_count", "batch_mark_read_count", "auto_mark_read_count", "push_reminder_count", "send_email_count", "important_emails_count", "pending_items_count"],
+    )
+    async def get_overview(self, **_):
+        """获取今日概览"""
+        try:
+            plugin = self._get_plugin()
+            result = plugin.get_overview()
+            return Ok(result)
+        except Exception as e:
+            return Err(SdkError(f"获取今日概览失败: {e}"))
+
+    @llm_tool(
+        name="neko_mail_start_polling",
+        description="启动新邮件轮询监听。每隔指定时间(默认5分钟)自动检查收件箱新邮件,发现新邮件立即触发后续处理流程。",
+        parameters={
+            "type": "object",
+            "properties": {
+                "interval_seconds": {
+                    "type": "integer",
+                    "description": "轮询间隔(秒),默认300秒(5分钟)",
+                },
+            },
+            "required": [],
+        },
+        timeout=10.0,
+    )
+    @plugin_entry(
+        id="start_polling",
+        name="启动邮件轮询",
+        description="启动新邮件自动轮询监听",
+        input_schema={
+            "type": "object",
+            "properties": {
+                "interval_seconds": {"type": "integer"},
+            },
+            "required": [],
+        },
+        llm_result_fields=["status", "interval", "last_uid"],
+    )
+    async def start_polling(self, interval_seconds: int = 300, **_):
+        """启动邮件轮询"""
+        try:
+            plugin = self._get_plugin()
+            result = plugin.start_polling(interval_seconds=interval_seconds)
+            if "error" in result:
+                return Err(SdkError(result["error"]))
+            return Ok(result)
+        except Exception as e:
+            return Err(SdkError(f"启动轮询失败: {e}"))
+
+    @llm_tool(
+        name="neko_mail_stop_polling",
+        description="停止新邮件轮询监听。",
+        parameters={
+            "type": "object",
+            "properties": {},
+            "required": [],
+        },
+        timeout=10.0,
+    )
+    @plugin_entry(
+        id="stop_polling",
+        name="停止邮件轮询",
+        description="停止新邮件自动轮询监听",
+        input_schema={
+            "type": "object",
+            "properties": {},
+            "required": [],
+        },
+        llm_result_fields=["status"],
+    )
+    async def stop_polling(self, **_):
+        """停止邮件轮询"""
+        try:
+            plugin = self._get_plugin()
+            result = plugin.stop_polling()
+            return Ok(result)
+        except Exception as e:
+            return Err(SdkError(f"停止轮询失败: {e}"))
+
+    @llm_tool(
+        name="neko_mail_get_polling_status",
+        description="获取新邮件轮询监听状态。返回是否正在运行、轮询间隔、上次检查的最新邮件UID等信息。",
+        parameters={
+            "type": "object",
+            "properties": {},
+            "required": [],
+        },
+        timeout=10.0,
+    )
+    @plugin_entry(
+        id="get_polling_status",
+        name="获取轮询状态",
+        description="获取新邮件轮询监听状态",
+        input_schema={
+            "type": "object",
+            "properties": {},
+            "required": [],
+        },
+        llm_result_fields=["is_running", "interval", "last_known_uid"],
+    )
+    async def get_polling_status(self, **_):
+        """获取轮询状态"""
+        try:
+            plugin = self._get_plugin()
+            result = plugin.get_polling_status()
+            return Ok(result)
+        except Exception as e:
+            return Err(SdkError(f"获取轮询状态失败: {e}"))

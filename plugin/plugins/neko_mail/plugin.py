@@ -6,13 +6,17 @@ v0.2 优化:
   - get_today_summary 使用轻量级邮件头方法,速度提升10倍+
   - 新增 get_all_emails 接口,支持已读+未读邮件列表
   - 新增 get_email_detail 接口,按需加载完整邮件
+  - 新增新邮件轮询监听机制(每5分钟自动检查)
 """
 
+import threading
+import time
 from datetime import datetime, date
 from typing import Optional
 from .client import NekoMailClient
 from .models import EmailMessage, EmailSummary, EmailSnippet, FolderInfo
 from .parser import classify_email_type
+from .operation_log import OperationLog
 
 
 class NekoMailPlugin:
@@ -39,6 +43,15 @@ class NekoMailPlugin:
             high_priority_senders=high_priority_senders,
             ignore_folders=ignore_folders,
         )
+        self.op_log = OperationLog()
+        
+        # 新邮件轮询监听
+        self._polling_thread: Optional[threading.Thread] = None
+        self._polling_stop_event = threading.Event()
+        self._polling_interval = 300  # 5分钟 = 300秒
+        self._last_known_uid: Optional[str] = None
+        self._new_email_callback = None  # 外部可注册的回调函数
+        self._polling_lock = threading.Lock()
     
     # === 读取类 ===
     
@@ -163,14 +176,37 @@ class NekoMailPlugin:
         """标记已读"""
         try:
             success = self.client.mark_read(uid=uid, folder=folder)
+            if success:
+                self.op_log.log_operation(
+                    operation_type="mark_read",
+                    description=f"标记邮件 {uid} 为已读",
+                    email_uid=uid
+                )
             return {"success": success, "uid": uid}
         except Exception as e:
             return {"error": str(e)}
     
-    def batch_mark_read(self, uids: list[str], folder: str = "INBOX") -> dict:
-        """批量标记邮件已读"""
+    def batch_mark_read(self, uids: list[str] | str, folder: str = "INBOX") -> dict:
+        """批量标记邮件已读，支持传入 'all' 标记所有邮件"""
         try:
+            # 支持 "all" 参数
+            if uids == "all":
+                result = self.client.mark_all_read(folder=folder)
+                if "success" in result and result["success"] > 0:
+                    self.op_log.log_operation(
+                        operation_type="batch_mark_read",
+                        description=f"批量标记文件夹 {folder} 内所有邮件为已读，共 {result['success']} 封",
+                        details={"count": result["success"], "folder": folder}
+                    )
+                return result
+            
             result = self.client.batch_mark_read(uids=uids, folder=folder)
+            if result.get("success", 0) > 0:
+                self.op_log.log_operation(
+                    operation_type="batch_mark_read",
+                    description=f"批量标记 {result['success']} 封邮件为已读",
+                    details={"count": result["success"], "failed": result.get("failed", 0)}
+                )
             return result
         except Exception as e:
             return {"error": str(e)}
@@ -179,6 +215,26 @@ class NekoMailPlugin:
         """标记文件夹内所有邮件为已读"""
         try:
             result = self.client.mark_all_read(folder=folder)
+            if result.get("success", 0) > 0:
+                self.op_log.log_operation(
+                    operation_type="batch_mark_read",
+                    description=f"标记文件夹 {folder} 内所有邮件为已读，共 {result['success']} 封",
+                    details={"count": result["success"], "folder": folder}
+                )
+            return result
+        except Exception as e:
+            return {"error": str(e)}
+    
+    def batch_delete(self, uids: list[str], folder: str = "INBOX") -> dict:
+        """批量删除邮件"""
+        try:
+            result = self.client.batch_delete(uids=uids, folder=folder)
+            if result.get("success", 0) > 0:
+                self.op_log.log_operation(
+                    operation_type="batch_delete",
+                    description=f"批量删除 {result['success']} 封邮件",
+                    details={"count": result["success"], "failed": result.get("failed", 0), "folder": folder}
+                )
             return result
         except Exception as e:
             return {"error": str(e)}
@@ -193,7 +249,119 @@ class NekoMailPlugin:
         """发送邮件"""
         try:
             success = self.client.send(to=to, subject=subject, body=body, cc=cc)
+            if success:
+                self.op_log.log_operation(
+                    operation_type="send_email",
+                    description=f"发送邮件给 {to}",
+                    details={"to": to, "subject": subject, "cc": cc}
+                )
             return {"success": success, "to": to, "subject": subject}
+        except Exception as e:
+            return {"error": str(e)}
+    
+    # === 新邮件监听 ===
+    
+    def check_new_emails(self, last_uid: Optional[str] = None, folder: str = "INBOX", limit: int = 20) -> dict:
+        """检查新邮件，返回自上次 UID 之后的新邮件"""
+        try:
+            # 如果没有提供 last_uid，获取当前最新的
+            if not last_uid:
+                current_latest = self.client.get_latest_uid(folder=folder)
+                return {
+                    "new_emails": [],
+                    "latest_uid": current_latest,
+                    "has_new": False,
+                    "count": 0
+                }
+            
+            # 获取新邮件
+            new_headers = self.client.get_new_emails_since_uid(
+                last_uid=last_uid, 
+                folder=folder, 
+                limit=limit
+            )
+            
+            if not new_headers:
+                return {
+                    "new_emails": [],
+                    "latest_uid": last_uid,
+                    "has_new": False,
+                    "count": 0
+                }
+            
+            # 转换为前端格式
+            new_emails = [self._header_to_dict(h) for h in new_headers]
+            
+            # 获取最新的 UID
+            latest_uid = self.client.get_latest_uid(folder=folder)
+            
+            # 筛选高优先级和低优先级邮件
+            high_priority = [e for e in new_emails if e.get("priority") == "high"]
+            low_priority = [e for e in new_emails if e.get("priority") == "low"]
+            
+            # 自动标记低优先级邮件（广告/订阅）为已读
+            auto_read_count = 0
+            for email in low_priority:
+                if email.get("category") in ["subscription", "ads"]:
+                    try:
+                        self.client.mark_read(uid=email["uid"], folder=folder)
+                        self.op_log.log_operation(
+                            operation_type="auto_mark_read",
+                            description=f"自动标记低优先级邮件为已读: {email['subject']}",
+                            email_uid=email["uid"],
+                            email_subject=email["subject"],
+                            email_sender=email["sender"]
+                        )
+                        self.op_log.update_category_stats(email.get("category", "general"), "auto_read")
+                        auto_read_count += 1
+                    except Exception:
+                        pass
+            
+            # 记录操作日志
+            self.op_log.log_operation(
+                operation_type="check_new",
+                description=f"检查新邮件，发现 {len(new_emails)} 封",
+                details={"count": len(new_emails), "high_priority": len(high_priority), "auto_read": auto_read_count, "folder": folder}
+            )
+            
+            # 记录分类统计
+            for email in new_emails:
+                category = email.get("category", "general")
+                if email.get("priority") != "low":
+                    self.op_log.update_category_stats(category, "pending")
+            
+            # 记录高优先级邮件
+            for email in high_priority:
+                self.op_log.log_important_email(
+                    uid=email["uid"],
+                    subject=email["subject"],
+                    sender=email["sender"],
+                    category=email.get("category", "general"),
+                    category_label=email.get("category_label", "普通邮件"),
+                    priority="high",
+                    key_info=email.get("key_info", {}),
+                    action_taken="pushed"
+                )
+                # 添加到待处理事项
+                self.op_log.add_pending_item(
+                    uid=email["uid"],
+                    subject=email["subject"],
+                    sender=email["sender"],
+                    category=email.get("category", "general"),
+                    category_label=email.get("category_label", "普通邮件"),
+                    priority="high",
+                    description=f"来自 {email['sender']} 的高优先级邮件"
+                )
+            
+            return {
+                "new_emails": new_emails,
+                "latest_uid": latest_uid or last_uid,
+                "has_new": len(new_emails) > 0,
+                "count": len(new_emails),
+                "high_priority_count": len(high_priority),
+                "high_priority_emails": high_priority,
+                "auto_read_count": auto_read_count
+            }
         except Exception as e:
             return {"error": str(e)}
     
@@ -276,6 +444,147 @@ class NekoMailPlugin:
             "catgirl_hint": classification["catgirl_hint"],
         }
     
+    # === 监控面板 & 日志查询 ===
+    
+    def get_daily_briefing(self, target_date: Optional[str] = None) -> dict:
+        """获取每日简报数据（供早安播报插件调用）"""
+        return self.op_log.get_daily_briefing(target_date)
+    
+    def get_operation_logs(self, limit: int = 100) -> list[dict]:
+        """获取今日操作日志"""
+        return self.op_log.get_today_logs(limit)
+    
+    def get_category_stats(self) -> dict:
+        """获取邮件分类统计"""
+        return self.op_log.get_category_stats()
+    
+    def get_pending_items(self) -> list[dict]:
+        """获取待处理事项"""
+        return self.op_log.get_pending_items()
+    
+    def get_important_emails(self, limit: int = 50) -> list[dict]:
+        """获取重要邮件日志"""
+        return self.op_log.get_important_emails(limit)
+    
+    def get_overview(self) -> dict:
+        """获取今日概览数据"""
+        return self.op_log.get_today_summary()
+    
+    # === 新邮件轮询监听 ===
+    
+    def start_polling(self, interval_seconds: int = 300, callback=None):
+        """
+        启动新邮件轮询监听
+        
+        Args:
+            interval_seconds: 轮询间隔（秒），默认 300 秒（5 分钟）
+            callback: 新邮件回调函数，签名 callback(new_emails: list[dict])
+        """
+        with self._polling_lock:
+            if self._polling_thread and self._polling_thread.is_alive():
+                return {"error": "轮询已在运行中"}
+            
+            self._polling_interval = interval_seconds
+            self._new_email_callback = callback
+            self._polling_stop_event.clear()
+            
+            # 获取当前最新 UID 作为起点
+            try:
+                self._last_known_uid = self.client.get_latest_uid(folder="INBOX")
+            except Exception:
+                self._last_known_uid = None
+            
+            self._polling_thread = threading.Thread(
+                target=self._polling_worker,
+                name="NekoMailPollingThread",
+                daemon=True
+            )
+            self._polling_thread.start()
+            
+            self.op_log.log_operation(
+                operation_type="polling_started",
+                description=f"启动新邮件轮询，间隔 {interval_seconds} 秒",
+                details={"interval": interval_seconds}
+            )
+            
+            return {
+                "status": "started",
+                "interval": interval_seconds,
+                "last_uid": self._last_known_uid
+            }
+    
+    def stop_polling(self):
+        """停止新邮件轮询"""
+        with self._polling_lock:
+            if not self._polling_thread or not self._polling_thread.is_alive():
+                return {"status": "not_running"}
+            
+            self._polling_stop_event.set()
+            self._polling_thread.join(timeout=10)
+            
+            self.op_log.log_operation(
+                operation_type="polling_stopped",
+                description="停止新邮件轮询"
+            )
+            
+            return {"status": "stopped"}
+    
+    def get_polling_status(self) -> dict:
+        """获取轮询状态"""
+        is_running = self._polling_thread and self._polling_thread.is_alive()
+        return {
+            "is_running": is_running,
+            "interval": self._polling_interval,
+            "last_known_uid": self._last_known_uid
+        }
+    
+    def _polling_worker(self):
+        """轮询工作线程"""
+        while not self._polling_stop_event.is_set():
+            try:
+                # 检查新邮件
+                result = self.check_new_emails(
+                    last_uid=self._last_known_uid,
+                    folder="INBOX",
+                    limit=50
+                )
+                
+                if result.get("has_new") and result.get("new_emails"):
+                    new_emails = result["new_emails"]
+                    
+                    # 更新最新 UID
+                    if result.get("latest_uid"):
+                        self._last_known_uid = result["latest_uid"]
+                    
+                    # 触发回调
+                    if self._new_email_callback:
+                        try:
+                            self._new_email_callback(new_emails)
+                        except Exception as e:
+                            self.op_log.log_operation(
+                                operation_type="polling_callback_error",
+                                description=f"新邮件回调执行失败: {e}",
+                                details={"error": str(e)}
+                            )
+                    
+                    # 记录日志
+                    self.op_log.log_operation(
+                        operation_type="new_emails_detected",
+                        description=f"检测到 {len(new_emails)} 封新邮件",
+                        details={"count": len(new_emails), "emails": [e.get("subject") for e in new_emails[:5]]}
+                    )
+                
+            except Exception as e:
+                self.op_log.log_operation(
+                    operation_type="polling_error",
+                    description=f"轮询检查失败: {e}",
+                    details={"error": str(e)}
+                )
+            
+            # 等待下一轮（使用 stop_event.wait 以便快速响应停止信号）
+            self._polling_stop_event.wait(self._polling_interval)
+    
     def close(self):
         """关闭连接"""
+        self.stop_polling()  # 先停止轮询
         self.client.disconnect()

@@ -5,7 +5,7 @@ short_description = "Catgirl mail secretary — QQ mailbox summaries, priority c
 keywords = ["邮件", "邮箱", "email", "mail", "QQ邮箱", "IMAP", "SMTP", "摘要", "猫娘", "メール", "메일", "почта", "correo"]
 version = "0.1.0"
 id = "neko_mail"
-entry = "plugin.plugins.neko_mail:NekoMailPluginEntry"
+entry = "plugins.neko_mail:NekoMailPluginEntry"
 
 [plugin.author]
 name = "N.E.K.O Team"
