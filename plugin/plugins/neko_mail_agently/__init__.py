@@ -55,12 +55,21 @@ def parse_agently_output(stdout: str, stderr: str) -> Dict[str, Any]:
 async def run_agently_command(args: List[str], cli_path: str = "agently-cli") -> Dict[str, Any]:
     """异步执行 Agently CLI 命令"""
     try:
-        cmd = [cli_path] + args
-        process = await asyncio.create_subprocess_exec(
-            *cmd,
-            stdout=asyncio.subprocess.PIPE,
-            stderr=asyncio.subprocess.PIPE
-        )
+        # Windows 下 .cmd 文件需要通过 cmd /c 执行
+        if cli_path.lower().endswith('.cmd'):
+            cmd_str = f'cmd /c "{cli_path}" ' + ' '.join(f'"{a}"' if ' ' in a else a for a in args)
+            process = await asyncio.create_subprocess_shell(
+                cmd_str,
+                stdout=asyncio.subprocess.PIPE,
+                stderr=asyncio.subprocess.PIPE
+            )
+        else:
+            cmd = [cli_path] + args
+            process = await asyncio.create_subprocess_exec(
+                *cmd,
+                stdout=asyncio.subprocess.PIPE,
+                stderr=asyncio.subprocess.PIPE
+            )
         stdout, stderr = await process.communicate()
 
         stdout_str = stdout.decode('utf-8', errors='ignore')
