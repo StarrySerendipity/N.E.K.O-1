@@ -147,9 +147,12 @@ class NekoMailPluginEntry(NekoPluginBase):
         return self._mail_plugin
 
     def _push_new_email_notification(self, new_emails: list[dict]) -> None:
-        """推送新邮件通知（包含正文内容）"""
+        """推送新邮件通知（包含正文内容）- 从后台线程安全调用"""
         if not new_emails:
+            self.logger.warning("_push_new_email_notification: new_emails is empty")
             return
+        
+        self.logger.info(f"_push_new_email_notification: processing {len(new_emails)} emails")
         
         # 获取动态称呼
         plugin = self._get_plugin()
@@ -162,6 +165,8 @@ class NekoMailPluginEntry(NekoPluginBase):
         sender = first_email.get("sender", "未知发件人")
         priority = first_email.get("priority", "medium")
         body_text = first_email.get("body_text", "")
+        
+        self.logger.info(f"Email details: subject={subject}, sender={sender}, priority={priority}, has_body={bool(body_text)}")
         
         # 构建通知文本（包含正文）
         if count == 1:
@@ -199,22 +204,54 @@ class NekoMailPluginEntry(NekoPluginBase):
                 text = f"📬 {master_name}，收到 {count} 封新邮件，最新一封来自 {sender}：「{subject}」"
                 priority_level = 5
         
+        self.logger.info(f"Pushing notification: priority={priority_level}, text_length={len(text)}")
+        
         try:
-            self.ctx.push_message(
-                source="neko_mail",
-                visibility=[],
-                ai_behavior="normal",
-                parts=[{"type": "text", "text": text}],
-                priority=priority_level,
-                metadata={
-                    "description": f"📧 新邮件通知 [{count}封]",
-                    "email_count": count,
-                    "first_subject": subject,
-                    "first_sender": sender,
-                },
-            )
-        except Exception:
-            self.logger.exception("push_message failed for new email notification")
+            # 使用异步版本，确保线程安全
+            import asyncio
+            try:
+                loop = asyncio.get_event_loop()
+            except RuntimeError:
+                loop = asyncio.new_event_loop()
+                asyncio.set_event_loop(loop)
+            
+            if loop.is_running():
+                # 如果事件循环已在运行，创建任务
+                asyncio.run_coroutine_threadsafe(
+                    self.ctx.push_message_async(
+                        source="neko_mail",
+                        visibility=[],
+                        ai_behavior="respond",  # 修复：使用正确的 ai_behavior
+                        parts=[{"type": "text", "text": text}],
+                        priority=priority_level,
+                        metadata={
+                            "description": f"📧 新邮件通知 [{count}封]",
+                            "email_count": count,
+                            "first_subject": subject,
+                            "first_sender": sender,
+                        },
+                    ),
+                    loop
+                )
+                self.logger.info("push_message_async scheduled successfully")
+            else:
+                # 直接调用同步版本
+                self.ctx.push_message(
+                    source="neko_mail",
+                    visibility=[],
+                    ai_behavior="respond",  # 修复：使用正确的 ai_behavior
+                    parts=[{"type": "text", "text": text}],
+                    priority=priority_level,
+                    metadata={
+                        "description": f"📧 新邮件通知 [{count}封]",
+                        "email_count": count,
+                        "first_subject": subject,
+                        "first_sender": sender,
+                    },
+                )
+                self.logger.info("push_message called successfully")
+        except Exception as e:
+            self.logger.exception(f"push_message failed: {type(e).__name__}: {e}")
 
     # ── LLM 工具 ─────────────────────────────────────────────────────
 

@@ -544,6 +544,10 @@ class NekoMailPlugin:
     
     def _polling_worker(self):
         """轮询工作线程"""
+        import logging
+        logger = logging.getLogger("neko_mail.polling")
+        logger.info("Polling worker started")
+        
         while not self._polling_stop_event.is_set():
             try:
                 # 检查新邮件
@@ -553,12 +557,16 @@ class NekoMailPlugin:
                     limit=50
                 )
                 
+                logger.info(f"Check result: has_new={result.get('has_new')}, count={result.get('count')}, error={result.get('error')}")
+                
                 if result.get("has_new") and result.get("new_emails"):
                     new_emails = result["new_emails"]
+                    logger.info(f"Found {len(new_emails)} new emails")
                     
                     # 更新最新 UID
                     if result.get("latest_uid"):
                         self._last_known_uid = result["latest_uid"]
+                        logger.info(f"Updated latest_uid to {self._last_known_uid}")
                     
                     # 获取完整邮件详情（包含正文）用于推送
                     full_emails = []
@@ -566,15 +574,20 @@ class NekoMailPlugin:
                         try:
                             uid = email_header.get("uid")
                             if uid:
+                                logger.info(f"Fetching full detail for email uid={uid}")
                                 full_detail = self.get_email_detail(uid=uid, folder="INBOX")
                                 if "error" not in full_detail:
                                     full_emails.append(full_detail)
+                                    logger.info(f"Got full detail for uid={uid}, subject={full_detail.get('subject')}")
                                 else:
+                                    logger.warning(f"Failed to get detail for uid={uid}: {full_detail.get('error')}")
                                     # 如果获取详情失败，使用邮件头信息
                                     full_emails.append(email_header)
                             else:
+                                logger.warning("Email header has no uid")
                                 full_emails.append(email_header)
                         except Exception as e:
+                            logger.exception(f"Error getting email detail: {e}")
                             self.op_log.log_operation(
                                 operation_type="polling_get_detail_error",
                                 description=f"获取邮件详情失败: {e}",
@@ -583,16 +596,23 @@ class NekoMailPlugin:
                             # 失败时使用邮件头信息
                             full_emails.append(email_header)
                     
+                    logger.info(f"Collected {len(full_emails)} full emails, triggering callback")
+                    
                     # 触发回调，传递完整邮件详情
                     if self._new_email_callback:
                         try:
+                            logger.info("Calling callback function")
                             self._new_email_callback(full_emails)
+                            logger.info("Callback completed successfully")
                         except Exception as e:
+                            logger.exception(f"Callback execution failed: {e}")
                             self.op_log.log_operation(
                                 operation_type="polling_callback_error",
                                 description=f"新邮件回调执行失败: {e}",
                                 details={"error": str(e)}
                             )
+                    else:
+                        logger.warning("No callback function registered!")
                     
                     # 记录日志
                     self.op_log.log_operation(
@@ -602,6 +622,7 @@ class NekoMailPlugin:
                     )
                 
             except Exception as e:
+                logger.exception(f"Polling worker error: {e}")
                 self.op_log.log_operation(
                     operation_type="polling_error",
                     description=f"轮询检查失败: {e}",
@@ -610,6 +631,8 @@ class NekoMailPlugin:
             
             # 等待下一轮（使用 stop_event.wait 以便快速响应停止信号）
             self._polling_stop_event.wait(self._polling_interval)
+        
+        logger.info("Polling worker stopped")
     
     def close(self):
         """关闭连接"""
