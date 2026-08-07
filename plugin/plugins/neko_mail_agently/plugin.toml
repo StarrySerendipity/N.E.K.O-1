@@ -17,7 +17,7 @@ auto_start = true
 [neko_mail_agently]
 # Agently CLI 路径（如果不在 PATH 中需要指定）
 # cli_path = "C:/Users/Yanfq/AppData/Roaming/npm/agently-cli.cmd"
-cli_path = "agently-cli"
+cli_path = "C:/Users/Yanfq/AppData/Roaming/npm/agently-cli.cmd"
 
 # 邮箱地址
 email_addr = "starryserendipity@agent.qq.com"
