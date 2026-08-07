@@ -706,7 +706,10 @@ class NekoMailAgentlyEntry(NekoPluginBase):
             args.extend(["--attachment", attachment_file_name])
 
         # 两阶段确认处理
-        if self.two_factor_confirm and not confirmed:
+        if confirmed:
+            # 用户已明确授权，使用 --confirmed 跳过确认
+            args.append("--confirmed")
+        elif self.two_factor_confirm:
             if confirmation_token:
                 # 使用确认令牌完成发送
                 args.extend(["--confirmation-token", confirmation_token])
@@ -736,8 +739,8 @@ class NekoMailAgentlyEntry(NekoPluginBase):
                     attach_info = f"\n附件: {attachment_file_name}" if attachment_file_name else ""
                     return Ok({
                         "success": True,
-                        "status": "queued",
-                        "message": f"✅ 邮件已加入发送队列\n收件人: {to}\n主题: {subject}{attach_info}"
+                        "status": "sent",
+                        "message": f"✅ 邮件已发送（服务端已接收）\n收件人: {to}\n主题: {subject}{attach_info}"
                     })
 
         # 执行发送（带确认令牌）
@@ -754,8 +757,8 @@ class NekoMailAgentlyEntry(NekoPluginBase):
             attach_info = f"\n附件: {attachment_file_name}" if attachment_file_name else ""
             return Ok({
                 "success": True,
-                "status": "queued",
-                "message": f"✅ 邮件已加入发送队列\n收件人: {to}\n主题: {subject}{attach_info}"
+                "status": "sent",
+                "message": f"✅ 邮件已发送（服务端已接收）\n收件人: {to}\n主题: {subject}{attach_info}"
             })
         else:
             error_msg = handle_agently_error(result)
