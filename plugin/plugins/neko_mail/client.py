@@ -14,6 +14,8 @@ import re
 import smtplib
 from datetime import datetime, date
 from email.header import decode_header
+from email.mime.text import MIMEText
+from email.mime.multipart import MIMEMultipart
 from email.utils import parseaddr, parsedate_to_datetime
 from typing import Optional
 from .models import EmailMessage, Attachment, FolderInfo
@@ -688,9 +690,6 @@ class NekoMailClient:
     ) -> bool:
         """发送邮件"""
         try:
-            from email.mime.text import MIMEText
-            from email.mime.multipart import MIMEMultipart
-            
             msg = MIMEMultipart()
             msg['From'] = self.email_addr
             msg['To'] = to
