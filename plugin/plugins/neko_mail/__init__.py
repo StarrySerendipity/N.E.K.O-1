@@ -364,7 +364,7 @@ class NekoMailPluginEntry(NekoPluginBase):
 
     @llm_tool(
         name="neko_mail_mark_read",
-        description="标记邮件已读。当主人说'标记为已读'、'看过了'等时使用。",
+        description="标记邮件已读。当用户说'标记为已读'、'看过了'等时使用。",
         parameters={
             "type": "object",
             "properties": {
@@ -924,3 +924,99 @@ class NekoMailPluginEntry(NekoPluginBase):
             return Ok(result)
         except Exception as e:
             return Err(SdkError(f"获取轮询状态失败: {e}"))
+
+    @llm_tool(
+        name="neko_mail_get_names",
+        description="获取猫娘对用户的称呼和猫娘自己的自称。返回当前配置的 master_name 和 catgirl_name。",
+        parameters={
+            "type": "object",
+            "properties": {},
+            "required": [],
+        },
+        timeout=5.0,
+    )
+    @plugin_entry(
+        id="get_names",
+        name="获取称呼配置",
+        description="获取猫娘对用户的称呼和猫娘自己的自称",
+        input_schema={
+            "type": "object",
+            "properties": {},
+            "required": [],
+        },
+        llm_result_fields=["master_name", "catgirl_name"],
+    )
+    async def get_names(self, **_):
+        """获取称呼配置"""
+        try:
+            plugin = self._get_plugin()
+            return Ok({
+                "master_name": plugin.master_name,
+                "catgirl_name": plugin.catgirl_name,
+            })
+        except Exception as e:
+            return Err(SdkError(f"获取称呼配置失败: {e}"))
+
+    @llm_tool(
+        name="neko_mail_set_names",
+        description="设置猫娘对用户的称呼和/或猫娘自己的自称。猫娘可以自主决定如何称呼用户,也可以和用户协商后共同决定。",
+        parameters={
+            "type": "object",
+            "properties": {
+                "master_name": {"type": "string", "description": "猫娘对用户的称呼,如'主人'、'哥哥'、'姐姐'等"},
+                "catgirl_name": {"type": "string", "description": "猫娘的自称,如'喵喵'、'小猫'等"},
+            },
+            "required": [],
+        },
+        timeout=5.0,
+    )
+    @plugin_entry(
+        id="set_names",
+        name="设置称呼配置",
+        description="设置猫娘对用户的称呼和/或猫娘自己的自称",
+        input_schema={
+            "type": "object",
+            "properties": {
+                "master_name": {"type": "string"},
+                "catgirl_name": {"type": "string"},
+            },
+            "required": [],
+        },
+        llm_result_fields=["success", "master_name", "catgirl_name"],
+    )
+    async def set_names(self, master_name: Optional[str] = None, catgirl_name: Optional[str] = None, **_):
+        """设置称呼配置"""
+        try:
+            plugin = self._get_plugin()
+            
+            # 更新内存中的称呼
+            if master_name is not None:
+                plugin.master_name = master_name.strip()
+            if catgirl_name is not None:
+                plugin.catgirl_name = catgirl_name.strip()
+            
+            # 持久化到配置文件
+            try:
+                cfg = await self.config.dump(timeout=5.0)
+                cfg = cfg if isinstance(cfg, dict) else {}
+                if "neko_mail" not in cfg:
+                    cfg["neko_mail"] = {}
+                
+                if master_name is not None:
+                    cfg["neko_mail"]["master_name"] = plugin.master_name
+                if catgirl_name is not None:
+                    cfg["neko_mail"]["catgirl_name"] = plugin.catgirl_name
+                
+                await self.config.update(cfg, timeout=5.0)
+            except Exception as e:
+                self.logger.warning(f"持久化称呼配置失败: {e},但内存中的称呼已更新")
+            
+            self.logger.info(f"称呼配置已更新: master_name={plugin.master_name}, catgirl_name={plugin.catgirl_name}")
+            
+            return Ok({
+                "success": True,
+                "master_name": plugin.master_name,
+                "catgirl_name": plugin.catgirl_name,
+            })
+        except Exception as e:
+            return Err(SdkError(f"设置称呼配置失败: {e}"))
