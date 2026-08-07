@@ -271,8 +271,28 @@ class NekoMailAgentlyEntry(NekoPluginBase):
             self.two_factor_confirm = plugin_cfg.get("two_factor_confirm", True)
             self.polling_interval = plugin_cfg.get("polling_interval", 300)
 
-            # 自动检测真实认证账户
-            me_result = await run_agently_command(["+me"], self.cli_path, logger=self.logger)
+            self.logger.info(f"猫娘邮箱(Agently) 插件启动")
+            self.logger.info(f"邮箱地址(配置): {self.email_addr}")
+            self.logger.info(f"CLI路径: {self.cli_path}")
+
+            # 异步检测真实账户（不阻塞启动）
+            asyncio.create_task(self._detect_real_account())
+
+            # 启动邮件监听
+            self._start_polling()
+
+            return Ok({"status": "ready", "email": self.email_addr})
+        except Exception as e:
+            self.logger.error(f"插件启动失败: {e}")
+            return Err(SdkError(f"插件启动失败: {str(e)}"))
+
+    async def _detect_real_account(self):
+        """异步检测真实认证账户（不阻塞启动）"""
+        try:
+            me_result = await asyncio.wait_for(
+                run_agently_command(["+me"], self.cli_path, logger=self.logger),
+                timeout=15.0
+            )
             if me_result.get("ok") and me_result.get("data", {}).get("aliases"):
                 aliases = me_result["data"]["aliases"]
                 primary = next((a for a in aliases if a.get("is_primary")), aliases[0] if aliases else None)
@@ -281,19 +301,10 @@ class NekoMailAgentlyEntry(NekoPluginBase):
                     if real_email and real_email != self.email_addr:
                         self.logger.info(f"检测到真实账户: {real_email} (配置为: {self.email_addr})")
                         self.email_addr = real_email
-
-            self.logger.info(f"猫娘邮箱(Agently) 插件启动")
-            self.logger.info(f"邮箱地址: {self.email_addr}")
-            self.logger.info(f"CLI路径: {self.cli_path}")
-            self.logger.info(f"两阶段确认: {self.two_factor_confirm}")
-
-            # 启动轮询任务
-            self._start_polling()
-
-            return Ok({"status": "ready", "email": self.email_addr})
+        except asyncio.TimeoutError:
+            self.logger.warning("检测真实账户超时，使用配置值")
         except Exception as e:
-            self.logger.error(f"插件启动失败: {e}")
-            return Err(SdkError(f"插件启动失败: {str(e)}"))
+            self.logger.warning(f"检测真实账户失败: {e}，使用配置值")
 
     @lifecycle(id="shutdown")
     def on_shutdown(self, **_):
