@@ -212,15 +212,18 @@ class NekoMailAgentlyEntry(NekoPluginBase):
         self._last_check_time = None
 
     @lifecycle(id="startup")
-    def on_startup(self, **_):
+    async def on_startup(self, **_):
         """插件启动时初始化配置"""
         try:
-            # 读取配置
-            config = self.ctx.config
-            self.cli_path = config.get("cli_path", "agently-cli")
-            self.email_addr = config.get("email_addr", "starryserendipity@agent.qq.com")
-            self.two_factor_confirm = config.get("two_factor_confirm", True)
-            self.polling_interval = config.get("polling_interval", 300)
+            # 读取配置（PluginConfig 的方法是 async 的）
+            cfg = await self.config.dump(timeout=5.0)
+            cfg = cfg if isinstance(cfg, dict) else {}
+            plugin_cfg = cfg.get("neko_mail_agently") if isinstance(cfg.get("neko_mail_agently"), dict) else cfg
+
+            self.cli_path = plugin_cfg.get("cli_path", "C:/Users/Yanfq/AppData/Roaming/npm/agently-cli.cmd")
+            self.email_addr = plugin_cfg.get("email_addr", "starryserendipity@agent.qq.com")
+            self.two_factor_confirm = plugin_cfg.get("two_factor_confirm", True)
+            self.polling_interval = plugin_cfg.get("polling_interval", 300)
 
             self.logger.info(f"猫娘邮箱(Agently) 插件启动")
             self.logger.info(f"邮箱地址: {self.email_addr}")
