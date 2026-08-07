@@ -114,6 +114,20 @@ class NekoMailPluginEntry(NekoPluginBase):
             "NekoMail started: email={}, imap={}:{}, smtp={}:{}, master_name={}, catgirl_name={}",
             email_addr, imap_server, imap_port, smtp_server, smtp_port, master_name, catgirl_name,
         )
+        
+        # 自动启动轮询监听（每5分钟检查一次新邮件）
+        try:
+            polling_result = self._mail_plugin.start_polling(
+                interval_seconds=300,
+                callback=self._push_new_email_notification
+            )
+            if "error" not in polling_result:
+                self.logger.info("邮件轮询已自动启动，间隔 300 秒")
+            else:
+                self.logger.warning(f"邮件轮询启动失败: {polling_result['error']}")
+        except Exception as e:
+            self.logger.warning(f"邮件轮询自动启动异常: {e}")
+        
         return Ok({"status": "running", "version": "0.1.0", "email": email_addr})
 
     @lifecycle(id="shutdown")
@@ -133,23 +147,57 @@ class NekoMailPluginEntry(NekoPluginBase):
         return self._mail_plugin
 
     def _push_new_email_notification(self, new_emails: list[dict]) -> None:
-        """推送新邮件通知"""
+        """推送新邮件通知（包含正文内容）"""
         if not new_emails:
             return
+        
+        # 获取动态称呼
+        plugin = self._get_plugin()
+        master_name = getattr(plugin, 'master_name', '主人')
+        catgirl_name = getattr(plugin, 'catgirl_name', '喵喵')
         
         count = len(new_emails)
         first_email = new_emails[0]
         subject = first_email.get("subject", "无主题")
         sender = first_email.get("sender", "未知发件人")
         priority = first_email.get("priority", "medium")
+        body_text = first_email.get("body_text", "")
         
-        # 根据优先级生成不同语气的通知
-        if priority == "high":
-            text = f"🔔 收到 {count} 封新邮件！其中有一封来自 {sender} 的重要邮件：「{subject}」，需要立即查看哦~"
-            priority_level = 8
+        # 构建通知文本（包含正文）
+        if count == 1:
+            # 单封邮件：包含完整正文
+            if body_text:
+                # 截取正文前 500 字符，避免过长
+                body_preview = body_text[:500].strip()
+                if len(body_text) > 500:
+                    body_preview += "..."
+                
+                if priority == "high":
+                    text = f"🔔 {master_name}，收到一封重要邮件喵！\n\n发件人：{sender}\n主题：{subject}\n\n邮件内容：\n{body_preview}"
+                    priority_level = 8
+                else:
+                    text = f"📬 {master_name}，收到新邮件喵~\n\n发件人：{sender}\n主题：{subject}\n\n邮件内容：\n{body_preview}"
+                    priority_level = 5
+            else:
+                # 没有正文，只显示主题和发件人
+                if priority == "high":
+                    text = f"🔔 {master_name}，收到一封重要邮件！来自 {sender}：「{subject}」，需要立即查看哦~"
+                    priority_level = 8
+                else:
+                    text = f"📬 {master_name}，收到新邮件，来自 {sender}：「{subject}」"
+                    priority_level = 5
         else:
-            text = f"📬 收到 {count} 封新邮件，最新一封来自 {sender}：「{subject}」"
-            priority_level = 5
+            # 多封邮件：显示摘要 + 第一封的正文
+            if body_text:
+                body_preview = body_text[:300].strip()
+                if len(body_text) > 300:
+                    body_preview += "..."
+                
+                text = f"📬 {master_name}，收到 {count} 封新邮件喵~\n\n最新一封来自 {sender}：「{subject}」\n\n邮件内容：\n{body_preview}"
+                priority_level = 5
+            else:
+                text = f"📬 {master_name}，收到 {count} 封新邮件，最新一封来自 {sender}：「{subject}」"
+                priority_level = 5
         
         try:
             self.ctx.push_message(
@@ -158,7 +206,12 @@ class NekoMailPluginEntry(NekoPluginBase):
                 ai_behavior="normal",
                 parts=[{"type": "text", "text": text}],
                 priority=priority_level,
-                metadata={"description": f"📧 新邮件通知 [{count}封]"},
+                metadata={
+                    "description": f"📧 新邮件通知 [{count}封]",
+                    "email_count": count,
+                    "first_subject": subject,
+                    "first_sender": sender,
+                },
             )
         except Exception:
             self.logger.exception("push_message failed for new email notification")

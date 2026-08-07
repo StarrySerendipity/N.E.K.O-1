@@ -560,10 +560,33 @@ class NekoMailPlugin:
                     if result.get("latest_uid"):
                         self._last_known_uid = result["latest_uid"]
                     
-                    # 触发回调
+                    # 获取完整邮件详情（包含正文）用于推送
+                    full_emails = []
+                    for email_header in new_emails:
+                        try:
+                            uid = email_header.get("uid")
+                            if uid:
+                                full_detail = self.get_email_detail(uid=uid, folder="INBOX")
+                                if "error" not in full_detail:
+                                    full_emails.append(full_detail)
+                                else:
+                                    # 如果获取详情失败，使用邮件头信息
+                                    full_emails.append(email_header)
+                            else:
+                                full_emails.append(email_header)
+                        except Exception as e:
+                            self.op_log.log_operation(
+                                operation_type="polling_get_detail_error",
+                                description=f"获取邮件详情失败: {e}",
+                                details={"uid": email_header.get("uid"), "error": str(e)}
+                            )
+                            # 失败时使用邮件头信息
+                            full_emails.append(email_header)
+                    
+                    # 触发回调，传递完整邮件详情
                     if self._new_email_callback:
                         try:
-                            self._new_email_callback(new_emails)
+                            self._new_email_callback(full_emails)
                         except Exception as e:
                             self.op_log.log_operation(
                                 operation_type="polling_callback_error",
