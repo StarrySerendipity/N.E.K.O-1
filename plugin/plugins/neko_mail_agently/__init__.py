@@ -279,6 +279,9 @@ class NekoMailAgentlyEntry(NekoPluginBase):
             # 启动轮询
             self._start_polling()
 
+            # 异步检测真实账户（不阻塞启动）
+            asyncio.create_task(self._detect_real_account())
+
             return Ok({"status": "ready", "email": self.email_addr})
         except Exception as e:
             self.logger.error(f"插件启动失败: {e}")
@@ -291,12 +294,38 @@ class NekoMailAgentlyEntry(NekoPluginBase):
         self.logger.info("猫娘邮箱(Agently) 插件已停止")
         return Ok({"status": "stopped"})
 
+    async def _detect_real_account(self):
+        """异步检测真实认证账户（不阻塞启动）"""
+        try:
+            me_result = await asyncio.wait_for(
+                run_agently_command(["+me"], self.cli_path, logger=self.logger),
+                timeout=15.0
+            )
+            if me_result.get("ok") and me_result.get("data", {}).get("aliases"):
+                aliases = me_result["data"]["aliases"]
+                primary = next((a for a in aliases if a.get("is_primary")), aliases[0] if aliases else None)
+                if primary:
+                    real_email = primary.get("email", "")
+                    if real_email and real_email != self.email_addr:
+                        self.logger.info(f"邮箱地址已更新: {self.email_addr} -> {real_email}")
+                        self.email_addr = real_email
+        except asyncio.TimeoutError:
+            self.logger.warning("检测真实账户超时，使用配置值")
+        except Exception as e:
+            self.logger.warning(f"检测真实账户失败: {e}，使用配置值")
+
     def _start_polling(self):
         """启动邮件轮询"""
         if self._polling_task and not self._polling_task.done():
             return
 
         async def polling_worker():
+            # 首次立即检查，不等间隔
+            try:
+                await self._check_new_emails()
+            except Exception as e:
+                self.logger.error(f"首次检查出错: {e}")
+            # 后续按间隔循环
             while True:
                 try:
                     await asyncio.sleep(self.polling_interval)
