@@ -14,8 +14,6 @@ import re
 import smtplib
 from datetime import datetime, date
 from email.header import decode_header
-from email.mime.text import MIMEText
-from email.mime.multipart import MIMEMultipart
 from email.utils import parseaddr, parsedate_to_datetime
 from typing import Optional
 from .models import EmailMessage, Attachment, FolderInfo
@@ -688,20 +686,43 @@ class NekoMailClient:
         cc: Optional[list[str]] = None,
         html: bool = False,
     ) -> bool:
-        """发送邮件"""
+        """发送邮件 - 手动构建邮件格式，不依赖 email.mime 模块"""
         try:
-            msg = MIMEMultipart()
-            msg['From'] = self.email_addr
-            msg['To'] = to
-            msg['Subject'] = subject
+            from email.utils import formatdate, make_msgid
+            from email.header import Header
             
+            # 手动构建邮件内容
+            boundary = "----=_NextPart_" + make_msgid().replace('<', '').replace('>', '')
+            
+            lines = []
+            lines.append(f"From: {self.email_addr}")
+            lines.append(f"To: {to}")
             if cc:
-                msg['Cc'] = ', '.join(cc)
+                lines.append(f"Cc: {', '.join(cc)}")
+            lines.append(f"Subject: {Header(subject, 'utf-8').encode()}")
+            lines.append(f"Date: {formatdate()}")
+            lines.append(f"Message-ID: {make_msgid()}")
+            lines.append("MIME-Version: 1.0")
+            lines.append(f'Content-Type: multipart/alternative; boundary="{boundary}"')
+            lines.append("")
+            lines.append(f"--{boundary}")
             
             if html:
-                msg.attach(MIMEText(body, 'html', 'utf-8'))
+                lines.append("Content-Type: text/html; charset=utf-8")
+                lines.append("Content-Transfer-Encoding: base64")
+                lines.append("")
+                import base64
+                lines.append(base64.b64encode(body.encode('utf-8')).decode('ascii'))
             else:
-                msg.attach(MIMEText(body, 'plain', 'utf-8'))
+                lines.append("Content-Type: text/plain; charset=utf-8")
+                lines.append("Content-Transfer-Encoding: base64")
+                lines.append("")
+                import base64
+                lines.append(base64.b64encode(body.encode('utf-8')).decode('ascii'))
+            
+            lines.append(f"--{boundary}--")
+            
+            msg_str = "\r\n".join(lines)
             
             recipients = [to]
             if cc:
@@ -709,7 +730,7 @@ class NekoMailClient:
             
             with smtplib.SMTP_SSL(self.smtp_server, self.smtp_port) as server:
                 server.login(self.email_addr, self.auth_code)
-                server.sendmail(self.email_addr, recipients, msg.as_string())
+                server.sendmail(self.email_addr, recipients, msg_str)
             
             return True
         except Exception as e:
