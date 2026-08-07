@@ -275,6 +275,9 @@ class NekoMailAgentlyEntry(NekoPluginBase):
             self.logger.info(f"邮箱地址(配置): {self.email_addr}")
             self.logger.info(f"CLI路径: {self.cli_path}")
 
+            # 启动轮询
+            self._start_polling()
+
             return Ok({"status": "ready", "email": self.email_addr})
         except Exception as e:
             self.logger.error(f"插件启动失败: {e}")
@@ -1414,7 +1417,13 @@ class NekoMailAgentlyEntry(NekoPluginBase):
         description="启动邮件轮询。轮询会定期检查新邮件并通知。",
         parameters={
             "type": "object",
-            "properties": {},
+            "properties": {
+                "interval_seconds": {
+                    "type": "integer",
+                    "description": "轮询间隔（秒），默认300秒",
+                    "default": 300
+                }
+            },
             "required": []
         },
         timeout=10.0
@@ -1423,17 +1432,22 @@ class NekoMailAgentlyEntry(NekoPluginBase):
         id="start_polling",
         name="启动轮询",
         description="启动邮件轮询",
-        input_schema={"type": "object", "properties": {}, "required": []},
+        input_schema={"type": "object", "properties": {"interval_seconds": {"type": "integer", "default": 300}}, "required": []},
         llm_result_fields=["status"]
     )
-    async def start_polling(self, **_) -> Dict[str, Any]:
+    async def start_polling(self, interval_seconds: int = 300, **_) -> Dict[str, Any]:
         """启动轮询"""
+        # 先停止已有轮询
+        self._stop_polling()
+        # 更新间隔
+        self.polling_interval = interval_seconds
+        # 重新启动
         self._start_polling()
 
         return Ok({
             "success": True,
             "status": "started",
-            "message": f"✅ 邮件轮询已启动\n间隔: {self.polling_interval} 秒"
+            "message": f"✅ 邮件轮询已启动\n间隔: {interval_seconds} 秒"
         })
 
     @llm_tool(
