@@ -56,6 +56,11 @@ class NekoMailPlugin:
         self._last_known_uid: Optional[str] = None
         self._new_email_callback = None  # 外部可注册的回调函数
         self._polling_lock = threading.Lock()
+        
+        # 已处理 UID 的集合，用于去重防止重复推送
+        self._processed_uids: set[str] = set()
+        self._processed_uids_lock = threading.Lock()
+        self._max_processed_uids = 1000  # 最多保留 1000 个已处理 UID
     
     # === 读取类 ===
     
@@ -563,63 +568,103 @@ class NekoMailPlugin:
                     new_emails = result["new_emails"]
                     logger.info(f"Found {len(new_emails)} new emails")
                     
-                    # 更新最新 UID
-                    if result.get("latest_uid"):
-                        self._last_known_uid = result["latest_uid"]
-                        logger.info(f"Updated latest_uid to {self._last_known_uid}")
-                    
-                    # 获取完整邮件详情（包含正文）用于推送
-                    full_emails = []
-                    for email_header in new_emails:
-                        try:
+                    # 过滤掉已处理的邮件（去重）
+                    unprocessed_emails = []
+                    with self._processed_uids_lock:
+                        for email_header in new_emails:
                             uid = email_header.get("uid")
-                            if uid:
-                                logger.info(f"Fetching full detail for email uid={uid}")
-                                full_detail = self.get_email_detail(uid=uid, folder="INBOX")
-                                if "error" not in full_detail:
-                                    full_emails.append(full_detail)
-                                    logger.info(f"Got full detail for uid={uid}, subject={full_detail.get('subject')}")
-                                else:
-                                    logger.warning(f"Failed to get detail for uid={uid}: {full_detail.get('error')}")
-                                    # 如果获取详情失败，使用邮件头信息
-                                    full_emails.append(email_header)
-                            else:
-                                logger.warning("Email header has no uid")
-                                full_emails.append(email_header)
-                        except Exception as e:
-                            logger.exception(f"Error getting email detail: {e}")
-                            self.op_log.log_operation(
-                                operation_type="polling_get_detail_error",
-                                description=f"获取邮件详情失败: {e}",
-                                details={"uid": email_header.get("uid"), "error": str(e)}
-                            )
-                            # 失败时使用邮件头信息
-                            full_emails.append(email_header)
+                            if uid and uid not in self._processed_uids:
+                                unprocessed_emails.append(email_header)
+                            elif uid:
+                                logger.info(f"Skipping already processed email uid={uid}")
                     
-                    logger.info(f"Collected {len(full_emails)} full emails, triggering callback")
-                    
-                    # 触发回调，传递完整邮件详情
-                    if self._new_email_callback:
-                        try:
-                            logger.info("Calling callback function")
-                            self._new_email_callback(full_emails)
-                            logger.info("Callback completed successfully")
-                        except Exception as e:
-                            logger.exception(f"Callback execution failed: {e}")
-                            self.op_log.log_operation(
-                                operation_type="polling_callback_error",
-                                description=f"新邮件回调执行失败: {e}",
-                                details={"error": str(e)}
-                            )
+                    if not unprocessed_emails:
+                        logger.info("All emails already processed, skipping")
+                        # 即使没有新邮件，也要更新 last_known_uid
+                        if result.get("latest_uid"):
+                            self._last_known_uid = result["latest_uid"]
+                            logger.info(f"Updated latest_uid to {self._last_known_uid}")
                     else:
-                        logger.warning("No callback function registered!")
-                    
-                    # 记录日志
-                    self.op_log.log_operation(
-                        operation_type="new_emails_detected",
-                        description=f"检测到 {len(new_emails)} 封新邮件",
-                        details={"count": len(new_emails), "emails": [e.get("subject") for e in new_emails[:5]]}
-                    )
+                        logger.info(f"Processing {len(unprocessed_emails)} unprocessed emails")
+                        
+                        # 获取完整邮件详情（包含正文）用于推送
+                        full_emails = []
+                        for email_header in unprocessed_emails:
+                            try:
+                                uid = email_header.get("uid")
+                                if uid:
+                                    logger.info(f"Fetching full detail for email uid={uid}")
+                                    full_detail = self.get_email_detail(uid=uid, folder="INBOX")
+                                    if "error" not in full_detail:
+                                        full_emails.append(full_detail)
+                                        logger.info(f"Got full detail for uid={uid}, subject={full_detail.get('subject')}")
+                                    else:
+                                        logger.warning(f"Failed to get detail for uid={uid}: {full_detail.get('error')}")
+                                        # 如果获取详情失败，使用邮件头信息
+                                        full_emails.append(email_header)
+                                else:
+                                    logger.warning("Email header has no uid")
+                                    full_emails.append(email_header)
+                            except Exception as e:
+                                logger.exception(f"Error getting email detail: {e}")
+                                self.op_log.log_operation(
+                                    operation_type="polling_get_detail_error",
+                                    description=f"获取邮件详情失败: {e}",
+                                    details={"uid": email_header.get("uid"), "error": str(e)}
+                                )
+                                # 失败时使用邮件头信息
+                                full_emails.append(email_header)
+                        
+                        logger.info(f"Collected {len(full_emails)} full emails, triggering callback")
+                        
+                        # 触发回调，传递完整邮件详情
+                        if self._new_email_callback:
+                            try:
+                                logger.info("Calling callback function")
+                                self._new_email_callback(full_emails)
+                                logger.info("Callback completed successfully")
+                                
+                                # 回调成功后，将已处理的 UID 加入集合
+                                with self._processed_uids_lock:
+                                    for email in full_emails:
+                                        uid = email.get("uid")
+                                        if uid:
+                                            self._processed_uids.add(uid)
+                                            logger.info(f"Marked uid={uid} as processed")
+                                    
+                                    # 清理过多的已处理 UID，防止内存泄漏
+                                    if len(self._processed_uids) > self._max_processed_uids:
+                                        # 保留最新的 500 个
+                                        processed_uids_list = sorted(self._processed_uids, key=lambda x: int(x) if x.isdigit() else 0)
+                                        self._processed_uids = set(processed_uids_list[-500:])
+                                        logger.info(f"Cleaned up processed_uids, kept {len(self._processed_uids)}")
+                                
+                                # 更新 last_known_uid（在回调成功后更新）
+                                if result.get("latest_uid"):
+                                    self._last_known_uid = result["latest_uid"]
+                                    logger.info(f"Updated latest_uid to {self._last_known_uid}")
+                                
+                            except Exception as e:
+                                logger.exception(f"Callback execution failed: {e}")
+                                self.op_log.log_operation(
+                                    operation_type="polling_callback_error",
+                                    description=f"新邮件回调执行失败: {e}",
+                                    details={"error": str(e)}
+                                )
+                                # 回调失败，不更新 last_known_uid，下次重试
+                        else:
+                            logger.warning("No callback function registered!")
+                            # 没有回调函数，也要更新 last_known_uid
+                            if result.get("latest_uid"):
+                                self._last_known_uid = result["latest_uid"]
+                                logger.info(f"Updated latest_uid to {self._last_known_uid}")
+                        
+                        # 记录日志
+                        self.op_log.log_operation(
+                            operation_type="new_emails_detected",
+                            description=f"检测到 {len(unprocessed_emails)} 封新邮件",
+                            details={"count": len(unprocessed_emails), "emails": [e.get("subject") for e in unprocessed_emails[:5]]}
+                        )
                 
             except Exception as e:
                 logger.exception(f"Polling worker error: {e}")
