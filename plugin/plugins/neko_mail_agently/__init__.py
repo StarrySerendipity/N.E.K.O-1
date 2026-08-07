@@ -275,36 +275,10 @@ class NekoMailAgentlyEntry(NekoPluginBase):
             self.logger.info(f"邮箱地址(配置): {self.email_addr}")
             self.logger.info(f"CLI路径: {self.cli_path}")
 
-            # 异步检测真实账户（不阻塞启动）
-            asyncio.create_task(self._detect_real_account())
-
-            # 启动邮件监听
-            self._start_polling()
-
             return Ok({"status": "ready", "email": self.email_addr})
         except Exception as e:
             self.logger.error(f"插件启动失败: {e}")
             return Err(SdkError(f"插件启动失败: {str(e)}"))
-
-    async def _detect_real_account(self):
-        """异步检测真实认证账户（不阻塞启动）"""
-        try:
-            me_result = await asyncio.wait_for(
-                run_agently_command(["+me"], self.cli_path, logger=self.logger),
-                timeout=15.0
-            )
-            if me_result.get("ok") and me_result.get("data", {}).get("aliases"):
-                aliases = me_result["data"]["aliases"]
-                primary = next((a for a in aliases if a.get("is_primary")), aliases[0] if aliases else None)
-                if primary:
-                    real_email = primary.get("email", "")
-                    if real_email and real_email != self.email_addr:
-                        self.logger.info(f"检测到真实账户: {real_email} (配置为: {self.email_addr})")
-                        self.email_addr = real_email
-        except asyncio.TimeoutError:
-            self.logger.warning("检测真实账户超时，使用配置值")
-        except Exception as e:
-            self.logger.warning(f"检测真实账户失败: {e}，使用配置值")
 
     @lifecycle(id="shutdown")
     def on_shutdown(self, **_):
@@ -314,59 +288,23 @@ class NekoMailAgentlyEntry(NekoPluginBase):
         return Ok({"status": "stopped"})
 
     def _start_polling(self):
-        """启动邮件监听（基于 watch 长轮询）"""
+        """启动邮件轮询"""
         if self._polling_task and not self._polling_task.done():
             return
 
-        async def watch_worker():
-            """使用 agently-cli message +watch 长轮询监听新邮件"""
-            retry_delay = 5
+        async def polling_worker():
             while True:
                 try:
-                    self.logger.info("[watch] 启动邮件监听...")
-                    if self.cli_path.lower().endswith('.cmd'):
-                        cmd_list = ["cmd", "/c", self.cli_path, "message", "+watch"]
-                    else:
-                        cmd_list = [self.cli_path, "message", "+watch"]
-
-                    process = await asyncio.create_subprocess_exec(
-                        *cmd_list,
-                        stdout=asyncio.subprocess.PIPE,
-                        stderr=asyncio.subprocess.PIPE
-                    )
-                    self.logger.info(f"[watch] 进程已启动 pid={process.pid}")
-                    retry_delay = 5  # 成功启动，重置重试延迟
-
-                    # 逐行读取 stdout（每个新邮件一行 JSON）
-                    while True:
-                        line = await process.stdout.readline()
-                        if not line:
-                            break  # 进程退出
-                        line_str = line.decode('utf-8', errors='ignore').strip()
-                        if not line_str:
-                            continue
-                        try:
-                            event = json.loads(line_str)
-                            await self._on_new_mail(event)
-                        except json.JSONDecodeError:
-                            self.logger.warning(f"[watch] 非JSON输出: {line_str[:200]}")
-
-                    # 进程退出，等待后重启
-                    exit_code = await process.wait()
-                    self.logger.warning(f"[watch] 进程退出 exit={exit_code}，{retry_delay}秒后重启")
-                    await asyncio.sleep(retry_delay)
-                    retry_delay = min(retry_delay * 2, 60)  # 指数退避，最大60秒
-
+                    await asyncio.sleep(self.polling_interval)
+                    await self._check_new_emails()
                 except asyncio.CancelledError:
-                    self.logger.info("[watch] 监听已取消")
                     break
                 except Exception as e:
-                    self.logger.error(f"[watch] 异常: {e}")
-                    await asyncio.sleep(retry_delay)
-                    retry_delay = min(retry_delay * 2, 60)
+                    self.logger.error(f"轮询出错: {e}")
+                    await asyncio.sleep(60)
 
-        self._polling_task = asyncio.create_task(watch_worker())
-        self.logger.info("邮件监听已启动（watch 模式）")
+        self._polling_task = asyncio.create_task(polling_worker())
+        self.logger.info(f"邮件轮询已启动，间隔 {self.polling_interval} 秒")
 
     def _stop_polling(self):
         """停止邮件轮询"""
@@ -374,40 +312,20 @@ class NekoMailAgentlyEntry(NekoPluginBase):
             self._polling_task.cancel()
             self.logger.info("邮件轮询已停止")
 
-    async def _on_new_mail(self, event: Dict[str, Any]):
-        """处理新邮件事件"""
+    async def _check_new_emails(self):
+        """检查新邮件"""
         try:
-            # watch 输出可能是完整消息或事件对象
-            msg = event.get("data", event)
-            subject = msg.get("subject", "(无主题)")
-            sender = msg.get("from", {})
-            sender_email = sender.get("email", "未知") if isinstance(sender, dict) else str(sender)
-            snippet = msg.get("snippet", "")
-            has_attachments = msg.get("has_attachments", False)
-            message_id = msg.get("message_id", "")
-
-            self.logger.info(f"[新邮件] 来自: {sender_email}, 主题: {subject}")
-
-            # 通知猫娘
-            attach_hint = " 📎有附件" if has_attachments else ""
-            notification = f"📧 新邮件！\n来自: {sender_email}\n主题: {subject}{attach_hint}\n预览: {snippet[:100]}..."
-            if message_id:
-                notification += f"\n邮件ID: {message_id}"
-
-            # 尝试通过 ctx 推送通知
-            try:
-                if hasattr(self.ctx, 'send_notification'):
-                    await self.ctx.send_notification(notification)
-                elif hasattr(self.ctx, 'push_message'):
-                    await self.ctx.push_message(notification)
-                else:
-                    # 回退：仅记录日志
-                    self.logger.info(f"[通知] {notification}")
-            except Exception as e:
-                self.logger.warning(f"[通知推送失败] {e}")
-
+            result = await run_agently_command(
+                ["message", "+list", "--dir", "inbox", "--is-unread", "--limit", "10"],
+                self.cli_path,
+                logger=self.logger
+            )
+            if result.get("exit_code") == 0:
+                emails = result.get("data", {}).get("data", [])
+                if emails:
+                    self.logger.info(f"发现 {len(emails)} 封未读邮件")
         except Exception as e:
-            self.logger.error(f"[新邮件处理失败] {e}")
+            self.logger.error(f"检查新邮件失败: {e}")
 
     # ==================== LLM 工具定义 ====================
 
@@ -1482,18 +1400,18 @@ class NekoMailAgentlyEntry(NekoPluginBase):
         llm_result_fields=["is_running", "interval"]
     )
     async def get_polling_status(self, **_) -> Dict[str, Any]:
-        """获取邮件监听状态"""
+        """获取邮件轮询状态"""
         is_running = self._polling_task and not self._polling_task.done()
 
         return Ok({
             "is_running": is_running,
-            "mode": "watch",
-            "message": f"{'🟢 邮件监听运行中（watch 模式）' if is_running else '🔴 邮件监听已停止'}\n模式: 长轮询（实时通知新邮件）"
+            "interval": self.polling_interval,
+            "message": f"{'🟢 轮询运行中' if is_running else '🔴 轮询已停止'}\n间隔: {self.polling_interval} 秒"
         })
 
     @llm_tool(
         name="neko_agently_start_polling",
-        description="启动邮件监听。使用 watch 长轮询实时接收新邮件通知。",
+        description="启动邮件轮询。轮询会定期检查新邮件并通知。",
         parameters={
             "type": "object",
             "properties": {},
@@ -1515,12 +1433,12 @@ class NekoMailAgentlyEntry(NekoPluginBase):
         return Ok({
             "success": True,
             "status": "started",
-            "message": "✅ 邮件监听已启动（watch 模式）\n新邮件会实时通知"
+            "message": f"✅ 邮件轮询已启动\n间隔: {self.polling_interval} 秒"
         })
 
     @llm_tool(
         name="neko_agently_stop_polling",
-        description="停止邮件监听。",
+        description="停止邮件轮询。",
         parameters={
             "type": "object",
             "properties": {},
@@ -1542,7 +1460,7 @@ class NekoMailAgentlyEntry(NekoPluginBase):
         return Ok({
             "success": True,
             "status": "stopped",
-            "message": "✅ 邮件监听已停止"
+            "message": "✅ 邮件轮询已停止"
         })
 
     @llm_tool(
