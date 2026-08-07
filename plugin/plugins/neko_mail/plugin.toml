@@ -40,3 +40,7 @@ smtp_port = 465
 high_priority_senders = ""
 # 要忽略的文件夹(逗号分隔)
 ignore_folders = ""
+# 猫娘对用户的称呼(支持猫娘自主决定或与用户协商)
+master_name = "主人"
+# 猫娘的自称
+catgirl_name = "喵喵"

@@ -32,6 +32,8 @@ class NekoMailPlugin:
         smtp_port: int = 465,
         high_priority_senders: Optional[list[str]] = None,
         ignore_folders: Optional[list[str]] = None,
+        master_name: str = "主人",
+        catgirl_name: str = "喵喵",
     ):
         self.client = NekoMailClient(
             email_addr=email_addr,
@@ -44,6 +46,8 @@ class NekoMailPlugin:
             ignore_folders=ignore_folders,
         )
         self.op_log = OperationLog()
+        self.master_name = master_name
+        self.catgirl_name = catgirl_name
         
         # 新邮件轮询监听
         self._polling_thread: Optional[threading.Thread] = None
@@ -386,7 +390,7 @@ class NekoMailPlugin:
         )
         
         # 智能分类（基于主题和发件人）
-        classification = classify_email_type(temp_email)
+        classification = classify_email_type(temp_email, self.master_name, self.catgirl_name)
         
         return {
             "uid": h["uid"],
@@ -412,7 +416,7 @@ class NekoMailPlugin:
     def _email_to_dict(self, email: EmailMessage) -> dict:
         """将 EmailMessage 转换为字典"""
         # 智能分类
-        classification = classify_email_type(email)
+        classification = classify_email_type(email, self.master_name, self.catgirl_name)
         
         return {
             "uid": email.uid,
@@ -531,7 +535,7 @@ class NekoMailPlugin:
     
     def get_polling_status(self) -> dict:
         """获取轮询状态"""
-        is_running = self._polling_thread and self._polling_thread.is_alive()
+        is_running = bool(self._polling_thread and self._polling_thread.is_alive())
         return {
             "is_running": is_running,
             "interval": self._polling_interval,

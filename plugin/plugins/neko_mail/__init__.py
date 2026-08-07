@@ -1,8 +1,8 @@
 """
 猫娘邮件插件 v0.1 (Neko Mail)
 
-让猫娘能读取主人的 QQ 邮箱,生成邮件摘要、判断优先级、
-帮主人标记已读、发送邮件。
+让猫娘能读取用户的 QQ 邮箱,生成邮件摘要、判断优先级、
+帮用户标记已读、发送邮件。
 
 数据模型:
   - EmailMessage: 完整邮件
@@ -85,6 +85,10 @@ class NekoMailPluginEntry(NekoPluginBase):
         ignore_raw = str(section.get("ignore_folders", "")).strip()
         ignore_folders = [s.strip() for s in ignore_raw.split(",") if s.strip()] if ignore_raw else []
 
+        # 猫娘称呼配置
+        master_name = str(section.get("master_name", "主人")).strip()
+        catgirl_name = str(section.get("catgirl_name", "喵喵")).strip()
+
         if not email_addr or not auth_code:
             self.logger.error("QQ_EMAIL or QQ_AUTH_CODE not configured")
             return Err(SdkError("邮箱配置缺失: 请在 plugin.toml 中配置 neko_mail.email_addr 和 neko_mail.auth_code"))
@@ -99,14 +103,16 @@ class NekoMailPluginEntry(NekoPluginBase):
                 smtp_port=smtp_port,
                 high_priority_senders=high_priority_senders,
                 ignore_folders=ignore_folders,
+                master_name=master_name,
+                catgirl_name=catgirl_name,
             )
         except Exception as e:
             self.logger.error("初始化邮件插件失败: {}", e)
             return Err(SdkError(f"初始化邮件插件失败: {e}"))
 
         self.logger.info(
-            "NekoMail started: email={}, imap={}:{}, smtp={}:{}",
-            email_addr, imap_server, imap_port, smtp_server, smtp_port,
+            "NekoMail started: email={}, imap={}:{}, smtp={}:{}, master_name={}, catgirl_name={}",
+            email_addr, imap_server, imap_port, smtp_server, smtp_port, master_name, catgirl_name,
         )
         return Ok({"status": "running", "version": "0.1.0", "email": email_addr})
 
@@ -126,11 +132,42 @@ class NekoMailPluginEntry(NekoPluginBase):
             raise RuntimeError("邮件插件未初始化,请检查配置")
         return self._mail_plugin
 
+    def _push_new_email_notification(self, new_emails: list[dict]) -> None:
+        """推送新邮件通知"""
+        if not new_emails:
+            return
+        
+        count = len(new_emails)
+        first_email = new_emails[0]
+        subject = first_email.get("subject", "无主题")
+        sender = first_email.get("sender", "未知发件人")
+        priority = first_email.get("priority", "medium")
+        
+        # 根据优先级生成不同语气的通知
+        if priority == "high":
+            text = f"🔔 收到 {count} 封新邮件！其中有一封来自 {sender} 的重要邮件：「{subject}」，需要立即查看哦~"
+            priority_level = 8
+        else:
+            text = f"📬 收到 {count} 封新邮件，最新一封来自 {sender}：「{subject}」"
+            priority_level = 5
+        
+        try:
+            self.ctx.push_message(
+                source="neko_mail",
+                visibility=[],
+                ai_behavior="normal",
+                parts=[{"type": "text", "text": text}],
+                priority=priority_level,
+                metadata={"description": f"📧 新邮件通知 [{count}封]"},
+            )
+        except Exception:
+            self.logger.exception("push_message failed for new email notification")
+
     # ── LLM 工具 ─────────────────────────────────────────────────────
 
     @llm_tool(
         name="neko_mail_get_summary",
-        description="获取今日邮件摘要。返回未读数、今日邮件数、按优先级分类的邮件列表。猫娘可以用这个信息告诉主人今天有哪些重要邮件。",
+        description="获取今日邮件摘要。返回未读数、今日邮件数、按优先级分类的邮件列表。猫娘可以用这个信息告诉用户今天有哪些重要邮件。",
         parameters={
             "type": "object",
             "properties": {},
@@ -821,7 +858,7 @@ class NekoMailPluginEntry(NekoPluginBase):
         """启动邮件轮询"""
         try:
             plugin = self._get_plugin()
-            result = plugin.start_polling(interval_seconds=interval_seconds)
+            result = plugin.start_polling(interval_seconds=interval_seconds, callback=self._push_new_email_notification)
             if "error" in result:
                 return Err(SdkError(result["error"]))
             return Ok(result)

@@ -177,7 +177,7 @@ def parse_attachment(part) -> Optional[Attachment]:
     )
 
 
-def classify_email_type(email: EmailMessage) -> dict:
+def classify_email_type(email: EmailMessage, master_name: str = "主人", catgirl_name: str = "喵喵") -> dict:
     """
     智能邮件分类 + 关键信息提取
     
@@ -236,7 +236,7 @@ def classify_email_type(email: EmailMessage) -> dict:
                 "code": code,
                 "service": service,
             },
-            "catgirl_hint": f"主人~{service}的验证码是 {code} 喵~ 快去认证吧!" if code else f"主人~{service}发了验证码邮件喵~"
+            "catgirl_hint": f"{master_name}~{service}的验证码是 {code} 喵~ 快去认证吧!" if code else f"{master_name}~{service}发了验证码邮件喵~"
         }
     
     # ── 2. 作业/课程类 ──
@@ -257,7 +257,7 @@ def classify_email_type(email: EmailMessage) -> dict:
         if task:
             hint_parts.append(f"任务: {task}")
         
-        hint = "主人~有作业提醒喵~ " + "，".join(hint_parts) if hint_parts else "主人~有课程相关邮件喵~"
+        hint = f"{master_name}~有作业提醒喵~ " + "，".join(hint_parts) if hint_parts else f"{master_name}~有课程相关邮件喵~"
         
         return {
             "category": "assignment",
@@ -286,7 +286,7 @@ def classify_email_type(email: EmailMessage) -> dict:
                 "risk_level": risk_level,
                 "action": action,
             },
-            "catgirl_hint": f"主人!!有安全通知喵! {'风险等级较高，请尽快处理!' if risk_level == 'high' else '请注意查看一下喵~'}"
+            "catgirl_hint": f"{master_name}!!有安全通知喵! {'风险等级较高，请尽快处理!' if risk_level == 'high' else '请注意查看一下喵~'}"
         }
     
     # ── 4. 订阅/广告类 ──
@@ -299,7 +299,7 @@ def classify_email_type(email: EmailMessage) -> dict:
             "category": "subscription",
             "category_label": "订阅广告",
             "key_info": {},
-            "catgirl_hint": "主人~这是广告/订阅邮件喵~可以不用管它哦~"
+            "catgirl_hint": f"{master_name}~这是广告/订阅邮件喵~可以不用管它哦~"
         }
     
     # ── 5. 项目/GitHub类 ──
@@ -311,13 +311,13 @@ def classify_email_type(email: EmailMessage) -> dict:
         project_name = _extract_project_name(email)
         action_type = _extract_project_action(email)
         
-        hint = f"主人~GitHub有动态喵~"
+        hint = f"{master_name}~GitHub有动态喵~"
         if project_name:
             hint += f" 项目: {project_name}"
         if action_type:
             hint += f" ({action_type})"
         if 'token' in combined or 'api key' in combined or '过期' in combined:
-            hint = "主人!Token/API Key快要过期了喵! 记得尽快处理!"
+            hint = f"{master_name}!Token/API Key快要过期了喵! 记得尽快处理!"
         
         return {
             "category": "project",
@@ -338,7 +338,7 @@ def classify_email_type(email: EmailMessage) -> dict:
             "category": "finance",
             "category_label": "财务通知",
             "key_info": {},
-            "catgirl_hint": "主人~有财务/账单相关邮件喵~记得看一下哦~"
+            "catgirl_hint": f"{master_name}~有财务/账单相关邮件喵~记得看一下哦~"
         }
     
     # ── 7. 社交通知类 ──
@@ -351,7 +351,7 @@ def classify_email_type(email: EmailMessage) -> dict:
             "category": "social",
             "category_label": "社交通知",
             "key_info": {},
-            "catgirl_hint": "主人~有人找你喵~快去看看社交通知吧~"
+            "catgirl_hint": f"{master_name}~有人找你喵~快去看看社交通知吧~"
         }
     
     # ── 默认 ──
