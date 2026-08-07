@@ -1,0 +1,32 @@
+[plugin]
+id = "neko_mail_agently"
+name = "猫娘邮箱(Agently)"
+description = "通过 Agently CLI 管理猫娘专属邮箱，支持邮件收发、搜索、回复、转发等功能"
+version = "1.0.0"
+entry = "plugin.plugins.neko_mail_agently:NekoMailAgentlyEntry"
+author = "N.E.K.O Team"
+
+[plugin.sdk]
+recommended = ">=0.1.0,<0.2.0"
+supported = ">=0.1.0,<0.3.0"
+
+[plugin_runtime]
+enabled = true
+auto_start = true
+
+[neko_mail_agently]
+# Agently CLI 路径（如果不在 PATH 中需要指定）
+# cli_path = "C:/Users/Yanfq/AppData/Roaming/npm/agently-cli.cmd"
+cli_path = "agently-cli"
+
+# 邮箱地址
+email_addr = "starryserendipity@agent.qq.com"
+
+# 是否自动刷新认证
+auto_refresh_auth = true
+
+# 轮询间隔（秒）
+polling_interval = 300
+
+# 是否启用两阶段确认
+two_factor_confirm = true
