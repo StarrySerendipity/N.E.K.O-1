@@ -84,30 +84,36 @@ def parse_agently_output(stdout: str, stderr: str) -> Dict[str, Any]:
     return {"error": "无法解析输出", "stdout": stdout, "stderr": stderr}
 
 
-async def run_agently_command(args: List[str], cli_path: str = "agently-cli", cwd: str = None) -> Dict[str, Any]:
+async def run_agently_command(args: List[str], cli_path: str = "agently-cli", cwd: str = None, logger=None) -> Dict[str, Any]:
     """异步执行 Agently CLI 命令"""
     try:
         # Windows 下 .cmd 文件需要通过 cmd /c 执行，用列表参数避免 shell 转义问题
         if cli_path.lower().endswith('.cmd'):
             cmd_list = ["cmd", "/c", cli_path] + args
-            process = await asyncio.create_subprocess_exec(
-                *cmd_list,
-                stdout=asyncio.subprocess.PIPE,
-                stderr=asyncio.subprocess.PIPE,
-                cwd=cwd
-            )
         else:
             cmd_list = [cli_path] + args
-            process = await asyncio.create_subprocess_exec(
-                *cmd_list,
-                stdout=asyncio.subprocess.PIPE,
-                stderr=asyncio.subprocess.PIPE,
-                cwd=cwd
-            )
+
+        if logger:
+            logger.info(f"[Agently CLI] 执行: {' '.join(cmd_list)}")
+            logger.info(f"[Agently CLI] cwd: {cwd or '默认'}")
+
+        process = await asyncio.create_subprocess_exec(
+            *cmd_list,
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.PIPE,
+            cwd=cwd
+        )
         stdout, stderr = await process.communicate()
 
         stdout_str = stdout.decode('utf-8', errors='ignore')
         stderr_str = stderr.decode('utf-8', errors='ignore')
+
+        if logger:
+            logger.info(f"[Agently CLI] exit={process.returncode}")
+            if stdout_str.strip():
+                logger.info(f"[Agently CLI] stdout: {stdout_str[:500]}")
+            if stderr_str.strip():
+                logger.info(f"[Agently CLI] stderr: {stderr_str[:500]}")
 
         result = parse_agently_output(stdout_str, stderr_str)
         result["exit_code"] = process.returncode
@@ -116,9 +122,15 @@ async def run_agently_command(args: List[str], cli_path: str = "agently-cli", cw
 
         return result
     except FileNotFoundError:
-        return {"error": f"找不到 Agently CLI: {cli_path}", "exit_code": -1}
+        err = f"找不到 Agently CLI: {cli_path}"
+        if logger:
+            logger.error(f"[Agently CLI] {err}")
+        return {"error": err, "exit_code": -1}
     except Exception as e:
-        return {"error": f"执行命令失败: {str(e)}", "exit_code": -1}
+        err = f"执行命令失败: {str(e)}"
+        if logger:
+            logger.error(f"[Agently CLI] {err}")
+        return {"error": err, "exit_code": -1}
 
 
 def format_email_list(emails: List[Dict], max_count: int = 20) -> str:
@@ -747,10 +759,12 @@ class NekoMailAgentlyEntry(NekoPluginBase):
                 args.extend(["--confirmation-token", confirmation_token])
             else:
                 # 首次调用，不带确认令牌，获取确认令牌
-                result = await run_agently_command(args, self.cli_path, cwd=attachment_cwd)
+                self.logger.info(f"[send_email] 两阶段确认：首次调用，附件={attachment_file_name}, cwd={attachment_cwd}")
+                result = await run_agently_command(args, self.cli_path, cwd=attachment_cwd, logger=self.logger)
 
                 # 检查是否需要确认
                 data = result.get("data", {})
+                self.logger.info(f"[send_email] 首次调用结果: exit={result.get('exit_code')}, data={data}")
                 if data.get("confirmation_required") or result.get("exit_code") == AgentlyExitCode.TWO_FACTOR:
                     ctk = data.get("confirmation_token", "")
                     if ctk:
@@ -774,9 +788,15 @@ class NekoMailAgentlyEntry(NekoPluginBase):
                         "status": "sent",
                         "message": f"✅ 邮件已发送（服务端已接收）\n收件人: {to}\n主题: {subject}{attach_info}"
                     })
+                else:
+                    # 首次调用失败，直接返回错误
+                    self.logger.error(f"[send_email] 首次调用失败: {result}")
+                    error_msg = handle_agently_error(result)
+                    return Err(SdkError(error_msg or "发送邮件失败"))
 
-        # 执行发送（带确认令牌）
-        result = await run_agently_command(args, self.cli_path, cwd=attachment_cwd)
+        # 执行发送（带确认令牌或 --confirmed）
+        self.logger.info(f"[send_email] 执行最终发送，附件={attachment_file_name}, confirmed={confirmed}, has_token={bool(confirmation_token)}")
+        result = await run_agently_command(args, self.cli_path, cwd=attachment_cwd, logger=self.logger)
 
         if result.get("exit_code") == 0:
             data = result.get("data", result)
@@ -787,12 +807,14 @@ class NekoMailAgentlyEntry(NekoPluginBase):
 
             # 发送成功返回的是 queued: true，没有 message_id
             attach_info = f"\n附件: {attachment_file_name}" if attachment_file_name else ""
+            self.logger.info(f"[send_email] 发送成功: {data}")
             return Ok({
                 "success": True,
                 "status": "sent",
                 "message": f"✅ 邮件已发送（服务端已接收）\n收件人: {to}\n主题: {subject}{attach_info}"
             })
         else:
+            self.logger.error(f"[send_email] 发送失败: exit={result.get('exit_code')}, error={result.get('error')}")
             error_msg = handle_agently_error(result)
             return Err(SdkError(error_msg or "发送邮件失败"))
 
@@ -900,21 +922,34 @@ class NekoMailAgentlyEntry(NekoPluginBase):
             if confirmation_token:
                 args.extend(["--confirmation-token", confirmation_token])
             else:
-                # 获取要回复的邮件信息用于确认摘要
-                email_result = await run_agently_command(
-                    ["message", "+read", "--id", message_id],
-                    self.cli_path
-                )
-                email_subject = ""
-                if email_result.get("exit_code") == 0:
-                    email_subject = email_result.get("data", {}).get("subject", "")
+                # 先调用 CLI 获取确认令牌
+                self.logger.info(f"[reply_email] 两阶段确认：首次调用，附件={attachment_file_name}")
+                result = await run_agently_command(args, self.cli_path, cwd=attachment_cwd, logger=self.logger)
+                data = result.get("data", {})
+                if data.get("confirmation_required") or result.get("exit_code") == AgentlyExitCode.TWO_FACTOR:
+                    ctk = data.get("confirmation_token", "")
+                    if ctk:
+                        confirmation_tokens[ctk] = {
+                            "args": args,
+                            "cwd": attachment_cwd,
+                            "created_at": datetime.now().isoformat()
+                        }
+                        return Ok({
+                            "status": "pending_confirmation",
+                            "confirmation_token": ctk,
+                            "message": f"📧 请确认回复邮件\n原邮件ID: {message_id}\n回复内容: {body[:100]}...\n\n确认令牌: {ctk}\n\n请再次调用 reply_email 并传入 confirmation_token 参数确认回复。"
+                        })
+                elif result.get("exit_code") == 0:
+                    return Ok({
+                        "success": True,
+                        "status": "replied",
+                        "message": f"✅ 已回复邮件 {message_id}"
+                    })
+                else:
+                    error_msg = handle_agently_error(result)
+                    return Err(SdkError(error_msg or "回复邮件失败"))
 
-                return Ok({
-                    "status": "pending_confirmation",
-                    "message": f"📧 请确认回复邮件：\n原邮件: {email_subject}\n回复内容: {body[:100]}...\n\n请再次调用 reply_email 并传入 confirmation_token 参数确认回复。"
-                })
-
-        result = await run_agently_command(args, self.cli_path, cwd=attachment_cwd)
+        result = await run_agently_command(args, self.cli_path, cwd=attachment_cwd, logger=self.logger)
 
         if result.get("exit_code") == 0:
             return Ok({
@@ -1004,12 +1039,34 @@ class NekoMailAgentlyEntry(NekoPluginBase):
             if confirmation_token:
                 args.extend(["--confirmation-token", confirmation_token])
             else:
-                return Ok({
-                    "status": "pending_confirmation",
-                    "message": f"📧 请确认转发邮件：\n转发给: {to}\n\n请再次调用 forward_email 并传入 confirmation_token 参数确认转发。"
-                })
+                # 先调用 CLI 获取确认令牌
+                self.logger.info(f"[forward_email] 两阶段确认：首次调用")
+                result = await run_agently_command(args, self.cli_path, logger=self.logger)
+                data = result.get("data", {})
+                if data.get("confirmation_required") or result.get("exit_code") == AgentlyExitCode.TWO_FACTOR:
+                    ctk = data.get("confirmation_token", "")
+                    if ctk:
+                        confirmation_tokens[ctk] = {
+                            "args": args,
+                            "cwd": None,
+                            "created_at": datetime.now().isoformat()
+                        }
+                        return Ok({
+                            "status": "pending_confirmation",
+                            "confirmation_token": ctk,
+                            "message": f"📧 请确认转发邮件\n转发给: {to}\n\n确认令牌: {ctk}\n\n请再次调用 forward_email 并传入 confirmation_token 参数确认转发。"
+                        })
+                elif result.get("exit_code") == 0:
+                    return Ok({
+                        "success": True,
+                        "status": "forwarded",
+                        "message": f"✅ 已转发邮件 {message_id} 给 {to}"
+                    })
+                else:
+                    error_msg = handle_agently_error(result)
+                    return Err(SdkError(error_msg or "转发邮件失败"))
 
-        result = await run_agently_command(args, self.cli_path)
+        result = await run_agently_command(args, self.cli_path, logger=self.logger)
 
         if result.get("exit_code") == 0:
             return Ok({
@@ -1075,12 +1132,34 @@ class NekoMailAgentlyEntry(NekoPluginBase):
             if confirmation_token:
                 args.extend(["--confirmation-token", confirmation_token])
             else:
-                return Ok({
-                    "status": "pending_confirmation",
-                    "message": f"🗑️ 请确认删除邮件 {message_id}\n\n请再次调用 trash_email 并传入 confirmation_token 参数确认删除。"
-                })
+                # 先调用 CLI 获取确认令牌
+                self.logger.info(f"[trash_email] 两阶段确认：首次调用")
+                result = await run_agently_command(args, self.cli_path, logger=self.logger)
+                data = result.get("data", {})
+                if data.get("confirmation_required") or result.get("exit_code") == AgentlyExitCode.TWO_FACTOR:
+                    ctk = data.get("confirmation_token", "")
+                    if ctk:
+                        confirmation_tokens[ctk] = {
+                            "args": args,
+                            "cwd": None,
+                            "created_at": datetime.now().isoformat()
+                        }
+                        return Ok({
+                            "status": "pending_confirmation",
+                            "confirmation_token": ctk,
+                            "message": f"🗑️ 请确认删除邮件 {message_id}\n\n确认令牌: {ctk}\n\n请再次调用 trash_email 并传入 confirmation_token 参数确认删除。"
+                        })
+                elif result.get("exit_code") == 0:
+                    return Ok({
+                        "success": True,
+                        "status": "deleted",
+                        "message": f"✅ 已删除邮件 {message_id}"
+                    })
+                else:
+                    error_msg = handle_agently_error(result)
+                    return Err(SdkError(error_msg or "删除邮件失败"))
 
-        result = await run_agently_command(args, self.cli_path)
+        result = await run_agently_command(args, self.cli_path, logger=self.logger)
 
         if result.get("exit_code") == 0:
             return Ok({
@@ -1360,4 +1439,62 @@ class NekoMailAgentlyEntry(NekoPluginBase):
             "success": True,
             "status": "stopped",
             "message": "✅ 邮件轮询已停止"
+        })
+
+    @llm_tool(
+        name="neko_agently_diagnose",
+        description="诊断邮箱插件状态，检查 CLI 路径、认证状态、账户信息等。用于排查问题。",
+        parameters={
+            "type": "object",
+            "properties": {},
+            "required": []
+        },
+        timeout=30.0
+    )
+    @plugin_entry(
+        id="diagnose",
+        name="诊断邮箱",
+        description="诊断邮箱插件状态",
+        input_schema={"type": "object", "properties": {}, "required": []},
+        llm_result_fields=["status"]
+    )
+    async def diagnose(self, **_) -> Dict[str, Any]:
+        """诊断邮箱插件状态"""
+        import platform
+        info = {
+            "cli_path": self.cli_path,
+            "email_addr": self.email_addr,
+            "two_factor_confirm": self.two_factor_confirm,
+            "polling_interval": self.polling_interval,
+            "platform": platform.system(),
+        }
+
+        # 检查 CLI 是否存在
+        cli_exists = os.path.exists(self.cli_path)
+        info["cli_exists"] = cli_exists
+
+        if not cli_exists:
+            return Ok({
+                "success": False,
+                "diagnosis": info,
+                "message": f"❌ CLI 文件不存在: {self.cli_path}"
+            })
+
+        # 检查认证状态
+        auth_result = await run_agently_command(["auth", "status"], self.cli_path, logger=self.logger)
+        info["auth_status"] = auth_result
+
+        # 检查账户信息
+        me_result = await run_agently_command(["+me"], self.cli_path, logger=self.logger)
+        info["account_info"] = me_result
+
+        # 测试附件发送能力（不实际发送）
+        test_args = ["message", "+send", "--to", "test@test.com", "--subject", "diag", "--body", "diag", "--confirmed", "--dry-run"]
+        test_result = await run_agently_command(test_args, self.cli_path, logger=self.logger)
+        info["send_dry_run"] = test_result
+
+        return Ok({
+            "success": True,
+            "diagnosis": info,
+            "message": f"📊 诊断完成\nCLI路径: {self.cli_path} (存在: {cli_exists})\n认证状态: {auth_result.get('data', {}).get('status', '未知')}\n账户: {me_result.get('data', {}).get('aliases', [{}])[0].get('email', '未知') if me_result.get('ok') else '获取失败'}"
         })
