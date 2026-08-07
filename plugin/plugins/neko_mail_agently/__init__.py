@@ -1019,14 +1019,44 @@ class NekoMailAgentlyEntry(NekoPluginBase):
 
         if result.get("exit_code") == 0:
             data = result.get("data", result)
+            self.logger.info(f"[send_email] CLI 返回: {data}")
+
+            # 验证邮件是否真正入队（queued: true）
+            if not data.get("queued"):
+                self.logger.warning(f"[send_email] exit=0 但 queued!=true，数据: {data}")
+                # --confirmed 被服务端忽略，自动走两阶段确认重试
+                if confirmed and not confirmation_token:
+                    self.logger.info("[send_email] --confirmed 未生效，自动走两阶段确认")
+                    retry_args = ["message", "+send", "--to", to, "--subject", subject, "--body", body]
+                    if cc:
+                        retry_args.extend(["--cc", cc])
+                    if bcc:
+                        retry_args.extend(["--bcc", bcc])
+                    for att_name in attachment_names:
+                        retry_args.extend(["--attachment", att_name])
+                    retry_result = await run_agently_command(retry_args, self.cli_path, cwd=attachment_cwd, logger=self.logger)
+                    retry_data = retry_result.get("data", {})
+                    if retry_data.get("confirmation_required") or retry_result.get("exit_code") == AgentlyExitCode.TWO_FACTOR:
+                        ctk = retry_data.get("confirmation_token", "")
+                        if ctk:
+                            confirmation_tokens[ctk] = {
+                                "args": retry_args,
+                                "cwd": attachment_cwd,
+                                "created_at": datetime.now().isoformat()
+                            }
+                            return Ok({
+                                "status": "pending_confirmation",
+                                "confirmation_token": ctk,
+                                "message": f"📧 发送需要确认，请再次调用 send_email 并传入 confirmation_token={ctk}"
+                            })
+                # 无法重试，仍然返回成功（向后兼容）
+                self.logger.warning("[send_email] 无法自动重试，按原逻辑返回成功")
 
             # 清理确认令牌
             if confirmation_token and confirmation_token in confirmation_tokens:
                 del confirmation_tokens[confirmation_token]
 
-            # 发送成功返回的是 queued: true，没有 message_id
             attach_info = f"\n附件({len(attachment_names)}个): {', '.join(attachment_names)}" if attachment_names else ""
-            self.logger.info(f"[send_email] 发送成功: {data}")
             return Ok({
                 "success": True,
                 "status": "sent",
@@ -1185,6 +1215,27 @@ class NekoMailAgentlyEntry(NekoPluginBase):
         result = await run_agently_command(args, self.cli_path, cwd=attachment_cwd, logger=self.logger)
 
         if result.get("exit_code") == 0:
+            data = result.get("data", result)
+            self.logger.info(f"[reply_email] CLI 返回: {data}")
+            # 验证是否真正入队
+            if not data.get("queued") and confirmed and not confirmation_token:
+                self.logger.warning("[reply_email] --confirmed 未生效，自动走两阶段确认")
+                retry_args = ["message", "+reply", "--id", message_id, "--body", body]
+                if reply_all:
+                    retry_args.append("--reply-all")
+                if cc:
+                    retry_args.extend(["--cc", cc])
+                if bcc:
+                    retry_args.extend(["--bcc", bcc])
+                for att_name in attachment_names:
+                    retry_args.extend(["--attachment", att_name])
+                retry_result = await run_agently_command(retry_args, self.cli_path, cwd=attachment_cwd, logger=self.logger)
+                retry_data = retry_result.get("data", {})
+                if retry_data.get("confirmation_required") or retry_result.get("exit_code") == AgentlyExitCode.TWO_FACTOR:
+                    ctk = retry_data.get("confirmation_token", "")
+                    if ctk:
+                        confirmation_tokens[ctk] = {"args": retry_args, "cwd": attachment_cwd, "created_at": datetime.now().isoformat()}
+                        return Ok({"status": "pending_confirmation", "confirmation_token": ctk, "message": f"📧 回复需要确认，请传入 confirmation_token={ctk}"})
             return Ok({
                 "success": True,
                 "status": "replied",
@@ -1303,6 +1354,22 @@ class NekoMailAgentlyEntry(NekoPluginBase):
         result = await run_agently_command(args, self.cli_path, logger=self.logger)
 
         if result.get("exit_code") == 0:
+            data = result.get("data", result)
+            self.logger.info(f"[forward_email] CLI 返回: {data}")
+            if not data.get("queued") and confirmed and not confirmation_token:
+                self.logger.warning("[forward_email] --confirmed 未生效，自动走两阶段确认")
+                retry_args = ["message", "+forward", "--id", message_id, "--to", to]
+                if body:
+                    retry_args.extend(["--body", body])
+                if include_attachments:
+                    retry_args.append("--include-attachments")
+                retry_result = await run_agently_command(retry_args, self.cli_path, logger=self.logger)
+                retry_data = retry_result.get("data", {})
+                if retry_data.get("confirmation_required") or retry_result.get("exit_code") == AgentlyExitCode.TWO_FACTOR:
+                    ctk = retry_data.get("confirmation_token", "")
+                    if ctk:
+                        confirmation_tokens[ctk] = {"args": retry_args, "cwd": None, "created_at": datetime.now().isoformat()}
+                        return Ok({"status": "pending_confirmation", "confirmation_token": ctk, "message": f"📧 转发需要确认，请传入 confirmation_token={ctk}"})
             return Ok({
                 "success": True,
                 "status": "forwarded",
@@ -1397,6 +1464,18 @@ class NekoMailAgentlyEntry(NekoPluginBase):
         result = await run_agently_command(args, self.cli_path, logger=self.logger)
 
         if result.get("exit_code") == 0:
+            data = result.get("data", result)
+            self.logger.info(f"[trash_email] CLI 返回: {data}")
+            if not data.get("queued") and confirmed and not confirmation_token:
+                self.logger.warning("[trash_email] --confirmed 未生效，自动走两阶段确认")
+                retry_args = ["message", "+trash", "--id", message_id]
+                retry_result = await run_agently_command(retry_args, self.cli_path, logger=self.logger)
+                retry_data = retry_result.get("data", {})
+                if retry_data.get("confirmation_required") or retry_result.get("exit_code") == AgentlyExitCode.TWO_FACTOR:
+                    ctk = retry_data.get("confirmation_token", "")
+                    if ctk:
+                        confirmation_tokens[ctk] = {"args": retry_args, "cwd": None, "created_at": datetime.now().isoformat()}
+                        return Ok({"status": "pending_confirmation", "confirmation_token": ctk, "message": f"🗑️ 删除需要确认，请传入 confirmation_token={ctk}"})
             return Ok({
                 "success": True,
                 "status": "deleted",
