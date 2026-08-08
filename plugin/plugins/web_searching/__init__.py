@@ -1,11 +1,11 @@
 """
-Web Searching Plugin — 联网搜索 v1.5.0
+Web Searching Plugin — 联网搜索 v1.6.0
 
 独立开发的联网搜索插件，让猫娘具备联网搜索能力。
 注册为 @llm_tool，猫娘可在遇到知识盲区时主动调用。
 
 搜索策略（按查询语言智能选择）：
-  - 中文查询：百度 → 搜狗 → Bing → DuckDuckGo
+  - 中文查询：知乎 → 百度 → 搜狗 → Bing → DuckDuckGo
   - 英文查询：DuckDuckGo → Bing → 百度
   - 知识层（并行）：DDG Instant Answer API + Wikipedia API
 
@@ -63,6 +63,10 @@ _BING_URL = "https://www.bing.com/search"
 # Jina AI — 免费搜索+阅读器（无需 API key，支持 JS 渲染）
 _JINA_SEARCH_URL = "https://s.jina.ai/"
 _JINA_READER_URL = "https://r.jina.ai/"
+
+# 知乎搜索 API（官方开放平台）
+_ZHIHU_SEARCH_URL = "https://developer.zhihu.com/api/v1/content/zhihu_search"
+_ZHIHU_API_TOKEN = "4c29ac01ee6e73575bf03a895d5a8725770ccfa8"
 
 # 中文 unicode 范围
 _CJK_RE = re.compile(r'[\u4e00-\u9fff]')
@@ -491,6 +495,74 @@ async def _jina_reader(url: str, timeout: float = 15.0) -> Dict[str, str]:
     }
 
 
+# ─── 策略 7: 知乎搜索 API（中文查询首选）────────────────────────────────────
+
+async def _search_zhihu(query: str, max_results: int = 5, timeout: float = 15.0) -> List[Dict[str, str]]:
+    """知乎搜索 API - 中文查询首选渠道
+    
+    使用知乎官方开放平台 API，返回结构化数据。
+    优势：内容质量高、专业性强、响应稳定。
+    """
+    headers = {
+        "Authorization": f"Bearer {_ZHIHU_API_TOKEN}",
+        "X-Request-Timestamp": str(int(time.time())),
+        "Content-Type": "application/json",
+        "User-Agent": _UA_PC,
+        "Accept": "application/json",
+    }
+    params = {
+        "Query": query,
+        "Count": min(max_results, 10),  # 知乎 API 最大支持 10
+    }
+
+    resp = await _fetch(_ZHIHU_SEARCH_URL, params, headers, timeout)
+    if not resp:
+        return []
+
+    try:
+        data = resp.json()
+    except Exception:
+        return []
+
+    # 检查响应状态
+    if data.get("Code") != 0:
+        return []
+
+    items = data.get("Data", {}).get("Items", [])
+    results: List[Dict[str, str]] = []
+
+    for item in items:
+        title = item.get("Title", "").strip()
+        url = item.get("Url", "").strip()
+        content_text = item.get("ContentText", "").strip()
+        
+        if not title or not url:
+            continue
+
+        # 构建摘要（优先用 ContentText）
+        snippet = content_text[:300] if content_text else ""
+
+        results.append({
+            "title": title,
+            "url": url,
+            "snippet": snippet,
+            "source": "zhihu",
+            "content_type": item.get("ContentType", ""),
+            "vote_up_count": item.get("VoteUpCount", 0),
+            "comment_count": item.get("CommentCount", 0),
+            "author_name": item.get("AuthorName", ""),
+            "author_badge": item.get("AuthorBadgeText", ""),
+            "edit_time": item.get("EditTime", 0),
+            "authority_level": item.get("AuthorityLevel", ""),
+            "ranking_score": item.get("RankingScore", 0.0),
+        })
+
+        if len(results) >= max_results:
+            break
+
+    return results
+
+
 # ─── 页面正文提取（解决"点不开链接"痛点）──────────────────────────────────
 
 # 需要移除的噪音标签
@@ -767,12 +839,12 @@ class WebSearchingPlugin(NekoPluginBase):
         except Exception as e:
             self.logger.warning("set_list_actions failed: {}", e)
 
-        self.logger.info("WebSearchingPlugin started v1.5.0")
+        self.logger.info("WebSearchingPlugin started v1.6.0")
         return Ok({
             "status": "running",
-            "version": "1.5.0",
+            "version": "1.6.0",
             "engines": {
-                "chinese": ["baidu", "sogou", "bing", "ddg"],
+                "chinese": ["zhihu", "baidu", "sogou", "bing", "ddg"],
                 "english": ["ddg", "bing", "baidu"],
                 "knowledge": ["ddg_ia", "wikipedia"],
             }
@@ -978,9 +1050,11 @@ class WebSearchingPlugin(NekoPluginBase):
             wiki_summary_text = wiki_result.get("summary", "")
 
         # ── Web 结果层：按国内可达性排序引擎 ──
+        # 中文查询：知乎优先（内容质量高、专业性强）
         # Jina/DDG 在国内可能不可达，降权到最后作为 fallback
         if is_chinese:
             engines = [
+                ("zhihu", _search_zhihu),
                 ("baidu", _search_baidu),
                 ("bing", _search_bing),
                 ("sogou", _search_sogou),
@@ -1303,9 +1377,9 @@ class WebSearchingPlugin(NekoPluginBase):
     )
     async def get_status(self, **_):
         return Ok({
-            "version": "1.5.0",
+            "version": "1.6.0",
             "engines": {
-                "chinese": ["baidu", "sogou", "bing", "ddg"],
+                "chinese": ["zhihu", "baidu", "sogou", "bing", "ddg"],
                 "english": ["ddg", "bing", "baidu"],
                 "knowledge": ["ddg_ia", "wikipedia"],
             },
