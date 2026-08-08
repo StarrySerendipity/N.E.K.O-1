@@ -1003,57 +1003,44 @@ class NekoMailAgentlyEntry(NekoPluginBase):
         for att_name in attachment_names:
             args.extend(["--attachment", att_name])
 
-        # 两阶段确认处理
-        if confirmed:
-            # 用户已明确授权，使用 --confirmed 跳过确认
-            args.append("--confirmed")
-        elif self.two_factor_confirm:
-            if confirmation_token:
-                # 使用确认令牌完成发送
-                args.extend(["--confirmation-token", confirmation_token])
-            else:
-                # 首次调用，不带确认令牌，获取确认令牌
-                self.logger.info(f"[send_email] 两阶段确认：首次调用，附件={attachment_names}, cwd={attachment_cwd}")
-                result = await run_agently_command(args, self.cli_path, cwd=attachment_cwd, logger=self.logger)
-
-                # 检查是否需要确认
-                data = result.get("data", {})
-                self.logger.info(f"[send_email] 首次调用结果: exit={result.get('exit_code')}, data={data}")
-                if data.get("confirmation_required") or result.get("exit_code") == AgentlyExitCode.TWO_FACTOR:
-                    ctk = data.get("confirmation_token", "")
-                    if ctk:
-                        confirmation_tokens[ctk] = {
-                            "args": args,
-                            "cwd": attachment_cwd,
-                            "created_at": datetime.now().isoformat()
-                        }
-                        attach_info = f"\n附件({len(attachment_names)}个): {', '.join(attachment_names)}" if attachment_names else ""
-                        return Ok({
-                            "status": "pending_confirmation",
-                            "confirmation_token": ctk,
-                            "summary": f"📧 即将发送邮件\n收件人: {to}\n主题: {subject}{attach_info}\n正文: {body[:100]}...",
-                            "message": f"📧 请确认发送邮件：\n收件人: {to}\n主题: {subject}{attach_info}\n\n确认令牌: {ctk}\n\n请再次调用 send_email 并传入 confirmation_token 参数确认发送。"
-                        })
-                elif result.get("exit_code") == 0:
-                    # 不需要确认，发后验证
-                    await asyncio.sleep(3)
-                    if await self._verify_sent(subject, to):
-                        attach_info = f"\n附件({len(attachment_names)}个): {', '.join(attachment_names)}" if attachment_names else ""
-                        return Ok({
-                            "success": True,
-                            "status": "sent",
-                            "message": f"✅ 邮件已发送并验证\n收件人: {to}\n主题: {subject}{attach_info}"
-                        })
+        # 确认逻辑：永远走两阶段确认（skip_confirmation 不可靠）
+        if confirmation_token:
+            # 已有确认令牌，直接使用
+            args.extend(["--confirmation-token", confirmation_token])
+        else:
+            # 首次调用：获取确认令牌
+            self.logger.info(f"[send_email] 首次调用获取令牌，附件={attachment_names}, cwd={attachment_cwd}")
+            result = await run_agently_command(args, self.cli_path, cwd=attachment_cwd, logger=self.logger)
+            data = result.get("data", {})
+            self.logger.info(f"[send_email] 首次调用结果: exit={result.get('exit_code')}, data={data}")
+            if data.get("confirmation_required") or result.get("exit_code") == AgentlyExitCode.TWO_FACTOR:
+                ctk = data.get("confirmation_token", "")
+                if ctk:
+                    confirmation_tokens[ctk] = {"args": args, "cwd": attachment_cwd, "created_at": datetime.now().isoformat()}
+                    if confirmed:
+                        # 用户已授权，自动用令牌确认（不让猫娘再确认一次）
+                        self.logger.info(f"[send_email] confirmed=True，自动用令牌 {ctk} 确认发送")
+                        args.extend(["--confirmation-token", ctk])
                     else:
-                        self.logger.warning("[send_email] 两阶段首次调用成功但 sent 验证失败")
+                        attach_info = f"\n附件({len(attachment_names)}个): {', '.join(attachment_names)}" if attachment_names else ""
+                        return Ok({"status": "pending_confirmation", "confirmation_token": ctk,
+                                   "summary": f"📧 即将发送邮件\n收件人: {to}\n主题: {subject}{attach_info}\n正文: {body[:100]}...",
+                                   "message": f"📧 请确认发送邮件：\n收件人: {to}\n主题: {subject}{attach_info}\n\n确认令牌: {ctk}\n\n请再次调用 send_email 并传入 confirmation_token 参数确认发送。"})
+            elif result.get("exit_code") == 0:
+                # 服务端不需要确认，直接成功 → 发后验证
+                await asyncio.sleep(3)
+                if await self._verify_sent(subject, to):
+                    attach_info = f"\n附件({len(attachment_names)}个): {', '.join(attachment_names)}" if attachment_names else ""
+                    return Ok({"success": True, "status": "sent", "message": f"✅ 邮件已发送并验证\n收件人: {to}\n主题: {subject}{attach_info}"})
                 else:
-                    # 首次调用失败，直接返回错误
-                    self.logger.error(f"[send_email] 首次调用失败: {result}")
-                    error_msg = handle_agently_error(result)
-                    return Err(SdkError(error_msg or "发送邮件失败"))
+                    self.logger.warning("[send_email] 首次调用成功但 sent 验证失败")
+            else:
+                self.logger.error(f"[send_email] 首次调用失败: {result}")
+                error_msg = handle_agently_error(result)
+                return Err(SdkError(error_msg or "发送邮件失败"))
 
-        # 执行发送（带确认令牌或 --confirmed）
-        self.logger.info(f"[send_email] 执行最终发送，附件={attachment_names}, confirmed={confirmed}, has_token={bool(confirmation_token)}")
+        # 执行最终发送（带确认令牌）
+        self.logger.info(f"[send_email] 执行最终发送，附件={attachment_names}, has_token={bool(confirmation_token)}")
 
         MAX_RETRIES = 2
         for attempt in range(MAX_RETRIES + 1):
@@ -1066,10 +1053,13 @@ class NekoMailAgentlyEntry(NekoPluginBase):
                     args.extend(["--bcc", bcc])
                 for att_name in attachment_names:
                     args.extend(["--attachment", att_name])
-                if confirmation_token:
-                    args.extend(["--confirmation-token", confirmation_token])
-                elif confirmed:
-                    args.append("--confirmed")
+                # 重试时重新走两阶段：先拿 token 再确认
+                first = await run_agently_command(args, self.cli_path, cwd=attachment_cwd, logger=self.logger)
+                retry_data = first.get("data", {})
+                retry_ctk = retry_data.get("confirmation_token", "")
+                if retry_ctk:
+                    args.extend(["--confirmation-token", retry_ctk])
+                    self.logger.info(f"[send_email] 重试获取新令牌: {retry_ctk}")
 
             result = await run_agently_command(args, self.cli_path, cwd=attachment_cwd, logger=self.logger)
 
@@ -1249,40 +1239,30 @@ class NekoMailAgentlyEntry(NekoPluginBase):
         for att_name in attachment_names:
             args.extend(["--attachment", att_name])
 
-        # 两阶段确认处理（与 send_email 一致：confirmation_token 优先）
+        # 确认逻辑：永远走两阶段确认（skip_confirmation 不可靠）
         if confirmation_token:
             args.extend(["--confirmation-token", confirmation_token])
-        elif confirmed:
-            args.append("--confirmed")
-        elif self.two_factor_confirm:
-            # 先调用 CLI 获取确认令牌
-            self.logger.info(f"[reply_email] 两阶段确认：首次调用，附件={attachment_names}")
+        else:
+            self.logger.info(f"[reply_email] 首次调用获取令牌，附件={attachment_names}")
             result = await run_agently_command(args, self.cli_path, cwd=attachment_cwd, logger=self.logger)
             data = result.get("data", {})
             if data.get("confirmation_required") or result.get("exit_code") == AgentlyExitCode.TWO_FACTOR:
                 ctk = data.get("confirmation_token", "")
                 if ctk:
-                    confirmation_tokens[ctk] = {
-                        "args": args,
-                        "cwd": attachment_cwd,
-                        "created_at": datetime.now().isoformat()
-                    }
-                    return Ok({
-                        "status": "pending_confirmation",
-                        "confirmation_token": ctk,
-                        "message": f"📧 请确认回复邮件\n原邮件ID: {message_id}\n回复内容: {body[:100]}...\n\n确认令牌: {ctk}\n\n请再次调用 reply_email 并传入 confirmation_token 参数确认回复。"
-                    })
+                    confirmation_tokens[ctk] = {"args": args, "cwd": attachment_cwd, "created_at": datetime.now().isoformat()}
+                    if confirmed:
+                        self.logger.info(f"[reply_email] confirmed=True，自动用令牌 {ctk} 确认回复")
+                        args.extend(["--confirmation-token", ctk])
+                    else:
+                        return Ok({"status": "pending_confirmation", "confirmation_token": ctk,
+                                   "message": f"📧 请确认回复邮件\n原邮件ID: {message_id}\n回复内容: {body[:100]}...\n\n确认令牌: {ctk}\n\n请再次调用 reply_email 并传入 confirmation_token 参数确认回复。"})
             elif result.get("exit_code") == 0:
-                # 不需要确认，发后验证
                 await asyncio.sleep(3)
-                sent_result = await run_agently_command(
-                    ["message", "+list", "--dir", "sent", "--limit", "1"],
-                    self.cli_path, logger=self.logger
-                )
+                sent_result = await run_agently_command(["message", "+list", "--dir", "sent", "--limit", "1"], self.cli_path, logger=self.logger)
                 if sent_result.get("exit_code") == 0 and sent_result.get("data", {}).get("data", []):
                     return Ok({"success": True, "status": "replied", "message": f"✅ 已回复邮件 {message_id}（sent 验证通过）"})
                 else:
-                    self.logger.warning("[reply_email] 两阶段首次调用成功但 sent 验证失败")
+                    self.logger.warning("[reply_email] 首次调用成功但 sent 验证失败")
             else:
                 error_msg = handle_agently_error(result)
                 return Err(SdkError(error_msg or "回复邮件失败"))
@@ -1301,10 +1281,12 @@ class NekoMailAgentlyEntry(NekoPluginBase):
                     args.extend(["--bcc", bcc])
                 for att_name in attachment_names:
                     args.extend(["--attachment", att_name])
-                if confirmation_token:
-                    args.extend(["--confirmation-token", confirmation_token])
-                elif confirmed:
-                    args.append("--confirmed")
+                # 重试时重新走两阶段
+                first = await run_agently_command(args, self.cli_path, cwd=attachment_cwd, logger=self.logger)
+                retry_data = first.get("data", {})
+                retry_ctk = retry_data.get("confirmation_token", "")
+                if retry_ctk:
+                    args.extend(["--confirmation-token", retry_ctk])
 
             result = await run_agently_command(args, self.cli_path, cwd=attachment_cwd, logger=self.logger)
 
@@ -1420,11 +1402,33 @@ class NekoMailAgentlyEntry(NekoPluginBase):
         if include_attachments:
             args.append("--include-attachments")
 
-        # 两阶段确认处理（与 send_email 一致：confirmation_token 优先）
+        # 确认逻辑：永远走两阶段确认（skip_confirmation 不可靠）
         if confirmation_token:
             args.extend(["--confirmation-token", confirmation_token])
-        elif confirmed:
-            args.append("--confirmed")
+        else:
+            self.logger.info(f"[forward_email] 首次调用获取令牌")
+            result = await run_agently_command(args, self.cli_path, logger=self.logger)
+            data = result.get("data", {})
+            if data.get("confirmation_required") or result.get("exit_code") == AgentlyExitCode.TWO_FACTOR:
+                ctk = data.get("confirmation_token", "")
+                if ctk:
+                    confirmation_tokens[ctk] = {"args": args, "cwd": None, "created_at": datetime.now().isoformat()}
+                    if confirmed:
+                        self.logger.info(f"[forward_email] confirmed=True，自动用令牌 {ctk} 确认转发")
+                        args.extend(["--confirmation-token", ctk])
+                    else:
+                        return Ok({"status": "pending_confirmation", "confirmation_token": ctk,
+                                   "message": f"📧 请确认转发邮件\n转发给: {to}\n\n确认令牌: {ctk}\n\n请再次调用 forward_email 并传入 confirmation_token 参数确认转发。"})
+            elif result.get("exit_code") == 0:
+                await asyncio.sleep(3)
+                sent_result = await run_agently_command(["message", "+list", "--dir", "sent", "--limit", "1"], self.cli_path, logger=self.logger)
+                if sent_result.get("exit_code") == 0 and sent_result.get("data", {}).get("data", []):
+                    return Ok({"success": True, "status": "forwarded", "message": f"✅ 已转发邮件 {message_id} 给 {to}（sent 验证通过）"})
+                else:
+                    self.logger.warning("[forward_email] 首次调用成功但 sent 验证失败")
+            else:
+                error_msg = handle_agently_error(result)
+                return Err(SdkError(error_msg or "转发邮件失败"))
 
         # 执行转发（重试机制）
         MAX_RETRIES = 2
@@ -1436,10 +1440,12 @@ class NekoMailAgentlyEntry(NekoPluginBase):
                     args.extend(["--body", body])
                 if include_attachments:
                     args.append("--include-attachments")
-                if confirmation_token:
-                    args.extend(["--confirmation-token", confirmation_token])
-                elif confirmed:
-                    args.append("--confirmed")
+                # 重试时重新走两阶段
+                first = await run_agently_command(args, self.cli_path, logger=self.logger)
+                retry_data = first.get("data", {})
+                retry_ctk = retry_data.get("confirmation_token", "")
+                if retry_ctk:
+                    args.extend(["--confirmation-token", retry_ctk])
 
             result = await run_agently_command(args, self.cli_path, logger=self.logger)
 
@@ -1538,11 +1544,28 @@ class NekoMailAgentlyEntry(NekoPluginBase):
         """删除邮件"""
         args = ["message", "+trash", "--id", message_id]
 
-        # 两阶段确认处理
+        # 确认逻辑：永远走两阶段确认
         if confirmation_token:
             args.extend(["--confirmation-token", confirmation_token])
-        elif confirmed:
-            args.append("--confirmed")
+        else:
+            self.logger.info(f"[trash_email] 首次调用获取令牌")
+            result = await run_agently_command(args, self.cli_path, logger=self.logger)
+            data = result.get("data", {})
+            if data.get("confirmation_required") or result.get("exit_code") == AgentlyExitCode.TWO_FACTOR:
+                ctk = data.get("confirmation_token", "")
+                if ctk:
+                    confirmation_tokens[ctk] = {"args": args, "cwd": None, "created_at": datetime.now().isoformat()}
+                    if confirmed:
+                        self.logger.info(f"[trash_email] confirmed=True，自动用令牌 {ctk} 确认删除")
+                        args.extend(["--confirmation-token", ctk])
+                    else:
+                        return Ok({"status": "pending_confirmation", "confirmation_token": ctk,
+                                   "message": f"🗑️ 请确认删除邮件 {message_id}\n\n确认令牌: {ctk}\n\n请再次调用 trash_email 并传入 confirmation_token 参数确认删除。"})
+            elif result.get("exit_code") == 0:
+                return Ok({"success": True, "status": "deleted", "message": f"✅ 已删除邮件 {message_id}（无需确认）"})
+            else:
+                error_msg = handle_agently_error(result)
+                return Err(SdkError(error_msg or "删除邮件失败"))
 
         # 执行删除（重试机制）
         MAX_RETRIES = 2
@@ -1550,10 +1573,12 @@ class NekoMailAgentlyEntry(NekoPluginBase):
             if attempt > 0:
                 self.logger.info(f"[trash_email] 第 {attempt + 1} 次尝试删除")
                 args = ["message", "+trash", "--id", message_id]
-                if confirmation_token:
-                    args.extend(["--confirmation-token", confirmation_token])
-                elif confirmed:
-                    args.append("--confirmed")
+                # 重试时重新走两阶段
+                first = await run_agently_command(args, self.cli_path, logger=self.logger)
+                retry_data = first.get("data", {})
+                retry_ctk = retry_data.get("confirmation_token", "")
+                if retry_ctk:
+                    args.extend(["--confirmation-token", retry_ctk])
 
             result = await run_agently_command(args, self.cli_path, logger=self.logger)
 
