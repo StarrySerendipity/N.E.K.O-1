@@ -1035,13 +1035,17 @@ class NekoMailAgentlyEntry(NekoPluginBase):
                             "message": f"📧 请确认发送邮件：\n收件人: {to}\n主题: {subject}{attach_info}\n\n确认令牌: {ctk}\n\n请再次调用 send_email 并传入 confirmation_token 参数确认发送。"
                         })
                 elif result.get("exit_code") == 0:
-                    # 不需要确认，直接成功
-                    attach_info = f"\n附件({len(attachment_names)}个): {', '.join(attachment_names)}" if attachment_names else ""
-                    return Ok({
-                        "success": True,
-                        "status": "sent",
-                        "message": f"✅ 邮件已发送（服务端已接收）\n收件人: {to}\n主题: {subject}{attach_info}"
-                    })
+                    # 不需要确认，发后验证
+                    await asyncio.sleep(3)
+                    if await self._verify_sent(subject, to):
+                        attach_info = f"\n附件({len(attachment_names)}个): {', '.join(attachment_names)}" if attachment_names else ""
+                        return Ok({
+                            "success": True,
+                            "status": "sent",
+                            "message": f"✅ 邮件已发送并验证\n收件人: {to}\n主题: {subject}{attach_info}"
+                        })
+                    else:
+                        self.logger.warning("[send_email] 两阶段首次调用成功但 sent 验证失败")
                 else:
                     # 首次调用失败，直接返回错误
                     self.logger.error(f"[send_email] 首次调用失败: {result}")
@@ -1269,11 +1273,16 @@ class NekoMailAgentlyEntry(NekoPluginBase):
                         "message": f"📧 请确认回复邮件\n原邮件ID: {message_id}\n回复内容: {body[:100]}...\n\n确认令牌: {ctk}\n\n请再次调用 reply_email 并传入 confirmation_token 参数确认回复。"
                     })
             elif result.get("exit_code") == 0:
-                return Ok({
-                    "success": True,
-                    "status": "replied",
-                    "message": f"✅ 已回复邮件 {message_id}"
-                })
+                # 不需要确认，发后验证
+                await asyncio.sleep(3)
+                sent_result = await run_agently_command(
+                    ["message", "+list", "--dir", "sent", "--limit", "1"],
+                    self.cli_path, logger=self.logger
+                )
+                if sent_result.get("exit_code") == 0 and sent_result.get("data", {}).get("data", []):
+                    return Ok({"success": True, "status": "replied", "message": f"✅ 已回复邮件 {message_id}（sent 验证通过）"})
+                else:
+                    self.logger.warning("[reply_email] 两阶段首次调用成功但 sent 验证失败")
             else:
                 error_msg = handle_agently_error(result)
                 return Err(SdkError(error_msg or "回复邮件失败"))
