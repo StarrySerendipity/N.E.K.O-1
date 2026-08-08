@@ -1,0 +1,703 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>猫娘日记 - 回忆小盒子</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', 'Microsoft YaHei', sans-serif;
+            background: linear-gradient(135deg, #e0f4ff 0%, #fff0f5 50%, #f0f8ff 100%);
+            min-height: 100vh;
+            color: #4a5568;
+        }
+
+        .container {
+            max-width: 900px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+
+        /* 头部标题 */
+        .header {
+            text-align: center;
+            padding: 30px 0;
+            background: linear-gradient(135deg, rgba(255, 255, 255, 0.9) 0%, rgba(230, 240, 255, 0.9) 100%);
+            border-radius: 20px;
+            margin-bottom: 30px;
+            box-shadow: 0 8px 32px rgba(135, 180, 230, 0.15);
+        }
+
+        .header h1 {
+            font-size: 2.5em;
+            background: linear-gradient(135deg, #667eea 0%, #f093fb 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            margin-bottom: 10px;
+        }
+
+        .header p {
+            color: #718096;
+            font-size: 1.1em;
+        }
+
+        /* 写日记区域 */
+        .write-section {
+            background: rgba(255, 255, 255, 0.95);
+            border-radius: 16px;
+            padding: 25px;
+            margin-bottom: 30px;
+            box-shadow: 0 4px 20px rgba(135, 180, 230, 0.12);
+        }
+
+        .write-section h2 {
+            color: #5a67d8;
+            margin-bottom: 20px;
+            font-size: 1.5em;
+        }
+
+        .form-group {
+            margin-bottom: 18px;
+        }
+
+        .form-group label {
+            display: block;
+            margin-bottom: 8px;
+            color: #4a5568;
+            font-weight: 500;
+        }
+
+        .form-group input,
+        .form-group textarea,
+        .form-group select {
+            width: 100%;
+            padding: 12px 15px;
+            border: 2px solid #e2e8f0;
+            border-radius: 10px;
+            font-size: 1em;
+            transition: all 0.3s;
+        }
+
+        .form-group input:focus,
+        .form-group textarea:focus,
+        .form-group select:focus {
+            outline: none;
+            border-color: #667eea;
+            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+        }
+
+        .form-group textarea {
+            resize: vertical;
+            min-height: 120px;
+            font-family: inherit;
+        }
+
+        /* 心情选择器 */
+        .mood-selector {
+            display: flex;
+            gap: 12px;
+            flex-wrap: wrap;
+        }
+
+        .mood-option {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 12px 16px;
+            border: 2px solid #e2e8f0;
+            border-radius: 12px;
+            cursor: pointer;
+            transition: all 0.3s;
+            min-width: 80px;
+        }
+
+        .mood-option:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+        }
+
+        .mood-option.selected {
+            border-color: #667eea;
+            background: linear-gradient(135deg, #f0f4ff 0%, #fff0f5 100%);
+        }
+
+        .mood-option .emoji {
+            font-size: 2em;
+            margin-bottom: 4px;
+        }
+
+        .mood-option .label {
+            font-size: 0.85em;
+            color: #718096;
+        }
+
+        /* 标签输入 */
+        .tags-input {
+            display: flex;
+            gap: 8px;
+            flex-wrap: wrap;
+            align-items: center;
+        }
+
+        .tag {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 6px 12px;
+            border-radius: 16px;
+            font-size: 0.9em;
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .tag .remove {
+            cursor: pointer;
+            font-weight: bold;
+        }
+
+        .tag-input {
+            flex: 1;
+            min-width: 120px;
+            padding: 8px 12px;
+            border: 2px solid #e2e8f0;
+            border-radius: 8px;
+            font-size: 0.95em;
+        }
+
+        /* 提交按钮 */
+        .submit-btn {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            padding: 14px 32px;
+            border-radius: 12px;
+            font-size: 1.1em;
+            cursor: pointer;
+            transition: all 0.3s;
+            box-shadow: 0 4px 15px rgba(102, 126, 234, 0.3);
+        }
+
+        .submit-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(102, 126, 234, 0.4);
+        }
+
+        .submit-btn:active {
+            transform: translateY(0);
+        }
+
+        /* 日记列表 */
+        .diary-list {
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+
+        .diary-entry {
+            background: rgba(255, 255, 255, 0.95);
+            border-radius: 16px;
+            padding: 20px;
+            box-shadow: 0 4px 20px rgba(135, 180, 230, 0.12);
+            transition: all 0.3s;
+        }
+
+        .diary-entry:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 24px rgba(135, 180, 230, 0.18);
+        }
+
+        .entry-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 12px;
+        }
+
+        .entry-date {
+            color: #718096;
+            font-size: 0.9em;
+        }
+
+        .entry-mood {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            padding: 4px 12px;
+            border-radius: 16px;
+            font-size: 0.9em;
+        }
+
+        .entry-title {
+            font-size: 1.3em;
+            color: #2d3748;
+            margin-bottom: 10px;
+        }
+
+        .entry-content {
+            color: #4a5568;
+            line-height: 1.8;
+            margin-bottom: 12px;
+            white-space: pre-wrap;
+        }
+
+        .entry-tags {
+            display: flex;
+            gap: 8px;
+            flex-wrap: wrap;
+        }
+
+        .entry-tag {
+            background: linear-gradient(135deg, #e0f4ff 0%, #fff0f5 100%);
+            color: #5a67d8;
+            padding: 4px 10px;
+            border-radius: 12px;
+            font-size: 0.85em;
+        }
+
+        .entry-actions {
+            display: flex;
+            gap: 10px;
+            margin-top: 12px;
+            padding-top: 12px;
+            border-top: 1px solid #e2e8f0;
+        }
+
+        .action-btn {
+            background: none;
+            border: 1px solid #e2e8f0;
+            padding: 6px 14px;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.3s;
+            font-size: 0.9em;
+        }
+
+        .action-btn:hover {
+            background: #f7fafc;
+            border-color: #cbd5e0;
+        }
+
+        .action-btn.delete:hover {
+            background: #fed7d7;
+            border-color: #f56565;
+            color: #c53030;
+        }
+
+        /* 空状态 */
+        .empty-state {
+            text-align: center;
+            padding: 60px 20px;
+            color: #a0aec0;
+        }
+
+        .empty-state .emoji {
+            font-size: 4em;
+            margin-bottom: 20px;
+        }
+
+        /* 加载状态 */
+        .loading {
+            text-align: center;
+            padding: 40px;
+            color: #718096;
+        }
+
+        /* 分页 */
+        .pagination {
+            display: flex;
+            justify-content: center;
+            gap: 10px;
+            margin-top: 30px;
+        }
+
+        .page-btn {
+            background: white;
+            border: 2px solid #e2e8f0;
+            padding: 8px 16px;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        .page-btn:hover {
+            border-color: #667eea;
+            background: #f0f4ff;
+        }
+
+        .page-btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        /* 消息提示 */
+        .toast {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            background: white;
+            padding: 16px 24px;
+            border-radius: 12px;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.15);
+            z-index: 1000;
+            animation: slideIn 0.3s ease-out;
+        }
+
+        @keyframes slideIn {
+            from {
+                transform: translateX(400px);
+                opacity: 0;
+            }
+            to {
+                transform: translateX(0);
+                opacity: 1;
+            }
+        }
+
+        .toast.success {
+            border-left: 4px solid #48bb78;
+        }
+
+        .toast.error {
+            border-left: 4px solid #f56565;
+        }
+
+        /* 响应式 */
+        @media (max-width: 768px) {
+            .container {
+                padding: 10px;
+            }
+
+            .header h1 {
+                font-size: 2em;
+            }
+
+            .mood-selector {
+                gap: 8px;
+            }
+
+            .mood-option {
+                min-width: 70px;
+                padding: 10px 12px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <!-- 头部 -->
+        <div class="header">
+            <h1>📔 猫娘日记</h1>
+            <p>记录每天的小事，珍藏每一份回忆喵~</p>
+        </div>
+
+        <!-- 写日记 -->
+        <div class="write-section">
+            <h2>✨ 写一篇日记</h2>
+            <form id="diaryForm">
+                <div class="form-group">
+                    <label>标题（可选）</label>
+                    <input type="text" id="title" placeholder="给今天起个小标题吧~">
+                </div>
+
+                <div class="form-group">
+                    <label>今天的心情</label>
+                    <div class="mood-selector" id="moodSelector">
+                        <div class="mood-option" data-mood="happy">
+                            <span class="emoji">😊</span>
+                            <span class="label">开心</span>
+                        </div>
+                        <div class="mood-option" data-mood="calm">
+                            <span class="emoji">😌</span>
+                            <span class="label">平静</span>
+                        </div>
+                        <div class="mood-option selected" data-mood="neutral">
+                            <span class="emoji">😐</span>
+                            <span class="label">一般</span>
+                        </div>
+                        <div class="mood-option" data-mood="excited">
+                            <span class="emoji">🤩</span>
+                            <span class="label">兴奋</span>
+                        </div>
+                        <div class="mood-option" data-mood="sad">
+                            <span class="emoji">😢</span>
+                            <span class="label">难过</span>
+                        </div>
+                        <div class="mood-option" data-mood="tired">
+                            <span class="emoji">😴</span>
+                            <span class="label">疲惫</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label>今天发生了什么</label>
+                    <textarea id="content" placeholder="记下今天的小事，哪怕只是一句话也好~" required></textarea>
+                </div>
+
+                <div class="form-group">
+                    <label>标签（按回车添加）</label>
+                    <div class="tags-input" id="tagsInput">
+                        <input type="text" class="tag-input" id="tagInput" placeholder="输入标签后按回车">
+                    </div>
+                </div>
+
+                <button type="submit" class="submit-btn">💝 保存日记</button>
+            </form>
+        </div>
+
+        <!-- 日记列表 -->
+        <div id="diaryList" class="diary-list">
+            <div class="loading">加载中...</div>
+        </div>
+
+        <!-- 分页 -->
+        <div class="pagination" id="pagination" style="display: none;">
+            <button class="page-btn" id="prevBtn">上一页</button>
+            <button class="page-btn" id="nextBtn">下一页</button>
+        </div>
+    </div>
+
+    <script>
+        // 全局状态
+        let selectedMood = 'neutral';
+        let tags = [];
+        let currentOffset = 0;
+        const pageSize = 20;
+
+        // 心情选择
+        document.getElementById('moodSelector').addEventListener('click', (e) => {
+            const option = e.target.closest('.mood-option');
+            if (!option) return;
+
+            document.querySelectorAll('.mood-option').forEach(el => el.classList.remove('selected'));
+            option.classList.add('selected');
+            selectedMood = option.dataset.mood;
+        });
+
+        // 标签输入
+        document.getElementById('tagInput').addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                const input = e.target;
+                const tag = input.value.trim();
+                
+                if (tag && !tags.includes(tag)) {
+                    tags.push(tag);
+                    renderTags();
+                    input.value = '';
+                }
+            }
+        });
+
+        function renderTags() {
+            const container = document.getElementById('tagsInput');
+            const input = document.getElementById('tagInput');
+            
+            // 移除所有标签元素
+            container.querySelectorAll('.tag').forEach(el => el.remove());
+            
+            // 添加标签
+            tags.forEach((tag, index) => {
+                const tagEl = document.createElement('span');
+                tagEl.className = 'tag';
+                tagEl.innerHTML = `${tag} <span class="remove" data-index="${index}">×</span>`;
+                container.insertBefore(tagEl, input);
+            });
+        }
+
+        // 删除标签
+        document.getElementById('tagsInput').addEventListener('click', (e) => {
+            if (e.target.classList.contains('remove')) {
+                const index = parseInt(e.target.dataset.index);
+                tags.splice(index, 1);
+                renderTags();
+            }
+        });
+
+        // 提交表单
+        document.getElementById('diaryForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            const content = document.getElementById('content').value.trim();
+            if (!content) {
+                showToast('日记内容不能为空喵~', 'error');
+                return;
+            }
+
+            const title = document.getElementById('title').value.trim();
+            
+            try {
+                const response = await fetch('/api/plugin/neko_diary/write', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        content,
+                        title: title || null,
+                        mood: selectedMood,
+                        tags: tags.length > 0 ? tags : null,
+                    }),
+                });
+
+                const result = await response.json();
+                
+                if (result.success) {
+                    showToast(result.message || '日记已保存喵~', 'success');
+                    // 清空表单
+                    document.getElementById('diaryForm').reset();
+                    tags = [];
+                    renderTags();
+                    selectedMood = 'neutral';
+                    document.querySelectorAll('.mood-option').forEach(el => el.classList.remove('selected'));
+                    document.querySelector('[data-mood="neutral"]').classList.add('selected');
+                    // 重新加载列表
+                    loadDiaries();
+                } else {
+                    showToast(result.error || '保存失败', 'error');
+                }
+            } catch (error) {
+                showToast('保存失败: ' + error.message, 'error');
+            }
+        });
+
+        // 加载日记列表
+        async function loadDiaries() {
+            try {
+                const response = await fetch(`/api/plugin/neko_diary/browse?limit=${pageSize}&offset=${currentOffset}`);
+                const result = await response.json();
+                
+                if (result.error) {
+                    document.getElementById('diaryList').innerHTML = `<div class="empty-state"><div class="emoji">😿</div><p>${result.error}</p></div>`;
+                    return;
+                }
+
+                if (!result.entries || result.entries.length === 0) {
+                    document.getElementById('diaryList').innerHTML = `
+                        <div class="empty-state">
+                            <div class="emoji">📝</div>
+                            <p>还没有日记呢，快写下第一篇吧~</p>
+                        </div>
+                    `;
+                    document.getElementById('pagination').style.display = 'none';
+                    return;
+                }
+
+                renderDiaryList(result.entries);
+                
+                // 分页
+                const pagination = document.getElementById('pagination');
+                if (result.total > pageSize) {
+                    pagination.style.display = 'flex';
+                    document.getElementById('prevBtn').disabled = currentOffset === 0;
+                    document.getElementById('nextBtn').disabled = currentOffset + pageSize >= result.total;
+                } else {
+                    pagination.style.display = 'none';
+                }
+            } catch (error) {
+                document.getElementById('diaryList').innerHTML = `<div class="empty-state"><div class="emoji">😿</div><p>加载失败: ${error.message}</p></div>`;
+            }
+        }
+
+        function renderDiaryList(entries) {
+            const container = document.getElementById('diaryList');
+            container.innerHTML = entries.map(entry => `
+                <div class="diary-entry" data-id="${entry.id}">
+                    <div class="entry-header">
+                        <span class="entry-date">${formatDate(entry.date, entry.created_at)}</span>
+                        <span class="entry-mood" style="background: ${entry.mood_color}20; color: ${entry.mood_color}">
+                            ${entry.mood_emoji} ${entry.mood_label}
+                        </span>
+                    </div>
+                    ${entry.title ? `<div class="entry-title">${escapeHtml(entry.title)}</div>` : ''}
+                    <div class="entry-content">${escapeHtml(entry.content)}</div>
+                    ${entry.tags && entry.tags.length > 0 ? `
+                        <div class="entry-tags">
+                            ${entry.tags.map(tag => `<span class="entry-tag">${escapeHtml(tag)}</span>`).join('')}
+                        </div>
+                    ` : ''}
+                    <div class="entry-actions">
+                        <button class="action-btn delete" onclick="deleteDiary('${entry.id}')">删除</button>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        function formatDate(date, createdAt) {
+            const d = new Date(createdAt);
+            const now = new Date();
+            const diff = now - d;
+            
+            if (diff < 60000) return '刚刚';
+            if (diff < 3600000) return `${Math.floor(diff / 60000)}分钟前`;
+            if (diff < 86400000) return `${Math.floor(diff / 3600000)}小时前`;
+            
+            return date;
+        }
+
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+
+        // 删除日记
+        async function deleteDiary(id) {
+            if (!confirm('确定要删除这篇日记吗？')) return;
+            
+            try {
+                const response = await fetch('/api/plugin/neko_diary/delete', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ entry_id: id, permanent: false }),
+                });
+
+                const result = await response.json();
+                
+                if (result.success) {
+                    showToast(result.message || '已删除', 'success');
+                    loadDiaries();
+                } else {
+                    showToast(result.error || '删除失败', 'error');
+                }
+            } catch (error) {
+                showToast('删除失败: ' + error.message, 'error');
+            }
+        }
+
+        // 分页
+        document.getElementById('prevBtn').addEventListener('click', () => {
+            if (currentOffset > 0) {
+                currentOffset -= pageSize;
+                loadDiaries();
+            }
+        });
+
+        document.getElementById('nextBtn').addEventListener('click', () => {
+            currentOffset += pageSize;
+            loadDiaries();
+        });
+
+        // 消息提示
+        function showToast(message, type = 'success') {
+            const toast = document.createElement('div');
+            toast.className = `toast ${type}`;
+            toast.textContent = message;
+            document.body.appendChild(toast);
+            
+            setTimeout(() => {
+                toast.style.animation = 'slideIn 0.3s ease-out reverse';
+                setTimeout(() => toast.remove(), 300);
+            }, 3000);
+        }
+
+        // 初始加载
+        loadDiaries();
+    </script>
+</body>
+</html>
