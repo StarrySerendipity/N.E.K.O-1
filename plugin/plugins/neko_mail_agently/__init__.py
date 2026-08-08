@@ -86,12 +86,25 @@ def parse_agently_output(stdout: str, stderr: str) -> Dict[str, Any]:
     return {"error": "无法解析输出", "stdout": stdout, "stderr": stderr}
 
 
+def _build_node_cmd(cli_path: str, args: List[str]) -> List[str]:
+    """从 .cmd 文件提取 node 路径和脚本路径，绕过 cmd /c 直接调用 node。
+    这样 --body 参数中的换行符不会被 cmd.exe 当作命令分隔符截断。"""
+    import shutil
+    npm_dir = os.path.dirname(os.path.abspath(cli_path))
+    script_path = os.path.join(npm_dir, "node_modules", "@tencent-qqmail", "agently-cli", "scripts", "run.js")
+    node_path = shutil.which("node")
+    if node_path and os.path.exists(script_path):
+        return [node_path, script_path] + args
+    # fallback：找不到 node 或脚本，退回 cmd /c
+    return ["cmd", "/c", cli_path] + args
+
+
 async def run_agently_command(args: List[str], cli_path: str = "agently-cli", cwd: str = None, logger=None, timeout: float = 30.0) -> Dict[str, Any]:
     """异步执行 Agently CLI 命令"""
     try:
-        # Windows 下 .cmd 文件需要通过 cmd /c 执行，用列表参数避免 shell 转义问题
+        # Windows .cmd 文件：绕过 cmd /c 直接调用 node，避免换行符被截断
         if cli_path.lower().endswith('.cmd'):
-            cmd_list = ["cmd", "/c", cli_path] + args
+            cmd_list = _build_node_cmd(cli_path, args)
         else:
             cmd_list = [cli_path] + args
 
@@ -277,6 +290,7 @@ class NekoMailAgentlyEntry(NekoPluginBase):
         self._seen_email_ids: set = set()
         self._polling_baseline_loaded = False
         self._seen_ids_path = os.path.join(os.path.dirname(__file__), ".seen_email_ids.json")
+        self._rate_limit_count = 0
 
     def _load_seen_ids(self):
         """从磁盘加载已知邮件ID，避免重启后重复推送"""
@@ -452,9 +466,17 @@ class NekoMailAgentlyEntry(NekoPluginBase):
                 self.cli_path,
                 logger=self.logger
             )
+            if result.get("exit_code") == 7:  # RATE_LIMIT
+                self._rate_limit_count += 1
+                backoff = min(300, 30 * (2 ** (self._rate_limit_count - 1)))
+                self.logger.warning(f"[轮询] 触发限流（第{self._rate_limit_count}次），退避 {backoff} 秒")
+                await asyncio.sleep(backoff)
+                return
             if result.get("exit_code") != 0:
                 self.logger.warning(f"[轮询] CLI 返回非零退出码: {result.get('exit_code')}, error={result.get('error')}")
                 return
+            # 非限流成功，重置计数
+            self._rate_limit_count = 0
 
             emails = result.get("data", {}).get("data", [])
             self.logger.info(f"[轮询] 获取到 {len(emails)} 封未读邮件")
@@ -1004,9 +1026,7 @@ class NekoMailAgentlyEntry(NekoPluginBase):
             return Err(SdkError(f"❌ 收件人邮箱格式无效: '{to}'，请提供完整邮箱地址（如 example@qq.com）"))
 
         # 构建命令参数
-        # body 中的换行符会导致 cmd /c 参数解析断裂，替换为空格
-        safe_body = body.replace('\n', ' ').replace('\r', '')
-        args = ["message", "+send", "--to", to, "--subject", subject, "--body", safe_body]
+        args = ["message", "+send", "--to", to, "--subject", subject, "--body", body]
 
         if cc:
             args.extend(["--cc", cc])
@@ -1023,6 +1043,14 @@ class NekoMailAgentlyEntry(NekoPluginBase):
             first_data = first.get("data", {})
             active_ctk = first_data.get("confirmation_token", "")
             self.logger.info(f"[send_email] 首次调用完整响应: exit={first.get('exit_code')}, queued={first_data.get('queued')}, confirmation_required={first_data.get('confirmation_required')}, ctk={active_ctk}")
+            # 限流(429)：等待后重试一次
+            if first.get("exit_code") == 7 and not active_ctk:
+                self.logger.warning("[send_email] 首次调用限流(429)，等待 15 秒后重试")
+                await asyncio.sleep(15)
+                first = await run_agently_command(args, self.cli_path, cwd=attachment_cwd, logger=self.logger)
+                first_data = first.get("data", {})
+                active_ctk = first_data.get("confirmation_token", "")
+                self.logger.info(f"[send_email] 重试后响应: exit={first.get('exit_code')}, ctk={active_ctk}")
             if active_ctk:
                 confirmation_tokens[active_ctk] = {"args": args, "cwd": attachment_cwd, "created_at": datetime.now().isoformat()}
                 args.extend(["--confirmation-token", active_ctk])
@@ -1050,7 +1078,7 @@ class NekoMailAgentlyEntry(NekoPluginBase):
         for attempt in range(3):
             if attempt > 0:
                 self.logger.info(f"[send_email] 第 {attempt + 1} 次重试")
-                args = ["message", "+send", "--to", to, "--subject", subject, "--body", safe_body]
+                args = ["message", "+send", "--to", to, "--subject", subject, "--body", body]
                 if cc:
                     args.extend(["--cc", cc])
                 if bcc:
@@ -1187,9 +1215,7 @@ class NekoMailAgentlyEntry(NekoPluginBase):
             attachment_cwd = os.path.dirname(abs_path)
             attachment_names.append(os.path.basename(abs_path))
 
-        # body 中的换行符会导致 cmd /c 参数解析断裂，替换为空格
-        safe_body = body.replace('\n', ' ').replace('\r', '')
-        args = ["message", "+reply", "--id", message_id, "--body", safe_body]
+        args = ["message", "+reply", "--id", message_id, "--body", body]
 
         if reply_all:
             args.append("--reply-all")
@@ -1207,6 +1233,14 @@ class NekoMailAgentlyEntry(NekoPluginBase):
             first_data = first.get("data", {})
             ctk = first_data.get("confirmation_token", "")
             self.logger.info(f"[reply_email] 首次调用完整响应: exit={first.get('exit_code')}, ctk={ctk}")
+            # 限流(429)：等待后重试一次
+            if first.get("exit_code") == 7 and not ctk:
+                self.logger.warning("[reply_email] 首次调用限流(429)，等待 15 秒后重试")
+                await asyncio.sleep(15)
+                first = await run_agently_command(args, self.cli_path, cwd=attachment_cwd, logger=self.logger)
+                first_data = first.get("data", {})
+                ctk = first_data.get("confirmation_token", "")
+                self.logger.info(f"[reply_email] 重试后响应: exit={first.get('exit_code')}, ctk={ctk}")
             if ctk:
                 confirmation_tokens[ctk] = {"args": args, "cwd": attachment_cwd, "created_at": datetime.now().isoformat()}
                 args.extend(["--confirmation-token", ctk])
@@ -1227,7 +1261,7 @@ class NekoMailAgentlyEntry(NekoPluginBase):
         for attempt in range(3):
             if attempt > 0:
                 self.logger.info(f"[reply_email] 第 {attempt + 1} 次重试")
-                args = ["message", "+reply", "--id", message_id, "--body", safe_body]
+                args = ["message", "+reply", "--id", message_id, "--body", body]
                 if reply_all:
                     args.append("--reply-all")
                 if cc:
@@ -1333,8 +1367,7 @@ class NekoMailAgentlyEntry(NekoPluginBase):
         args = ["message", "+forward", "--id", message_id, "--to", to]
 
         if body:
-            # body 中的换行符会导致 cmd /c 参数解析断裂，替换为空格
-            args.extend(["--body", body.replace('\n', ' ').replace('\r', '')])
+            args.extend(["--body", body])
         if include_attachments:
             args.append("--include-attachments")
 
@@ -1345,6 +1378,14 @@ class NekoMailAgentlyEntry(NekoPluginBase):
             first_data = first.get("data", {})
             ctk = first_data.get("confirmation_token", "")
             self.logger.info(f"[forward_email] 首次调用完整响应: exit={first.get('exit_code')}, ctk={ctk}")
+            # 限流(429)：等待后重试一次
+            if first.get("exit_code") == 7 and not ctk:
+                self.logger.warning("[forward_email] 首次调用限流(429)，等待 15 秒后重试")
+                await asyncio.sleep(15)
+                first = await run_agently_command(args, self.cli_path, logger=self.logger)
+                first_data = first.get("data", {})
+                ctk = first_data.get("confirmation_token", "")
+                self.logger.info(f"[forward_email] 重试后响应: exit={first.get('exit_code')}, ctk={ctk}")
             if ctk:
                 confirmation_tokens[ctk] = {"args": args, "cwd": None, "created_at": datetime.now().isoformat()}
                 args.extend(["--confirmation-token", ctk])
@@ -1367,7 +1408,7 @@ class NekoMailAgentlyEntry(NekoPluginBase):
                 self.logger.info(f"[forward_email] 第 {attempt + 1} 次重试")
                 args = ["message", "+forward", "--id", message_id, "--to", to]
                 if body:
-                    args.extend(["--body", body.replace('\n', ' ').replace('\r', '')])
+                    args.extend(["--body", body])
                 if include_attachments:
                     args.append("--include-attachments")
                 first = await run_agently_command(args, self.cli_path, logger=self.logger)
