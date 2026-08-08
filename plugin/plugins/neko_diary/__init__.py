@@ -503,19 +503,17 @@ class NekoDiaryPluginEntry(NekoPluginBase):
             if catgirl_name is not None:
                 plugin.catgirl_name = catgirl_name.strip()
             
-            # 持久化到配置文件
+            # 持久化到配置文件（使用扁平化键名，参考 catgirl_daily_planner 的实现）
             try:
-                cfg = await self.config.dump(timeout=5.0)
-                cfg = cfg if isinstance(cfg, dict) else {}
-                if "neko_diary" not in cfg:
-                    cfg["neko_diary"] = {}
-                
+                update_dict = {}
                 if master_name is not None:
-                    cfg["neko_diary"]["master_name"] = plugin.master_name
+                    update_dict["neko_diary.master_name"] = plugin.master_name
                 if catgirl_name is not None:
-                    cfg["neko_diary"]["catgirl_name"] = plugin.catgirl_name
+                    update_dict["neko_diary.catgirl_name"] = plugin.catgirl_name
                 
-                await self.config.update(cfg, timeout=5.0)
+                if update_dict:
+                    await self.config.update(update_dict, timeout=5.0)
+                    self.logger.info(f"称呼配置已持久化: {update_dict}")
             except Exception as e:
                 self.logger.warning(f"持久化称呼配置失败: {e}")
             
