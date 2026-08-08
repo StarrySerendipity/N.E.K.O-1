@@ -484,7 +484,10 @@ class CatgirlDailyPlannerPlugin(NekoPluginBase):
         self.store._write_value(_HISTORY_KEY, hist)
 
     def _record_monthly_stats_unlocked(self, date_str: str, plan: Dict[str, Any]) -> None:
-        """把当日的完成情况汇总到月度统计,供 get_stats / get_year_overview 使用。"""
+        """把当日的完成情况汇总到月度统计,供 get_stats / get_year_overview 使用。
+
+        修复:使用覆盖而非累加的方式记录当天统计,避免重复调用导致统计数据膨胀。
+        """
         ym = date_str[:7]  # YYYY-MM
         try:
             stats = self.store._read_value(self._stats_key(ym), None) or {}
@@ -498,20 +501,53 @@ class CatgirlDailyPlannerPlugin(NekoPluginBase):
         stats.setdefault("skipped", 0)
         stats.setdefault("by_category", {})
         stats.setdefault("by_day", {})
+        stats.setdefault("_recorded_dates", {})  # 记录每天的统计快照
 
         tasks = plan.get("tasks", [])
-        stats["total"] += len(tasks)
+
+        # 获取当天之前记录的统计快照(如果有的话)
+        prev_snapshot = stats["_recorded_dates"].get(date_str, {})
+        prev_total = prev_snapshot.get("total", 0)
+        prev_done = prev_snapshot.get("done", 0)
+        prev_skipped = prev_snapshot.get("skipped", 0)
+        prev_by_category = prev_snapshot.get("by_category", {})
+
+        # 计算当天的统计
+        day_total = len(tasks)
         day_done = 0
+        day_skipped = 0
+        day_by_category = {}
         for t in tasks:
             cat = t.get("category") or DEFAULT_CATEGORY
-            stats["by_category"][cat] = int(stats["by_category"].get(cat, 0)) + 1
+            day_by_category[cat] = day_by_category.get(cat, 0) + 1
             st = t.get("status")
             if st == _STATUS_DONE:
-                stats["done"] += 1
                 day_done += 1
             elif st == _STATUS_SKIPPED:
-                stats["skipped"] += 1
+                day_skipped += 1
+
+        # 用差值更新月度统计(先减去旧值,再加上新值)
+        stats["total"] = stats["total"] - prev_total + day_total
+        stats["done"] = stats["done"] - prev_done + day_done
+        stats["skipped"] = stats["skipped"] - prev_skipped + day_skipped
+
+        # 更新分类统计
+        for cat, count in prev_by_category.items():
+            stats["by_category"][cat] = max(0, int(stats["by_category"].get(cat, 0)) - count)
+        for cat, count in day_by_category.items():
+            stats["by_category"][cat] = int(stats["by_category"].get(cat, 0)) + count
+
+        # 更新 by_day
         stats["by_day"][date_str] = day_done
+
+        # 保存当天的统计快照
+        stats["_recorded_dates"][date_str] = {
+            "total": day_total,
+            "done": day_done,
+            "skipped": day_skipped,
+            "by_category": day_by_category,
+        }
+
         self.store._write_value(self._stats_key(ym), stats)
 
     def _expand_recurring_locked(self, days_ahead: int = 14) -> None:
