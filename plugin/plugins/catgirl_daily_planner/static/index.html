@@ -735,6 +735,7 @@
         <h3>🛠 维护</h3>
       </div>
       <div class="row" style="justify-content: flex-end; gap: 8px;">
+        <button class="ghost tiny" onclick="rebuildStats()">🔧 重建本月统计</button>
         <button class="ghost tiny" onclick="cleanupHistory()">🧹 清理 1 年前的历史</button>
         <button class="ghost tiny" onclick="loadMeta()">🔄 刷新分类/优先级</button>
       </div>
@@ -1388,6 +1389,18 @@
     if (!confirm("清理 1 年前的历史计划(只删统计,不影响 reminder)?")) return;
     // 暂用 list_calendar 删除 1 年前的数据 — 后端没有入口,直接提示未实现
     showToast("暂未实现(数据保留即可,占用空间很小)");
+  }
+  async function rebuildStats() {
+    if (!confirm("重建本月统计数据?\n这会从实际计划数据重新计算,修复统计数字不准确的问题。")) return;
+    showToast("正在重建统计...");
+    const res = await apiCall("rebuild_stats", {});
+    if (res && res.ok) {
+      const v = res.value || {};
+      showToast(`重建完成: ${v.month} 共 ${v.total} 项,完成 ${v.done} 项`);
+      renderStats(); // 刷新统计页
+    } else {
+      showToast("重建失败: " + ((res && res.error) || "未知错误"), true);
+    }
   }
 
   // ===== 分类下拉填充 =====

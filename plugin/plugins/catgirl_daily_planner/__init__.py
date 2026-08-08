@@ -526,10 +526,10 @@ class CatgirlDailyPlannerPlugin(NekoPluginBase):
             elif st == _STATUS_SKIPPED:
                 day_skipped += 1
 
-        # 用差值更新月度统计(先减去旧值,再加上新值)
-        stats["total"] = stats["total"] - prev_total + day_total
-        stats["done"] = stats["done"] - prev_done + day_done
-        stats["skipped"] = stats["skipped"] - prev_skipped + day_skipped
+        # 用差值更新月度统计(先减去旧值,再加上新值),加 max(0, ...) 防止负数
+        stats["total"] = max(0, stats["total"] - prev_total + day_total)
+        stats["done"] = max(0, stats["done"] - prev_done + day_done)
+        stats["skipped"] = max(0, stats["skipped"] - prev_skipped + day_skipped)
 
         # 更新分类统计
         for cat, count in prev_by_category.items():
@@ -2338,4 +2338,97 @@ class CatgirlDailyPlannerPlugin(NekoPluginBase):
                 {"id": t["id"], "name": t["name"], "icon": t["icon"], "desc": t["desc"]}
                 for t in _TEMPLATES.values()
             ],
+        })
+
+    @llm_tool(
+        name="catgirl_planner_rebuild_stats",
+        description="重建指定月份的统计数据。当统计数字明显不对时使用此工具修复,会从实际计划数据重新计算。",
+        parameters={
+            "type": "object",
+            "properties": {
+                "month": {"type": "string", "description": "YYYY-MM,默认本月"},
+            },
+        },
+        timeout=30.0,
+    )
+    @plugin_entry(
+        id="rebuild_stats",
+        name="重建月度统计",
+        description="从实际计划数据重建指定月份的统计数据,修复历史统计错误。",
+        input_schema={
+            "type": "object",
+            "properties": {
+                "month": {"type": "string", "description": "YYYY-MM,默认本月"},
+            },
+        },
+        llm_result_fields=["month", "total", "done"],
+    )
+    async def rebuild_stats(self, month: str = "", **_):
+        if not month:
+            month = _now_in_tz(self._tz).strftime("%Y-%m")
+
+        # 计算该月的日期范围
+        try:
+            year, mon = int(month[:4]), int(month[5:7])
+            start_date = datetime(year, mon, 1).date()
+            if mon == 12:
+                end_date = datetime(year + 1, 1, 1).date() - timedelta(days=1)
+            else:
+                end_date = datetime(year, mon + 1, 1).date() - timedelta(days=1)
+        except (ValueError, IndexError):
+            return Err(SdkError(f"月份格式错误: {month!r}"))
+
+        # 遍历该月每天的计划数据,重新统计
+        new_stats: Dict[str, Any] = {
+            "month": month,
+            "total": 0,
+            "done": 0,
+            "skipped": 0,
+            "by_category": {},
+            "by_day": {},
+            "_recorded_dates": {},
+        }
+
+        d = start_date
+        while d <= end_date:
+            ds = d.strftime("%Y-%m-%d")
+            plan = self._load_plan(ds)
+            tasks = plan.get("tasks", [])
+            if tasks:
+                day_total = len(tasks)
+                day_done = 0
+                day_skipped = 0
+                day_by_cat: Dict[str, int] = {}
+                for t in tasks:
+                    cat = t.get("category") or DEFAULT_CATEGORY
+                    day_by_cat[cat] = day_by_cat.get(cat, 0) + 1
+                    st = t.get("status")
+                    if st == _STATUS_DONE:
+                        day_done += 1
+                    elif st == _STATUS_SKIPPED:
+                        day_skipped += 1
+
+                new_stats["total"] += day_total
+                new_stats["done"] += day_done
+                new_stats["skipped"] += day_skipped
+                for cat, cnt in day_by_cat.items():
+                    new_stats["by_category"][cat] = new_stats["by_category"].get(cat, 0) + cnt
+                new_stats["by_day"][ds] = day_done
+                new_stats["_recorded_dates"][ds] = {
+                    "total": day_total,
+                    "done": day_done,
+                    "skipped": day_skipped,
+                    "by_category": day_by_cat,
+                }
+            d += timedelta(days=1)
+
+        self.store._write_value(self._stats_key(month), new_stats)
+
+        return Ok({
+            "month": month,
+            "total": new_stats["total"],
+            "done": new_stats["done"],
+            "skipped": new_stats["skipped"],
+            "by_category": new_stats["by_category"],
+            "instruction": f"已重建 {month} 的统计: 共 {new_stats['total']} 项任务,完成 {new_stats['done']} 项。",
         })
