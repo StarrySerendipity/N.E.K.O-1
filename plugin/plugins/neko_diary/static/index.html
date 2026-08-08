@@ -16,73 +16,186 @@
             background: linear-gradient(135deg, #e0f4ff 0%, #fff0f5 50%, #f0f8ff 100%);
             min-height: 100vh;
             color: #4a5568;
+            position: relative;
+            overflow-x: hidden;
+        }
+
+        /* 背景装饰 */
+        body::before {
+            content: '';
+            position: fixed;
+            top: -50%;
+            left: -50%;
+            width: 200%;
+            height: 200%;
+            background: 
+                radial-gradient(circle at 20% 30%, rgba(255, 182, 193, 0.15) 0%, transparent 50%),
+                radial-gradient(circle at 80% 70%, rgba(173, 216, 230, 0.15) 0%, transparent 50%),
+                radial-gradient(circle at 50% 50%, rgba(255, 192, 203, 0.1) 0%, transparent 50%);
+            animation: float 20s ease-in-out infinite;
+            pointer-events: none;
+            z-index: 0;
+        }
+
+        @keyframes float {
+            0%, 100% { transform: translate(0, 0) rotate(0deg); }
+            50% { transform: translate(-20px, -20px) rotate(5deg); }
         }
 
         .container {
-            max-width: 900px;
+            max-width: 1000px;
             margin: 0 auto;
             padding: 20px;
+            position: relative;
+            z-index: 1;
         }
 
         /* 头部标题 */
         .header {
             text-align: center;
-            padding: 30px 0;
-            background: linear-gradient(135deg, rgba(255, 255, 255, 0.9) 0%, rgba(230, 240, 255, 0.9) 100%);
-            border-radius: 20px;
+            padding: 40px 30px;
+            background: rgba(255, 255, 255, 0.95);
+            border-radius: 24px;
             margin-bottom: 30px;
-            box-shadow: 0 8px 32px rgba(135, 180, 230, 0.15);
+            box-shadow: 0 8px 32px rgba(135, 180, 230, 0.2);
+            position: relative;
+            overflow: hidden;
+        }
+
+        .header::before {
+            content: '✨';
+            position: absolute;
+            top: 15px;
+            left: 30px;
+            font-size: 2em;
+            animation: sparkle 2s ease-in-out infinite;
+        }
+
+        .header::after {
+            content: '🌸';
+            position: absolute;
+            top: 15px;
+            right: 30px;
+            font-size: 2em;
+            animation: sparkle 2s ease-in-out infinite 0.5s;
+        }
+
+        @keyframes sparkle {
+            0%, 100% { opacity: 1; transform: scale(1); }
+            50% { opacity: 0.6; transform: scale(1.1); }
         }
 
         .header h1 {
-            font-size: 2.5em;
-            background: linear-gradient(135deg, #667eea 0%, #f093fb 100%);
+            font-size: 2.8em;
+            background: linear-gradient(135deg, #667eea 0%, #f093fb 50%, #667eea 100%);
             -webkit-background-clip: text;
             -webkit-text-fill-color: transparent;
             background-clip: text;
-            margin-bottom: 10px;
+            margin-bottom: 12px;
+            font-weight: 700;
+            letter-spacing: 2px;
         }
 
         .header p {
             color: #718096;
             font-size: 1.1em;
+            font-style: italic;
+        }
+
+        /* 标签页导航 */
+        .tabs {
+            display: flex;
+            gap: 12px;
+            margin-bottom: 24px;
+            background: rgba(255, 255, 255, 0.9);
+            padding: 8px;
+            border-radius: 16px;
+            box-shadow: 0 4px 16px rgba(135, 180, 230, 0.15);
+        }
+
+        .tab-btn {
+            flex: 1;
+            padding: 12px 20px;
+            border: none;
+            background: transparent;
+            color: #718096;
+            font-size: 1em;
+            font-weight: 600;
+            cursor: pointer;
+            border-radius: 12px;
+            transition: all 0.3s;
+        }
+
+        .tab-btn:hover {
+            background: rgba(102, 126, 234, 0.1);
+            color: #667eea;
+        }
+
+        .tab-btn.active {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3);
+        }
+
+        /* 标签页内容 */
+        .tab-content {
+            display: none;
+            animation: fadeIn 0.3s ease-in;
+        }
+
+        .tab-content.active {
+            display: block;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
         }
 
         /* 写日记区域 */
         .write-section {
             background: rgba(255, 255, 255, 0.95);
-            border-radius: 16px;
-            padding: 25px;
-            margin-bottom: 30px;
-            box-shadow: 0 4px 20px rgba(135, 180, 230, 0.12);
+            border-radius: 20px;
+            padding: 30px;
+            box-shadow: 0 8px 32px rgba(135, 180, 230, 0.15);
         }
 
-        .write-section h2 {
+        .section-title {
+            font-size: 1.6em;
             color: #5a67d8;
-            margin-bottom: 20px;
-            font-size: 1.5em;
+            margin-bottom: 24px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .section-title::before {
+            content: '✍️';
+            font-size: 1.2em;
         }
 
         .form-group {
-            margin-bottom: 18px;
+            margin-bottom: 20px;
         }
 
         .form-group label {
             display: block;
-            margin-bottom: 8px;
+            margin-bottom: 10px;
             color: #4a5568;
-            font-weight: 500;
+            font-weight: 600;
+            font-size: 1.05em;
         }
 
         .form-group input,
         .form-group textarea,
         .form-group select {
             width: 100%;
-            padding: 12px 15px;
+            padding: 14px 18px;
             border: 2px solid #e2e8f0;
-            border-radius: 10px;
+            border-radius: 12px;
             font-size: 1em;
             transition: all 0.3s;
+            background: white;
         }
 
         .form-group input:focus,
@@ -90,85 +203,106 @@
         .form-group select:focus {
             outline: none;
             border-color: #667eea;
-            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+            box-shadow: 0 0 0 4px rgba(102, 126, 234, 0.1);
         }
 
         .form-group textarea {
             resize: vertical;
-            min-height: 120px;
+            min-height: 140px;
             font-family: inherit;
+            line-height: 1.6;
         }
 
         /* 心情选择器 */
         .mood-selector {
-            display: flex;
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(100px, 1fr));
             gap: 12px;
-            flex-wrap: wrap;
         }
 
         .mood-option {
             display: flex;
             flex-direction: column;
             align-items: center;
-            padding: 12px 16px;
+            padding: 16px 12px;
             border: 2px solid #e2e8f0;
-            border-radius: 12px;
+            border-radius: 14px;
             cursor: pointer;
             transition: all 0.3s;
-            min-width: 80px;
+            background: white;
         }
 
         .mood-option:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+            transform: translateY(-3px);
+            box-shadow: 0 6px 16px rgba(0, 0, 0, 0.1);
+            border-color: #cbd5e0;
         }
 
         .mood-option.selected {
             border-color: #667eea;
             background: linear-gradient(135deg, #f0f4ff 0%, #fff0f5 100%);
+            box-shadow: 0 6px 20px rgba(102, 126, 234, 0.2);
+            transform: translateY(-3px);
         }
 
         .mood-option .emoji {
-            font-size: 2em;
-            margin-bottom: 4px;
+            font-size: 2.5em;
+            margin-bottom: 6px;
         }
 
         .mood-option .label {
-            font-size: 0.85em;
+            font-size: 0.9em;
             color: #718096;
+            font-weight: 500;
         }
 
         /* 标签输入 */
         .tags-input {
             display: flex;
-            gap: 8px;
+            gap: 10px;
             flex-wrap: wrap;
             align-items: center;
+            padding: 12px;
+            border: 2px solid #e2e8f0;
+            border-radius: 12px;
+            background: white;
+            min-height: 50px;
         }
 
         .tag {
             background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
             color: white;
-            padding: 6px 12px;
-            border-radius: 16px;
+            padding: 8px 14px;
+            border-radius: 20px;
             font-size: 0.9em;
             display: inline-flex;
             align-items: center;
-            gap: 6px;
+            gap: 8px;
+            box-shadow: 0 2px 8px rgba(102, 126, 234, 0.2);
         }
 
         .tag .remove {
             cursor: pointer;
             font-weight: bold;
+            font-size: 1.2em;
+            line-height: 1;
+        }
+
+        .tag .remove:hover {
+            color: #fed7d7;
         }
 
         .tag-input {
             flex: 1;
-            min-width: 120px;
+            min-width: 150px;
             padding: 8px 12px;
-            border: 2px solid #e2e8f0;
-            border-radius: 8px;
+            border: none;
             font-size: 0.95em;
+            background: transparent;
+        }
+
+        .tag-input:focus {
+            outline: none;
         }
 
         /* 提交按钮 */
@@ -176,17 +310,20 @@
             background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
             color: white;
             border: none;
-            padding: 14px 32px;
-            border-radius: 12px;
-            font-size: 1.1em;
+            padding: 16px 40px;
+            border-radius: 14px;
+            font-size: 1.15em;
+            font-weight: 600;
             cursor: pointer;
             transition: all 0.3s;
-            box-shadow: 0 4px 15px rgba(102, 126, 234, 0.3);
+            box-shadow: 0 6px 20px rgba(102, 126, 234, 0.3);
+            width: 100%;
+            margin-top: 10px;
         }
 
         .submit-btn:hover {
             transform: translateY(-2px);
-            box-shadow: 0 6px 20px rgba(102, 126, 234, 0.4);
+            box-shadow: 0 8px 24px rgba(102, 126, 234, 0.4);
         }
 
         .submit-btn:active {
@@ -202,81 +339,89 @@
 
         .diary-entry {
             background: rgba(255, 255, 255, 0.95);
-            border-radius: 16px;
-            padding: 20px;
-            box-shadow: 0 4px 20px rgba(135, 180, 230, 0.12);
+            border-radius: 18px;
+            padding: 24px;
+            box-shadow: 0 6px 24px rgba(135, 180, 230, 0.15);
             transition: all 0.3s;
+            border-left: 4px solid transparent;
         }
 
         .diary-entry:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 6px 24px rgba(135, 180, 230, 0.18);
+            transform: translateY(-3px);
+            box-shadow: 0 8px 28px rgba(135, 180, 230, 0.2);
         }
 
         .entry-header {
             display: flex;
             justify-content: space-between;
             align-items: center;
-            margin-bottom: 12px;
+            margin-bottom: 14px;
         }
 
         .entry-date {
             color: #718096;
-            font-size: 0.9em;
+            font-size: 0.95em;
+            font-weight: 500;
         }
 
         .entry-mood {
             display: flex;
             align-items: center;
-            gap: 6px;
-            padding: 4px 12px;
-            border-radius: 16px;
-            font-size: 0.9em;
+            gap: 8px;
+            padding: 6px 14px;
+            border-radius: 20px;
+            font-size: 0.95em;
+            font-weight: 600;
         }
 
         .entry-title {
-            font-size: 1.3em;
+            font-size: 1.4em;
             color: #2d3748;
-            margin-bottom: 10px;
+            margin-bottom: 12px;
+            font-weight: 600;
         }
 
         .entry-content {
             color: #4a5568;
             line-height: 1.8;
-            margin-bottom: 12px;
+            margin-bottom: 14px;
             white-space: pre-wrap;
+            font-size: 1.05em;
         }
 
         .entry-tags {
             display: flex;
             gap: 8px;
             flex-wrap: wrap;
+            margin-top: 12px;
         }
 
         .entry-tag {
             background: linear-gradient(135deg, #e0f4ff 0%, #fff0f5 100%);
             color: #5a67d8;
-            padding: 4px 10px;
-            border-radius: 12px;
+            padding: 6px 12px;
+            border-radius: 14px;
             font-size: 0.85em;
+            font-weight: 500;
         }
 
         .entry-actions {
             display: flex;
             gap: 10px;
-            margin-top: 12px;
-            padding-top: 12px;
+            margin-top: 16px;
+            padding-top: 16px;
             border-top: 1px solid #e2e8f0;
         }
 
         .action-btn {
-            background: none;
-            border: 1px solid #e2e8f0;
-            padding: 6px 14px;
-            border-radius: 8px;
+            background: white;
+            border: 2px solid #e2e8f0;
+            padding: 8px 16px;
+            border-radius: 10px;
             cursor: pointer;
             transition: all 0.3s;
             font-size: 0.9em;
+            font-weight: 500;
         }
 
         .action-btn:hover {
@@ -290,43 +435,151 @@
             color: #c53030;
         }
 
+        /* 搜索框 */
+        .search-box {
+            background: rgba(255, 255, 255, 0.95);
+            border-radius: 16px;
+            padding: 20px;
+            margin-bottom: 20px;
+            box-shadow: 0 4px 16px rgba(135, 180, 230, 0.15);
+        }
+
+        .search-input {
+            width: 100%;
+            padding: 14px 18px;
+            border: 2px solid #e2e8f0;
+            border-radius: 12px;
+            font-size: 1em;
+            transition: all 0.3s;
+        }
+
+        .search-input:focus {
+            outline: none;
+            border-color: #667eea;
+            box-shadow: 0 0 0 4px rgba(102, 126, 234, 0.1);
+        }
+
+        /* 统计卡片 */
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 16px;
+            margin-bottom: 24px;
+        }
+
+        .stat-card {
+            background: rgba(255, 255, 255, 0.95);
+            border-radius: 16px;
+            padding: 20px;
+            box-shadow: 0 4px 16px rgba(135, 180, 230, 0.15);
+            text-align: center;
+        }
+
+        .stat-value {
+            font-size: 2.5em;
+            font-weight: 700;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            margin-bottom: 8px;
+        }
+
+        .stat-label {
+            color: #718096;
+            font-size: 0.95em;
+        }
+
+        /* 心情分布 */
+        .mood-distribution {
+            background: rgba(255, 255, 255, 0.95);
+            border-radius: 16px;
+            padding: 24px;
+            box-shadow: 0 4px 16px rgba(135, 180, 230, 0.15);
+        }
+
+        .mood-bar {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            margin-bottom: 12px;
+        }
+
+        .mood-bar-label {
+            min-width: 80px;
+            font-weight: 500;
+        }
+
+        .mood-bar-track {
+            flex: 1;
+            height: 24px;
+            background: #f0f4ff;
+            border-radius: 12px;
+            overflow: hidden;
+        }
+
+        .mood-bar-fill {
+            height: 100%;
+            border-radius: 12px;
+            transition: width 0.5s ease-out;
+        }
+
+        .mood-bar-count {
+            min-width: 40px;
+            text-align: right;
+            font-weight: 600;
+            color: #5a67d8;
+        }
+
         /* 空状态 */
         .empty-state {
             text-align: center;
-            padding: 60px 20px;
+            padding: 80px 20px;
             color: #a0aec0;
         }
 
         .empty-state .emoji {
-            font-size: 4em;
+            font-size: 5em;
             margin-bottom: 20px;
+            animation: bounce 2s ease-in-out infinite;
+        }
+
+        @keyframes bounce {
+            0%, 100% { transform: translateY(0); }
+            50% { transform: translateY(-10px); }
+        }
+
+        .empty-state p {
+            font-size: 1.1em;
         }
 
         /* 加载状态 */
         .loading {
             text-align: center;
-            padding: 40px;
+            padding: 60px;
             color: #718096;
+            font-size: 1.1em;
         }
 
         /* 分页 */
         .pagination {
             display: flex;
             justify-content: center;
-            gap: 10px;
+            gap: 12px;
             margin-top: 30px;
         }
 
         .page-btn {
             background: white;
             border: 2px solid #e2e8f0;
-            padding: 8px 16px;
-            border-radius: 8px;
+            padding: 10px 20px;
+            border-radius: 10px;
             cursor: pointer;
             transition: all 0.3s;
+            font-weight: 500;
         }
 
-        .page-btn:hover {
+        .page-btn:hover:not(:disabled) {
             border-color: #667eea;
             background: #f0f4ff;
         }
@@ -342,11 +595,12 @@
             top: 20px;
             right: 20px;
             background: white;
-            padding: 16px 24px;
-            border-radius: 12px;
+            padding: 18px 28px;
+            border-radius: 14px;
             box-shadow: 0 8px 32px rgba(0, 0, 0, 0.15);
             z-index: 1000;
             animation: slideIn 0.3s ease-out;
+            font-weight: 500;
         }
 
         @keyframes slideIn {
@@ -362,16 +616,18 @@
 
         .toast.success {
             border-left: 4px solid #48bb78;
+            color: #2f855a;
         }
 
         .toast.error {
             border-left: 4px solid #f56565;
+            color: #c53030;
         }
 
         /* 响应式 */
         @media (max-width: 768px) {
             .container {
-                padding: 10px;
+                padding: 12px;
             }
 
             .header h1 {
@@ -379,12 +635,19 @@
             }
 
             .mood-selector {
-                gap: 8px;
+                grid-template-columns: repeat(auto-fit, minmax(80px, 1fr));
             }
 
             .mood-option {
-                min-width: 70px;
-                padding: 10px 12px;
+                padding: 12px 8px;
+            }
+
+            .mood-option .emoji {
+                font-size: 2em;
+            }
+
+            .stats-grid {
+                grid-template-columns: 1fr;
             }
         }
     </style>
@@ -397,70 +660,106 @@
             <p>记录每天的小事，珍藏每一份回忆喵~</p>
         </div>
 
+        <!-- 标签页导航 -->
+        <div class="tabs">
+            <button class="tab-btn active" data-tab="write">✍️ 写日记</button>
+            <button class="tab-btn" data-tab="browse">📖 浏览日记</button>
+            <button class="tab-btn" data-tab="search">🔍 搜索</button>
+            <button class="tab-btn" data-tab="stats">📊 统计</button>
+        </div>
+
         <!-- 写日记 -->
-        <div class="write-section">
-            <h2>✨ 写一篇日记</h2>
-            <form id="diaryForm">
-                <div class="form-group">
-                    <label>标题（可选）</label>
-                    <input type="text" id="title" placeholder="给今天起个小标题吧~">
-                </div>
+        <div id="writeTab" class="tab-content active">
+            <div class="write-section">
+                <div class="section-title">写一篇日记</div>
+                <form id="diaryForm">
+                    <div class="form-group">
+                        <label>标题（可选）</label>
+                        <input type="text" id="title" placeholder="给今天起个小标题吧~">
+                    </div>
 
-                <div class="form-group">
-                    <label>今天的心情</label>
-                    <div class="mood-selector" id="moodSelector">
-                        <div class="mood-option" data-mood="happy">
-                            <span class="emoji">😊</span>
-                            <span class="label">开心</span>
-                        </div>
-                        <div class="mood-option" data-mood="calm">
-                            <span class="emoji">😌</span>
-                            <span class="label">平静</span>
-                        </div>
-                        <div class="mood-option selected" data-mood="neutral">
-                            <span class="emoji">😐</span>
-                            <span class="label">一般</span>
-                        </div>
-                        <div class="mood-option" data-mood="excited">
-                            <span class="emoji">🤩</span>
-                            <span class="label">兴奋</span>
-                        </div>
-                        <div class="mood-option" data-mood="sad">
-                            <span class="emoji">😢</span>
-                            <span class="label">难过</span>
-                        </div>
-                        <div class="mood-option" data-mood="tired">
-                            <span class="emoji">😴</span>
-                            <span class="label">疲惫</span>
+                    <div class="form-group">
+                        <label>今天的心情</label>
+                        <div class="mood-selector" id="moodSelector">
+                            <div class="mood-option" data-mood="happy">
+                                <span class="emoji">😊</span>
+                                <span class="label">开心</span>
+                            </div>
+                            <div class="mood-option" data-mood="calm">
+                                <span class="emoji">😌</span>
+                                <span class="label">平静</span>
+                            </div>
+                            <div class="mood-option selected" data-mood="neutral">
+                                <span class="emoji">😐</span>
+                                <span class="label">一般</span>
+                            </div>
+                            <div class="mood-option" data-mood="excited">
+                                <span class="emoji">🤩</span>
+                                <span class="label">兴奋</span>
+                            </div>
+                            <div class="mood-option" data-mood="sad">
+                                <span class="emoji">😢</span>
+                                <span class="label">难过</span>
+                            </div>
+                            <div class="mood-option" data-mood="tired">
+                                <span class="emoji">😴</span>
+                                <span class="label">疲惫</span>
+                            </div>
+                            <div class="mood-option" data-mood="angry">
+                                <span class="emoji">😠</span>
+                                <span class="label">生气</span>
+                            </div>
+                            <div class="mood-option" data-mood="anxious">
+                                <span class="emoji">😰</span>
+                                <span class="label">焦虑</span>
+                            </div>
                         </div>
                     </div>
-                </div>
 
-                <div class="form-group">
-                    <label>今天发生了什么</label>
-                    <textarea id="content" placeholder="记下今天的小事，哪怕只是一句话也好~" required></textarea>
-                </div>
-
-                <div class="form-group">
-                    <label>标签（按回车添加）</label>
-                    <div class="tags-input" id="tagsInput">
-                        <input type="text" class="tag-input" id="tagInput" placeholder="输入标签后按回车">
+                    <div class="form-group">
+                        <label>今天发生了什么</label>
+                        <textarea id="content" placeholder="记下今天的小事，哪怕只是一句话也好~" required></textarea>
                     </div>
-                </div>
 
-                <button type="submit" class="submit-btn">💝 保存日记</button>
-            </form>
+                    <div class="form-group">
+                        <label>标签（按回车添加）</label>
+                        <div class="tags-input" id="tagsInput">
+                            <input type="text" class="tag-input" id="tagInput" placeholder="输入标签后按回车">
+                        </div>
+                    </div>
+
+                    <button type="submit" class="submit-btn">💝 保存日记</button>
+                </form>
+            </div>
         </div>
 
-        <!-- 日记列表 -->
-        <div id="diaryList" class="diary-list">
-            <div class="loading">加载中...</div>
+        <!-- 浏览日记 -->
+        <div id="browseTab" class="tab-content">
+            <div id="diaryList" class="diary-list">
+                <div class="loading">加载中...</div>
+            </div>
+            <div class="pagination" id="pagination" style="display: none;">
+                <button class="page-btn" id="prevBtn">← 上一页</button>
+                <button class="page-btn" id="nextBtn">下一页 →</button>
+            </div>
         </div>
 
-        <!-- 分页 -->
-        <div class="pagination" id="pagination" style="display: none;">
-            <button class="page-btn" id="prevBtn">上一页</button>
-            <button class="page-btn" id="nextBtn">下一页</button>
+        <!-- 搜索 -->
+        <div id="searchTab" class="tab-content">
+            <div class="search-box">
+                <input type="text" class="search-input" id="searchInput" placeholder="搜索日记内容、标题或标签...">
+            </div>
+            <div id="searchResults" class="diary-list"></div>
+        </div>
+
+        <!-- 统计 -->
+        <div id="statsTab" class="tab-content">
+            <div class="stats-grid" id="statsGrid">
+                <div class="loading">加载中...</div>
+            </div>
+            <div class="mood-distribution" id="moodDistribution">
+                <div class="loading">加载中...</div>
+            </div>
         </div>
     </div>
 
@@ -470,6 +769,26 @@
         let tags = [];
         let currentOffset = 0;
         const pageSize = 20;
+        let searchTimeout = null;
+
+        // 标签页切换
+        document.querySelectorAll('.tab-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                const tab = btn.dataset.tab;
+                
+                // 切换按钮状态
+                document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+                btn.classList.add('active');
+                
+                // 切换内容
+                document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+                document.getElementById(tab + 'Tab').classList.add('active');
+                
+                // 加载对应数据
+                if (tab === 'browse') loadDiaries();
+                if (tab === 'stats') loadStats();
+            });
+        });
 
         // 心情选择
         document.getElementById('moodSelector').addEventListener('click', (e) => {
@@ -556,8 +875,6 @@
                     selectedMood = 'neutral';
                     document.querySelectorAll('.mood-option').forEach(el => el.classList.remove('selected'));
                     document.querySelector('[data-mood="neutral"]').classList.add('selected');
-                    // 重新加载列表
-                    loadDiaries();
                 } else {
                     showToast(result.error || '保存失败', 'error');
                 }
@@ -588,7 +905,7 @@
                     return;
                 }
 
-                renderDiaryList(result.entries);
+                renderDiaryList(result.entries, 'diaryList');
                 
                 // 分页
                 const pagination = document.getElementById('pagination');
@@ -604,8 +921,8 @@
             }
         }
 
-        function renderDiaryList(entries) {
-            const container = document.getElementById('diaryList');
+        function renderDiaryList(entries, containerId) {
+            const container = document.getElementById(containerId);
             container.innerHTML = entries.map(entry => `
                 <div class="diary-entry" data-id="${entry.id}">
                     <div class="entry-header">
@@ -622,10 +939,104 @@
                         </div>
                     ` : ''}
                     <div class="entry-actions">
-                        <button class="action-btn delete" onclick="deleteDiary('${entry.id}')">删除</button>
+                        <button class="action-btn delete" onclick="deleteDiary('${entry.id}')">🗑️ 删除</button>
                     </div>
                 </div>
             `).join('');
+        }
+
+        // 搜索
+        document.getElementById('searchInput').addEventListener('input', (e) => {
+            clearTimeout(searchTimeout);
+            searchTimeout = setTimeout(() => {
+                const keyword = e.target.value.trim();
+                if (keyword) {
+                    searchDiaries(keyword);
+                } else {
+                    document.getElementById('searchResults').innerHTML = '';
+                }
+            }, 300);
+        });
+
+        async function searchDiaries(keyword) {
+            try {
+                const response = await fetch(`/api/plugin/neko_diary/search?keyword=${encodeURIComponent(keyword)}&limit=50`);
+                const result = await response.json();
+                
+                if (result.error) {
+                    document.getElementById('searchResults').innerHTML = `<div class="empty-state"><div class="emoji">😿</div><p>${result.error}</p></div>`;
+                    return;
+                }
+
+                if (!result.entries || result.entries.length === 0) {
+                    document.getElementById('searchResults').innerHTML = `
+                        <div class="empty-state">
+                            <div class="emoji">🔍</div>
+                            <p>没有找到匹配的日记~</p>
+                        </div>
+                    `;
+                    return;
+                }
+
+                renderDiaryList(result.entries, 'searchResults');
+            } catch (error) {
+                document.getElementById('searchResults').innerHTML = `<div class="empty-state"><div class="emoji">😿</div><p>搜索失败: ${error.message}</p></div>`;
+            }
+        }
+
+        // 加载统计
+        async function loadStats() {
+            try {
+                const response = await fetch('/api/plugin/neko_diary/get_mood_stats?days=30');
+                const result = await response.json();
+                
+                if (result.error) {
+                    document.getElementById('statsGrid').innerHTML = `<div class="empty-state"><div class="emoji">😿</div><p>${result.error}</p></div>`;
+                    return;
+                }
+
+                // 统计卡片
+                document.getElementById('statsGrid').innerHTML = `
+                    <div class="stat-card">
+                        <div class="stat-value">${result.total_entries || 0}</div>
+                        <div class="stat-label">日记总数</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-value">${result.dominant_mood?.emoji || '😐'}</div>
+                        <div class="stat-label">主要心情</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-value">${result.dominant_mood?.label || '一般'}</div>
+                        <div class="stat-label">最常心情</div>
+                    </div>
+                `;
+
+                // 心情分布
+                if (result.mood_distribution && result.mood_distribution.length > 0) {
+                    const maxCount = Math.max(...result.mood_distribution.map(m => m.count));
+                    document.getElementById('moodDistribution').innerHTML = `
+                        <div class="section-title">心情分布（近30天）</div>
+                        ${result.mood_distribution.map(mood => `
+                            <div class="mood-bar">
+                                <div class="mood-bar-label">${mood.emoji} ${mood.label}</div>
+                                <div class="mood-bar-track">
+                                    <div class="mood-bar-fill" style="width: ${(mood.count / maxCount * 100)}%; background: ${mood.color}"></div>
+                                </div>
+                                <div class="mood-bar-count">${mood.count}</div>
+                            </div>
+                        `).join('')}
+                    `;
+                } else {
+                    document.getElementById('moodDistribution').innerHTML = `
+                        <div class="empty-state">
+                            <div class="emoji">📊</div>
+                            <p>还没有心情数据~</p>
+                        </div>
+                    `;
+                }
+            } catch (error) {
+                document.getElementById('statsGrid').innerHTML = `<div class="empty-state"><div class="emoji">😿</div><p>加载统计失败: ${error.message}</p></div>`;
+            }
         }
 
         function formatDate(date, createdAt) {
@@ -696,7 +1107,7 @@
             }, 3000);
         }
 
-        // 初始加载
+        // 初始加载浏览页
         loadDiaries();
     </script>
 </body>
