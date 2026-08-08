@@ -928,7 +928,7 @@ class NekoMailAgentlyEntry(NekoPluginBase):
             "properties": {
                 "to": {
                     "type": "string",
-                    "description": "收件人邮箱地址，多个用逗号分隔"
+                    "description": "收件人邮箱地址（必须是完整邮箱格式如 example@qq.com，不接受昵称或中文名称），多个用逗号分隔"
                 },
                 "subject": {
                     "type": "string",
@@ -936,7 +936,7 @@ class NekoMailAgentlyEntry(NekoPluginBase):
                 },
                 "body": {
                     "type": "string",
-                    "description": "邮件正文内容"
+                    "description": "邮件正文内容，支持换行和多段落"
                 },
                 "cc": {
                     "type": "string",
@@ -1105,7 +1105,7 @@ class NekoMailAgentlyEntry(NekoPluginBase):
                 },
                 "body": {
                     "type": "string",
-                    "description": "回复内容"
+                    "description": "回复内容，支持换行和多段落"
                 },
                 "reply_all": {
                     "type": "boolean",
@@ -1267,11 +1267,11 @@ class NekoMailAgentlyEntry(NekoPluginBase):
                 },
                 "to": {
                     "type": "string",
-                    "description": "转发收件人邮箱地址"
+                    "description": "转发收件人邮箱地址（必须是完整邮箱格式如 example@qq.com，不接受昵称或中文名称）"
                 },
                 "body": {
                     "type": "string",
-                    "description": "转发时添加的说明内容"
+                    "description": "转发时添加的说明内容，支持换行和多段落"
                 },
                 "include_attachments": {
                     "type": "boolean",
