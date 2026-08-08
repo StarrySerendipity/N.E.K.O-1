@@ -1003,16 +1003,19 @@ class NekoMailAgentlyEntry(NekoPluginBase):
         for att_name in attachment_names:
             args.extend(["--attachment", att_name])
 
-        # 两阶段确认：首次调用拿 token → 用 token 确认。唯一路径，没有例外。
+        # 两阶段确认：首次调用拿 token → 等待 → 用 token 确认。唯一路径。
         if not confirmation_token:
             self.logger.info(f"[send_email] 首次调用获取令牌，附件={attachment_names}")
             first = await run_agently_command(args, self.cli_path, cwd=attachment_cwd, logger=self.logger)
             first_data = first.get("data", {})
             ctk = first_data.get("confirmation_token", "")
+            self.logger.info(f"[send_email] 首次调用完整响应: exit={first.get('exit_code')}, queued={first_data.get('queued')}, confirmation_required={first_data.get('confirmation_required')}, ctk={ctk}")
             if ctk:
                 confirmation_tokens[ctk] = {"args": args, "cwd": attachment_cwd, "created_at": datetime.now().isoformat()}
                 args.extend(["--confirmation-token", ctk])
-                self.logger.info(f"[send_email] 获得令牌 {ctk}，立即确认发送")
+                # 等待服务端处理首次请求后再确认（关键！不能立即确认）
+                await asyncio.sleep(2)
+                self.logger.info(f"[send_email] 获得令牌 {ctk}，等待 2 秒后确认发送")
             elif first.get("exit_code") == 0:
                 # 服务端不需要确认，直接成功
                 await asyncio.sleep(3)
@@ -1042,19 +1045,21 @@ class NekoMailAgentlyEntry(NekoPluginBase):
                 ctk = first.get("data", {}).get("confirmation_token", "")
                 if ctk:
                     args.extend(["--confirmation-token", ctk])
+                    await asyncio.sleep(2)
                 else:
                     self.logger.warning(f"[send_email] 重试未获得令牌，跳过")
                     await asyncio.sleep(2)
                     continue
 
             result = await run_agently_command(args, self.cli_path, cwd=attachment_cwd, logger=self.logger)
+            self.logger.info(f"[send_email] 确认调用响应: exit={result.get('exit_code')}, data={result.get('data', {})}")
             if result.get("exit_code") != 0:
                 self.logger.warning(f"[send_email] 第 {attempt + 1} 次失败: {result.get('error')}")
                 await asyncio.sleep(2)
                 continue
 
             # 发后验证
-            await asyncio.sleep(3)
+            await asyncio.sleep(5)
             if await self._verify_sent(subject, to):
                 self.logger.info(f"[send_email] ✅ sent 验证通过: {subject}")
                 if confirmation_token and confirmation_token in confirmation_tokens:
@@ -1180,16 +1185,18 @@ class NekoMailAgentlyEntry(NekoPluginBase):
         for att_name in attachment_names:
             args.extend(["--attachment", att_name])
 
-        # 两阶段确认：首次调用拿 token → 用 token 确认。唯一路径。
+        # 两阶段确认：首次调用拿 token → 等待 → 用 token 确认。唯一路径。
         if not confirmation_token:
             self.logger.info(f"[reply_email] 首次调用获取令牌，附件={attachment_names}")
             first = await run_agently_command(args, self.cli_path, cwd=attachment_cwd, logger=self.logger)
             first_data = first.get("data", {})
             ctk = first_data.get("confirmation_token", "")
+            self.logger.info(f"[reply_email] 首次调用完整响应: exit={first.get('exit_code')}, ctk={ctk}")
             if ctk:
                 confirmation_tokens[ctk] = {"args": args, "cwd": attachment_cwd, "created_at": datetime.now().isoformat()}
                 args.extend(["--confirmation-token", ctk])
-                self.logger.info(f"[reply_email] 获得令牌 {ctk}，立即确认回复")
+                await asyncio.sleep(2)
+                self.logger.info(f"[reply_email] 获得令牌 {ctk}，等待 2 秒后确认回复")
             elif first.get("exit_code") == 0:
                 await asyncio.sleep(3)
                 sent_result = await run_agently_command(["message", "+list", "--dir", "sent", "--limit", "1"], self.cli_path, logger=self.logger)
@@ -1218,6 +1225,7 @@ class NekoMailAgentlyEntry(NekoPluginBase):
                 ctk = first.get("data", {}).get("confirmation_token", "")
                 if ctk:
                     args.extend(["--confirmation-token", ctk])
+                    await asyncio.sleep(2)
                 else:
                     await asyncio.sleep(2)
                     continue
@@ -1227,7 +1235,7 @@ class NekoMailAgentlyEntry(NekoPluginBase):
                 await asyncio.sleep(2)
                 continue
 
-            await asyncio.sleep(3)
+            await asyncio.sleep(5)
             sent_result = await run_agently_command(["message", "+list", "--dir", "sent", "--limit", "1"], self.cli_path, logger=self.logger)
             if sent_result.get("exit_code") == 0 and sent_result.get("data", {}).get("data", []):
                 self.logger.info(f"[reply_email] ✅ sent 验证通过")
@@ -1310,16 +1318,18 @@ class NekoMailAgentlyEntry(NekoPluginBase):
         if include_attachments:
             args.append("--include-attachments")
 
-        # 两阶段确认：首次调用拿 token → 用 token 确认。唯一路径。
+        # 两阶段确认：首次调用拿 token → 等待 → 用 token 确认。唯一路径。
         if not confirmation_token:
             self.logger.info(f"[forward_email] 首次调用获取令牌")
             first = await run_agently_command(args, self.cli_path, logger=self.logger)
             first_data = first.get("data", {})
             ctk = first_data.get("confirmation_token", "")
+            self.logger.info(f"[forward_email] 首次调用完整响应: exit={first.get('exit_code')}, ctk={ctk}")
             if ctk:
                 confirmation_tokens[ctk] = {"args": args, "cwd": None, "created_at": datetime.now().isoformat()}
                 args.extend(["--confirmation-token", ctk])
-                self.logger.info(f"[forward_email] 获得令牌 {ctk}，立即确认转发")
+                await asyncio.sleep(2)
+                self.logger.info(f"[forward_email] 获得令牌 {ctk}，等待 2 秒后确认转发")
             elif first.get("exit_code") == 0:
                 await asyncio.sleep(3)
                 sent_result = await run_agently_command(["message", "+list", "--dir", "sent", "--limit", "1"], self.cli_path, logger=self.logger)
@@ -1344,6 +1354,7 @@ class NekoMailAgentlyEntry(NekoPluginBase):
                 ctk = first.get("data", {}).get("confirmation_token", "")
                 if ctk:
                     args.extend(["--confirmation-token", ctk])
+                    await asyncio.sleep(2)
                 else:
                     await asyncio.sleep(2)
                     continue
@@ -1353,7 +1364,7 @@ class NekoMailAgentlyEntry(NekoPluginBase):
                 await asyncio.sleep(2)
                 continue
 
-            await asyncio.sleep(3)
+            await asyncio.sleep(5)
             sent_result = await run_agently_command(["message", "+list", "--dir", "sent", "--limit", "1"], self.cli_path, logger=self.logger)
             if sent_result.get("exit_code") == 0 and sent_result.get("data", {}).get("data", []):
                 self.logger.info(f"[forward_email] ✅ sent 验证通过")
@@ -1412,16 +1423,18 @@ class NekoMailAgentlyEntry(NekoPluginBase):
         """删除邮件"""
         args = ["message", "+trash", "--id", message_id]
 
-        # 两阶段确认：首次调用拿 token → 用 token 确认。唯一路径。
+        # 两阶段确认：首次调用拿 token → 等待 → 用 token 确认。唯一路径。
         if not confirmation_token:
             self.logger.info(f"[trash_email] 首次调用获取令牌")
             first = await run_agently_command(args, self.cli_path, logger=self.logger)
             first_data = first.get("data", {})
             ctk = first_data.get("confirmation_token", "")
+            self.logger.info(f"[trash_email] 首次调用完整响应: exit={first.get('exit_code')}, ctk={ctk}")
             if ctk:
                 confirmation_tokens[ctk] = {"args": args, "cwd": None, "created_at": datetime.now().isoformat()}
                 args.extend(["--confirmation-token", ctk])
-                self.logger.info(f"[trash_email] 获得令牌 {ctk}，立即确认删除")
+                await asyncio.sleep(2)
+                self.logger.info(f"[trash_email] 获得令牌 {ctk}，等待 2 秒后确认删除")
             elif first.get("exit_code") == 0:
                 return Ok({"success": True, "status": "deleted", "message": f"✅ 已删除邮件 {message_id}（无需确认）"})
             else:
@@ -1438,6 +1451,7 @@ class NekoMailAgentlyEntry(NekoPluginBase):
                 ctk = first.get("data", {}).get("confirmation_token", "")
                 if ctk:
                     args.extend(["--confirmation-token", ctk])
+                    await asyncio.sleep(2)
                 else:
                     await asyncio.sleep(2)
                     continue
