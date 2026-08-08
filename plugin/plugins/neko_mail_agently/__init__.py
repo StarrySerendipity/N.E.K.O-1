@@ -1004,20 +1004,19 @@ class NekoMailAgentlyEntry(NekoPluginBase):
             args.extend(["--attachment", att_name])
 
         # 两阶段确认：首次调用拿 token → 等待 → 用 token 确认。唯一路径。
+        active_ctk = None  # 跟踪当前活跃的 token，用于清理
         if not confirmation_token:
             self.logger.info(f"[send_email] 首次调用获取令牌，附件={attachment_names}")
             first = await run_agently_command(args, self.cli_path, cwd=attachment_cwd, logger=self.logger)
             first_data = first.get("data", {})
-            ctk = first_data.get("confirmation_token", "")
-            self.logger.info(f"[send_email] 首次调用完整响应: exit={first.get('exit_code')}, queued={first_data.get('queued')}, confirmation_required={first_data.get('confirmation_required')}, ctk={ctk}")
-            if ctk:
-                confirmation_tokens[ctk] = {"args": args, "cwd": attachment_cwd, "created_at": datetime.now().isoformat()}
-                args.extend(["--confirmation-token", ctk])
-                # 等待服务端处理首次请求后再确认（关键！不能立即确认）
+            active_ctk = first_data.get("confirmation_token", "")
+            self.logger.info(f"[send_email] 首次调用完整响应: exit={first.get('exit_code')}, queued={first_data.get('queued')}, confirmation_required={first_data.get('confirmation_required')}, ctk={active_ctk}")
+            if active_ctk:
+                confirmation_tokens[active_ctk] = {"args": args, "cwd": attachment_cwd, "created_at": datetime.now().isoformat()}
+                args.extend(["--confirmation-token", active_ctk])
                 await asyncio.sleep(2)
-                self.logger.info(f"[send_email] 获得令牌 {ctk}，等待 2 秒后确认发送")
+                self.logger.info(f"[send_email] 获得令牌 {active_ctk}，等待 2 秒后确认发送")
             elif first.get("exit_code") == 0:
-                # 服务端不需要确认，直接成功
                 await asyncio.sleep(3)
                 if await self._verify_sent(subject, to):
                     attach_info = f"\n附件({len(attachment_names)}个): {', '.join(attachment_names)}" if attachment_names else ""
@@ -1030,6 +1029,12 @@ class NekoMailAgentlyEntry(NekoPluginBase):
             args.extend(["--confirmation-token", confirmation_token])
 
         # 用确认令牌发送（重试机制）
+        def _cleanup_token():
+            nonlocal active_ctk
+            if active_ctk and active_ctk in confirmation_tokens:
+                del confirmation_tokens[active_ctk]
+                active_ctk = None
+
         for attempt in range(3):
             if attempt > 0:
                 self.logger.info(f"[send_email] 第 {attempt + 1} 次重试")
@@ -1040,11 +1045,10 @@ class NekoMailAgentlyEntry(NekoPluginBase):
                     args.extend(["--bcc", bcc])
                 for att_name in attachment_names:
                     args.extend(["--attachment", att_name])
-                # 重试：重新走两阶段
                 first = await run_agently_command(args, self.cli_path, cwd=attachment_cwd, logger=self.logger)
-                ctk = first.get("data", {}).get("confirmation_token", "")
-                if ctk:
-                    args.extend(["--confirmation-token", ctk])
+                active_ctk = first.get("data", {}).get("confirmation_token", "")
+                if active_ctk:
+                    args.extend(["--confirmation-token", active_ctk])
                     await asyncio.sleep(2)
                 else:
                     self.logger.warning(f"[send_email] 重试未获得令牌，跳过")
@@ -1058,19 +1062,16 @@ class NekoMailAgentlyEntry(NekoPluginBase):
                 await asyncio.sleep(2)
                 continue
 
-            # 发后验证
             await asyncio.sleep(5)
             if await self._verify_sent(subject, to):
                 self.logger.info(f"[send_email] ✅ sent 验证通过: {subject}")
-                if confirmation_token and confirmation_token in confirmation_tokens:
-                    del confirmation_tokens[confirmation_token]
+                _cleanup_token()
                 attach_info = f"\n附件({len(attachment_names)}个): {', '.join(attachment_names)}" if attachment_names else ""
                 return Ok({"success": True, "status": "sent", "message": f"✅ 邮件已发送并验证\n收件人: {to}\n主题: {subject}{attach_info}"})
             self.logger.warning(f"[send_email] sent 验证失败，第 {attempt + 1} 次")
             await asyncio.sleep(2)
 
-        if confirmation_token and confirmation_token in confirmation_tokens:
-            del confirmation_tokens[confirmation_token]
+        _cleanup_token()
         return Ok({"success": False, "status": "unverified", "message": f"⚠️ 邮件发送后未在 sent 文件夹中找到，可能未实际投递。\n收件人: {to}\n主题: {subject}"})
 
     @llm_tool(
