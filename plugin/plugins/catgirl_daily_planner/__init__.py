@@ -1957,6 +1957,56 @@ class CatgirlDailyPlannerPlugin(NekoPluginBase):
         if not isinstance(stats, dict):
             stats = {}
 
+        # 自动检测旧数据并修复：如果缺少 _recorded_dates 字段，说明是旧版累加数据
+        # 需要从实际计划数据重建，避免显示错误的统计值
+        if stats and "_recorded_dates" not in stats and stats.get("total", 0) > 0:
+            logger.info("检测到旧版统计数据，自动重建: %s", month)
+            try:
+                real_total, real_done, real_skipped, real_by_cat = 0, 0, 0, {}
+                year, mon = map(int, month.split("-"))
+                days_in_month = 31
+                if mon in (4, 6, 9, 11):
+                    days_in_month = 30
+                elif mon == 2:
+                    days_in_month = 29 if (year % 4 == 0 and (year % 100 != 0 or year % 400 == 0)) else 28
+                for day in range(1, days_in_month + 1):
+                    ds = f"{year:04d}-{mon:02d}-{day:02d}"
+                    plan = self._load_plan(ds)
+                    tasks = plan.get("tasks", [])
+                    day_total = len(tasks)
+                    day_done = sum(1 for t in tasks if t.get("status") == _STATUS_DONE)
+                    day_skipped = sum(1 for t in tasks if t.get("status") == _STATUS_SKIPPED)
+                    real_total += day_total
+                    real_done += day_done
+                    real_skipped += day_skipped
+                    for t in tasks:
+                        cat = (t.get("category") or "").strip() or "未分类"
+                        real_by_cat[cat] = real_by_cat.get(cat, 0) + 1
+                # 重建统计数据
+                stats["total"] = real_total
+                stats["done"] = real_done
+                stats["skipped"] = real_skipped
+                stats["by_category"] = real_by_cat
+                stats["_recorded_dates"] = {}
+                # 为每天保存快照
+                for day in range(1, days_in_month + 1):
+                    ds = f"{year:04d}-{mon:02d}-{day:02d}"
+                    plan = self._load_plan(ds)
+                    tasks = plan.get("tasks", [])
+                    if tasks:
+                        dt = len(tasks)
+                        dd = sum(1 for t in tasks if t.get("status") == _STATUS_DONE)
+                        dsk = sum(1 for t in tasks if t.get("status") == _STATUS_SKIPPED)
+                        dbc = {}
+                        for t in tasks:
+                            cat = (t.get("category") or "").strip() or "未分类"
+                            dbc[cat] = dbc.get(cat, 0) + 1
+                        stats["_recorded_dates"][ds] = {"total": dt, "done": dd, "skipped": dsk, "by_category": dbc}
+                self.store._write_value(self._stats_key(month), stats)
+                logger.info("自动重建完成: total=%d, done=%d", real_total, real_done)
+            except Exception as e:
+                logger.error("自动重建统计失败: %s", e)
+
         # 最近 N 天每日汇总
         today = _now_in_tz(self._tz).date()
         by_day: List[Dict[str, Any]] = []
