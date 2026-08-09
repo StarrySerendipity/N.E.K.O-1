@@ -2154,10 +2154,12 @@ class XiYinPavilionPlugin(NekoPluginBase):
             detected_duration if detected_duration is not None else _DEFAULT_TRACK_DURATION_SECONDS
         )
         lyric_clean = str(lyric_text or "").replace("\r\n", "\n").strip()[:_LYRIC_PUSH_MAX_CHARS]
+        # 保存原始 item_id 用于歌词兜底查找
+        lookup_item_id = str(item_id or "").strip()
         if not lyric_clean:
             async with self._state_lock:
                 source_item = self._find_music_item_locked(
-                    item_id=item_id,
+                    item_id=lookup_item_id,
                     url=link,
                     title=final_title,
                     artist=final_artist,
