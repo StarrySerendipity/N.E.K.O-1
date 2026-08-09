@@ -82,7 +82,8 @@ class NekoDiaryPlugin:
                 attachments TEXT,
                 created_at TEXT NOT NULL,
                 updated_at TEXT,
-                deleted INTEGER DEFAULT 0
+                deleted INTEGER DEFAULT 0,
+                visibility TEXT DEFAULT 'public'
             )
         """)
 
@@ -90,8 +91,17 @@ class NekoDiaryPlugin:
         cursor.execute("CREATE INDEX IF NOT EXISTS idx_diary_date ON diary_entries(date)")
         cursor.execute("CREATE INDEX IF NOT EXISTS idx_diary_mood ON diary_entries(mood)")
         cursor.execute("CREATE INDEX IF NOT EXISTS idx_diary_deleted ON diary_entries(deleted)")
+        cursor.execute("CREATE INDEX IF NOT EXISTS idx_diary_visibility ON diary_entries(visibility)")
 
         self._conn.commit()
+
+        # 迁移：如果表已存在但没有 visibility 字段，则添加
+        try:
+            cursor.execute("SELECT visibility FROM diary_entries LIMIT 1")
+        except sqlite3.OperationalError:
+            # 字段不存在，添加它
+            cursor.execute("ALTER TABLE diary_entries ADD COLUMN visibility TEXT DEFAULT 'public'")
+            self._conn.commit()
 
     def close(self) -> None:
         """关闭数据库连接"""
@@ -116,6 +126,7 @@ class NekoDiaryPlugin:
         mood: Optional[str] = None,
         tags: Optional[List[str]] = None,
         attachments: Optional[List[str]] = None,
+        visibility: str = "public",
     ) -> Dict[str, Any]:
         """写一篇日记"""
         if not content or not content.strip():
@@ -126,6 +137,10 @@ class NekoDiaryPlugin:
             mood = self.default_mood
         elif not mood:
             mood = self.default_mood
+
+        # 验证可见性
+        if visibility not in ("public", "private"):
+            visibility = "public"
 
         entry_id = uuid.uuid4().hex[:12]
         now = self._now_iso()
@@ -141,13 +156,14 @@ class NekoDiaryPlugin:
 
             cursor = self._conn.cursor()
             cursor.execute("""
-                INSERT INTO diary_entries (id, date, title, content, mood, tags, attachments, created_at)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-            """, (entry_id, today, title, content.strip(), mood, tags_json, attachments_json, now))
+                INSERT INTO diary_entries (id, date, title, content, mood, tags, attachments, created_at, visibility)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """, (entry_id, today, title, content.strip(), mood, tags_json, attachments_json, now, visibility))
             self._conn.commit()
 
             # 构建返回结果
             mood_info = MOOD_TYPES.get(mood, MOOD_TYPES["neutral"])
+            vis_label = "仅自己可见" if visibility == "private" else "公开"
             return {
                 "success": True,
                 "entry_id": entry_id,
@@ -157,8 +173,10 @@ class NekoDiaryPlugin:
                 "mood_label": mood_info["label"],
                 "mood_emoji": mood_info["emoji"],
                 "tags": tags or [],
+                "visibility": visibility,
+                "visibility_label": vis_label,
                 "created_at": now,
-                "message": f"日记已保存喵~ 今天的心情是{mood_info['emoji']}{mood_info['label']}哦",
+                "message": f"日记已保存喵~ 今天的心情是{mood_info['emoji']}{mood_info['label']}哦 ({vis_label})",
             }
         except Exception as e:
             return {"error": f"保存日记失败: {e}"}
@@ -171,8 +189,13 @@ class NekoDiaryPlugin:
         end_date: Optional[str] = None,
         limit: Optional[int] = None,
         offset: Optional[int] = None,
+        visibility: Optional[str] = None,
     ) -> Dict[str, Any]:
-        """浏览日记时间线"""
+        """浏览日记时间线
+
+        Args:
+            visibility: None=全部(含私有), 'public'=仅公开, 'private'=仅私有
+        """
         if self._conn is None:
             return {"error": "数据库未初始化"}
 
@@ -189,6 +212,9 @@ class NekoDiaryPlugin:
         if end_date:
             conditions.append("date <= ?")
             params.append(end_date)
+        if visibility in ("public", "private"):
+            conditions.append("visibility = ?")
+            params.append(visibility)
 
         where_clause = " AND ".join(conditions)
 
@@ -201,7 +227,7 @@ class NekoDiaryPlugin:
 
             # 获取分页数据
             cursor.execute(f"""
-                SELECT id, date, title, content, mood, tags, attachments, created_at
+                SELECT id, date, title, content, mood, tags, attachments, created_at, visibility
                 FROM diary_entries
                 WHERE {where_clause}
                 ORDER BY date DESC, created_at DESC
@@ -243,6 +269,10 @@ class NekoDiaryPlugin:
         except:
             attachments = []
 
+        # 获取可见性字段，默认为 public
+        visibility = row["visibility"] if "visibility" in row.keys() else "public"
+        visibility_label = "仅自己可见" if visibility == "private" else "公开"
+
         return {
             "id": row["id"],
             "date": row["date"],
@@ -255,6 +285,8 @@ class NekoDiaryPlugin:
             "tags": tags,
             "attachments": attachments,
             "created_at": row["created_at"],
+            "visibility": visibility,
+            "visibility_label": visibility_label,
         }
 
     # ── 日记搜索 ─────────────────────────────────────────────────────
@@ -276,7 +308,7 @@ class NekoDiaryPlugin:
             # 搜索标题、内容、标签
             search_pattern = f"%{keyword}%"
             cursor.execute("""
-                SELECT id, date, title, content, mood, tags, attachments, created_at
+                SELECT id, date, title, content, mood, tags, attachments, created_at, visibility
                 FROM diary_entries
                 WHERE deleted = 0
                   AND (title LIKE ? OR content LIKE ? OR tags LIKE ?)
@@ -400,7 +432,7 @@ class NekoDiaryPlugin:
                 target_year = current_year - years
                 date_pattern = f"{target_year:04d}-{month:02d}-{day:02d}"
                 cursor.execute("""
-                    SELECT id, date, title, content, mood, tags, attachments, created_at
+                    SELECT id, date, title, content, mood, tags, attachments, created_at, visibility
                     FROM diary_entries
                     WHERE deleted = 0 AND date = ?
                     ORDER BY created_at DESC
@@ -408,7 +440,7 @@ class NekoDiaryPlugin:
             else:
                 # 查看所有年份的同月同日（排除今年）
                 cursor.execute("""
-                    SELECT id, date, title, content, mood, tags, attachments, created_at
+                    SELECT id, date, title, content, mood, tags, attachments, created_at, visibility
                     FROM diary_entries
                     WHERE deleted = 0
                       AND strftime('%m', date) = ?

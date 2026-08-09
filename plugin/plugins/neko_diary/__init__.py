@@ -130,7 +130,7 @@ class NekoDiaryPluginEntry(NekoPluginBase):
 
     @llm_tool(
         name="neko_diary_write",
-        description="写一篇日记。记录今天发生的小事，可以标记心情、添加标签、附带图片。",
+        description="写一篇日记。记录今天发生的小事，可以标记心情、添加标签、附带图片。支持设置可见性（公开/仅自己可见）。",
         parameters={
             "type": "object",
             "properties": {
@@ -139,6 +139,7 @@ class NekoDiaryPluginEntry(NekoPluginBase):
                 "mood": {"type": "string", "enum": list(MOOD_TYPES.keys()), "description": "心情标记"},
                 "tags": {"type": "array", "items": {"type": "string"}, "description": "标签列表"},
                 "attachments": {"type": "array", "items": {"type": "string"}, "description": "附件路径列表（图片等）"},
+                "visibility": {"type": "string", "enum": ["public", "private"], "description": "可见性：public=公开，private=仅自己可见（默认public）"},
             },
             "required": ["content"],
         },
@@ -156,10 +157,11 @@ class NekoDiaryPluginEntry(NekoPluginBase):
                 "mood": {"type": "string", "enum": list(MOOD_TYPES.keys())},
                 "tags": {"type": "array", "items": {"type": "string"}},
                 "attachments": {"type": "array", "items": {"type": "string"}},
+                "visibility": {"type": "string", "enum": ["public", "private"]},
             },
             "required": ["content"],
         },
-        llm_result_fields=["entry_id", "date", "mood"],
+        llm_result_fields=["entry_id", "date", "mood", "visibility"],
     )
     async def write(
         self,
@@ -168,6 +170,7 @@ class NekoDiaryPluginEntry(NekoPluginBase):
         mood: Optional[str] = None,
         tags: Optional[List[str]] = None,
         attachments: Optional[List[str]] = None,
+        visibility: str = "public",
         **_,
     ):
         """写一篇日记"""
@@ -179,6 +182,7 @@ class NekoDiaryPluginEntry(NekoPluginBase):
                 mood=mood,
                 tags=tags,
                 attachments=attachments,
+                visibility=visibility,
             )
             if isinstance(result, dict) and "error" in result:
                 return Err(SdkError(result["error"]))
@@ -188,7 +192,7 @@ class NekoDiaryPluginEntry(NekoPluginBase):
 
     @llm_tool(
         name="neko_diary_browse",
-        description="浏览日记时间线。可以按日期范围查看，支持分页。",
+        description="浏览日记时间线。可以按日期范围查看，支持分页，支持按可见性过滤（public/private/全部）。",
         parameters={
             "type": "object",
             "properties": {
@@ -196,6 +200,7 @@ class NekoDiaryPluginEntry(NekoPluginBase):
                 "end_date": {"type": "string", "description": "结束日期 YYYY-MM-DD（可选）"},
                 "limit": {"type": "integer", "description": "每页数量，默认20"},
                 "offset": {"type": "integer", "description": "偏移量，用于加载更多"},
+                "visibility": {"type": "string", "enum": ["public", "private"], "description": "可见性过滤：public=仅公开，private=仅私有，留空=全部"},
             },
             "required": [],
         },
@@ -212,6 +217,7 @@ class NekoDiaryPluginEntry(NekoPluginBase):
                 "end_date": {"type": "string"},
                 "limit": {"type": "integer"},
                 "offset": {"type": "integer"},
+                "visibility": {"type": "string", "enum": ["public", "private"]},
             },
             "required": [],
         },
@@ -223,6 +229,7 @@ class NekoDiaryPluginEntry(NekoPluginBase):
         end_date: Optional[str] = None,
         limit: Optional[int] = None,
         offset: Optional[int] = None,
+        visibility: Optional[str] = None,
         **_,
     ):
         """浏览日记时间线"""
@@ -233,6 +240,7 @@ class NekoDiaryPluginEntry(NekoPluginBase):
                 end_date=end_date,
                 limit=limit,
                 offset=offset,
+                visibility=visibility,
             )
             if isinstance(result, dict) and "error" in result:
                 return Err(SdkError(result["error"]))
