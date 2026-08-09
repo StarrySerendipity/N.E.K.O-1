@@ -38,6 +38,7 @@ from plugin.sdk.plugin import (
     neko_plugin,
     plugin_entry,
     lifecycle,
+    llm_tool,
     Ok,
     Err,
     SdkError,
@@ -84,11 +85,11 @@ def _env_positive_int(name: str) -> int | None:
 
 
 def _read_max_audio_size_bytes() -> int:
-    by_bytes = _env_positive_int("MUSIC_PUSHER_MAX_UPLOAD_BYTES")
+    by_bytes = _env_positive_int("XIYIN_PAVILION_MAX_UPLOAD_BYTES")
     if by_bytes is not None:
         return by_bytes
 
-    raw_tb = str(os.getenv("MUSIC_PUSHER_MAX_UPLOAD_TB", "") or "").strip()
+    raw_tb = str(os.getenv("XIYIN_PAVILION_MAX_UPLOAD_TB", "") or "").strip()
     if raw_tb:
         try:
             tb = float(raw_tb)
@@ -101,11 +102,11 @@ def _read_max_audio_size_bytes() -> int:
 
 
 def _read_max_duration_seconds() -> int:
-    by_seconds = _env_positive_int("MUSIC_PUSHER_MAX_DURATION_SECONDS")
+    by_seconds = _env_positive_int("XIYIN_PAVILION_MAX_DURATION_SECONDS")
     if by_seconds is not None:
         return by_seconds
 
-    raw_hours = str(os.getenv("MUSIC_PUSHER_MAX_DURATION_HOURS", "") or "").strip()
+    raw_hours = str(os.getenv("XIYIN_PAVILION_MAX_DURATION_HOURS", "") or "").strip()
     if raw_hours:
         try:
             hours = float(raw_hours)
@@ -405,7 +406,7 @@ def _extract_duration_from_av_container(container: Any) -> int | None:
 
 
 @neko_plugin
-class MusicPusherPlugin(NekoPluginBase):
+class XiYinPavilionPlugin(NekoPluginBase):
     """汐音阁 · XiYin Pavilion —— 音乐推送 + 定时队列插件。"""
 
     def __init__(self, ctx: Any):
@@ -667,6 +668,20 @@ class MusicPusherPlugin(NekoPluginBase):
         deadline_monotonic: float | None = None,
         cancel_event: threading.Event | None = None,
     ) -> bool:
+        # 关键修复：若调用方未传入 lyric_text，则在推送前从素材池/歌词映射中
+        # 兜底查找。这样无论是猫娘推歌、前端手动推歌还是定时队列推歌，只要
+        # 该歌曲绑定过歌词且 attach_prompt_on_push 为 True，歌词片段都能正确
+        # 随推歌事件传给猫娘。
+        if not str(lyric_text or "").strip():
+            async with self._state_lock:
+                source_item = self._find_music_item_locked(
+                    url=url,
+                    title=title,
+                    artist=artist,
+                )
+                if source_item:
+                    lyric_text = self._lyric_text_for_item_locked(source_item)
+
         play_push_started = threading.Event()
         try:
             return bool(
@@ -1449,7 +1464,7 @@ class MusicPusherPlugin(NekoPluginBase):
         return None
 
     def _install_push_mapper(self) -> None:
-        """插件内动态映射：统一给 music_pusher 推送打标签，便于跨模块识别。"""
+        """插件内动态映射：统一给 xiyin_pavilion 推送打标签，便于跨模块识别。"""
         if self._push_mapper_installed:
             return
         original = getattr(self.ctx, "push_message", None)
@@ -1460,11 +1475,11 @@ class MusicPusherPlugin(NekoPluginBase):
 
         def _mapped_push_message(*args, **kwargs):
             source = str(kwargs.get("source") or "").strip()
-            if source == "music_pusher":
+            if source == "xiyin_pavilion":
                 metadata = kwargs.get("metadata")
                 if not isinstance(metadata, dict):
                     metadata = {}
-                metadata.setdefault("plugin_marker", "music_pusher")
+                metadata.setdefault("plugin_marker", "xiyin_pavilion")
                 metadata.setdefault("dynamic_mapped", True)
                 kwargs["metadata"] = metadata
             return self._original_push_message(*args, **kwargs)
@@ -1491,10 +1506,10 @@ class MusicPusherPlugin(NekoPluginBase):
     ) -> None:
         merged_meta = dict(metadata or {})
         merged_meta.setdefault("created_at", datetime.now(timezone.utc).isoformat())
-        merged_meta.setdefault("push_marker", "music_pusher_proactive")
-        merged_meta.setdefault("plugin_marker", "music_pusher")
+        merged_meta.setdefault("push_marker", "xiyin_pavilion_proactive")
+        merged_meta.setdefault("plugin_marker", "xiyin_pavilion")
         self.ctx.push_message(
-            source="music_pusher",
+            source="xiyin_pavilion",
             message_type="proactive_notification",
             description=description,
             priority=priority,
@@ -1537,7 +1552,7 @@ class MusicPusherPlugin(NekoPluginBase):
             raise ValueError("url 无法安全加入播放白名单")
 
         self.ctx.push_message(
-            source="music_pusher",
+            source="xiyin_pavilion",
             message_type="music_allowlist_add",
             description=f"Allow music host: {domains[0]}",
             priority=7,
@@ -1550,7 +1565,7 @@ class MusicPusherPlugin(NekoPluginBase):
         if play_push_started is not None:
             play_push_started.set()
         self.ctx.push_message(
-            source="music_pusher",
+            source="xiyin_pavilion",
             message_type="music_play_url",
             description=f"🎵 用户分享链接 [{title or 'External Link'}]",
             priority=9,
@@ -1695,6 +1710,169 @@ class MusicPusherPlugin(NekoPluginBase):
             if self._active_cancel_event is not None:
                 self._active_cancel_event.set()
             return True
+
+    @llm_tool(
+        name="xiyin_list_songs",
+        description=(
+            "获取汐音阁（XiYin Pavilion）中所有已上传的歌曲列表。"
+            "返回每首歌曲的 item_id、标题、歌手、时长（秒）和是否绑定歌词。"
+            "歌曲列表是动态的——用户可以随时通过 Web UI 上传新歌曲。"
+            "当用户想听歌但未指定具体歌曲时，先调用此工具查看可用歌曲，再用 xiyin_push_song 推送。"
+        ),
+        parameters={"type": "object", "properties": {}},
+        timeout=10.0,
+    )
+    async def llm_list_songs(self, **_: Any) -> dict[str, Any]:
+        async with self._state_lock:
+            songs: list[dict[str, Any]] = []
+            for it in self._music_items:
+                songs.append({
+                    "item_id": str(it.get("item_id") or ""),
+                    "title": str(it.get("title") or "未命名音乐"),
+                    "artist": str(it.get("artist") or "未知"),
+                    "duration_sec": _normalize_duration(it.get("duration_sec")),
+                    "lyric_bound": bool(self._lyric_text_for_item_locked(it)),
+                    "source": str(it.get("source") or "link"),
+                })
+        total = len(songs)
+        summary = f"汐音阁当前共有 {total} 首歌曲。" if total else "汐音阁暂无歌曲，请提醒用户先通过 Web UI 上传音频。"
+        return {"total": total, "songs": songs, "summary": summary}
+
+    @llm_tool(
+        name="xiyin_push_song",
+        description=(
+            "从汐音阁（XiYin Pavilion）歌曲库中选择一首歌推送给用户播放。"
+            "可以通过 item_id 精确指定歌曲，或通过 title 和 artist 模糊匹配。"
+            "优先级：item_id > title（+artist）。"
+            "推送成功后，歌曲会在主对话中播放；如果该歌曲绑定了歌词且推送附带提示开关已开启，"
+            "歌词片段会随推歌事件一起发送给猫娘，猫娘可据此与用户互动。"
+            "建议在推送前先用 xiyin_list_songs 查看可用歌曲。"
+        ),
+        parameters={
+            "type": "object",
+            "properties": {
+                "title": {
+                    "type": "string",
+                    "description": "歌曲名称（支持模糊匹配）",
+                },
+                "artist": {
+                    "type": "string",
+                    "description": "歌手名称（可选，用于辅助精确匹配）",
+                },
+                "item_id": {
+                    "type": "string",
+                    "description": "歌曲的唯一ID（精确匹配，优先级最高）",
+                },
+            },
+        },
+        timeout=30.0,
+    )
+    async def llm_push_song(
+        self,
+        *,
+        title: Any = None,
+        artist: Any = None,
+        item_id: Any = None,
+        **_: Any,
+    ) -> dict[str, Any]:
+        title_str = str(title or "").strip()
+        artist_str = str(artist or "").strip()
+        item_id_str = str(item_id or "").strip()
+
+        if not item_id_str and not title_str:
+            return {
+                "summary": "请至少提供 title 或 item_id 来指定要推送的歌曲。",
+                "is_error": True,
+                "error": "missing_song_identifier",
+            }
+
+        chosen: dict[str, Any] | None = None
+        chosen_lyric = ""
+        match_reason = ""
+
+        async with self._state_lock:
+            if item_id_str:
+                chosen = self._find_music_item_locked(item_id=item_id_str)
+                match_reason = "item_id" if chosen else "item_id_not_found"
+            else:
+                chosen, match_reason = self._match_music_item_by_name_locked(
+                    title=title_str, artist=artist_str,
+                )
+            if chosen:
+                chosen_lyric = self._lyric_text_for_item_locked(chosen)
+                chosen = dict(chosen)
+
+        if not chosen:
+            if match_reason == "ambiguous_exact":
+                return {
+                    "summary": f"按歌曲名「{title_str}」精确匹配到多首歌曲，请补充歌手名或使用 item_id 精确指定。",
+                    "is_error": True,
+                    "error": "ambiguous_match",
+                }
+            if match_reason == "ambiguous_partial":
+                return {
+                    "summary": f"按歌曲名「{title_str}」模糊匹配到多首歌曲，请提供更完整的歌名或补充歌手名。",
+                    "is_error": True,
+                    "error": "ambiguous_match",
+                }
+            return {
+                "summary": f"未找到与「{title_str or item_id_str}」匹配的歌曲，请先用 xiyin_list_songs 查看可用歌曲列表。",
+                "is_error": True,
+                "error": "song_not_found",
+            }
+
+        attach_prompt = bool(self._attach_prompt_on_push)
+
+        try:
+            result = await self.push_music_url(
+                url=str(chosen.get("url") or ""),
+                item_id=str(chosen.get("item_id") or ""),
+                title=str(chosen.get("title") or ""),
+                artist=str(chosen.get("artist") or ""),
+                auto_push=True,
+                add_to_library=False,
+                duration_sec=chosen.get("duration_sec"),
+                lyric_text=chosen_lyric,
+                attach_prompt_on_push=attach_prompt,
+            )
+        except Exception as exc:
+            return {
+                "summary": f"推送歌曲「{chosen.get('title', '未知')}」时出错: {exc}",
+                "is_error": True,
+                "error": str(exc),
+            }
+
+        if isinstance(result, Ok):
+            data = result.value if isinstance(result.value, dict) else {}
+            pushed = bool(data.get("pushed"))
+            song_title = str(chosen.get("title") or "未命名音乐")
+            song_artist = str(chosen.get("artist") or "未知")
+            lyric_bound = bool(chosen_lyric)
+            summary = f"已推送歌曲「{song_title}」by {song_artist}。"
+            if not pushed:
+                summary += "（播放推送未确认，但歌曲信息已处理。）"
+            if lyric_bound and attach_prompt:
+                summary += " 该歌曲已绑定歌词，歌词片段将随推歌事件一起发送给你。"
+            elif not lyric_bound:
+                summary += " 该歌曲未绑定歌词。"
+            return {
+                "summary": summary,
+                "pushed": pushed,
+                "title": song_title,
+                "artist": song_artist,
+                "lyric_bound": lyric_bound,
+                "item_id": str(chosen.get("item_id") or ""),
+            }
+
+        err_msg = ""
+        if isinstance(result, Err):
+            err_obj = result.error
+            err_msg = str(err_obj) if err_obj else "未知错误"
+        return {
+            "summary": f"推送歌曲失败: {err_msg}",
+            "is_error": True,
+            "error": err_msg or "push_failed",
+        }
 
     @lifecycle(id="startup")
     async def on_start(self, **_):
