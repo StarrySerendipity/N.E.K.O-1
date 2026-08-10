@@ -22,6 +22,7 @@ import socket
 import threading
 import time
 from datetime import datetime, timezone
+from http.server import HTTPServer, BaseHTTPRequestHandler
 from pathlib import Path
 from typing import Any
 from urllib.parse import urlparse
@@ -405,6 +406,90 @@ def _extract_duration_from_av_container(container: Any) -> int | None:
     return None
 
 
+class MusicFileHandler(BaseHTTPRequestHandler):
+    """处理 /api/plugin/{plugin_id}/music/{filename} 请求的HTTP处理器"""
+    
+    plugin_instance = None  # 将在插件初始化时设置
+    
+    def log_message(self, format, *args):
+        """禁用默认的日志输出"""
+        pass
+    
+    def do_GET(self):
+        """处理GET请求"""
+        # 解析路径: /api/plugin/{plugin_id}/music/{filename}
+        path_parts = self.path.strip('/').split('/')
+        
+        # 验证路径格式
+        if len(path_parts) != 5 or path_parts[0] != 'api' or path_parts[2] != 'music':
+            self.send_response(404)
+            self.end_headers()
+            return
+        
+        plugin_id = path_parts[1]
+        filename = path_parts[4]
+        
+        # 验证plugin_id
+        if self.plugin_instance is None or self.plugin_instance.plugin_id != plugin_id:
+            self.send_response(404)
+            self.end_headers()
+            return
+        
+        # 构建文件路径
+        file_path = self.plugin_instance._upload_dir / filename
+        
+        # 安全检查：确保文件在上传目录内
+        try:
+            file_path = file_path.resolve()
+            upload_dir = self.plugin_instance._upload_dir.resolve()
+            if not str(file_path).startswith(str(upload_dir)):
+                self.send_response(403)
+                self.end_headers()
+                return
+        except Exception:
+            self.send_response(400)
+            self.end_headers()
+            return
+        
+        # 检查文件是否存在
+        if not file_path.is_file():
+            self.send_response(404)
+            self.end_headers()
+            return
+        
+        # 检查文件扩展名
+        if file_path.suffix.lower() not in _ALLOWED_AUDIO_EXTENSIONS:
+            self.send_response(403)
+            self.end_headers()
+            return
+        
+        # 发送文件
+        try:
+            self.send_response(200)
+            
+            # 设置Content-Type
+            ext = file_path.suffix.lower()
+            content_type_map = {
+                '.mp3': 'audio/mpeg',
+                '.wav': 'audio/wav',
+                '.ogg': 'audio/ogg',
+                '.m4a': 'audio/mp4',
+                '.aac': 'audio/aac',
+                '.flac': 'audio/flac',
+            }
+            self.send_header('Content-Type', content_type_map.get(ext, 'application/octet-stream'))
+            
+            # 读取并发送文件
+            with open(file_path, 'rb') as f:
+                data = f.read()
+                self.send_header('Content-Length', str(len(data)))
+                self.end_headers()
+                self.wfile.write(data)
+        except Exception:
+            self.send_response(500)
+            self.end_headers()
+
+
 @neko_plugin
 class XiYinPavilionPlugin(NekoPluginBase):
     """汐音阁 · XiYin Pavilion —— 音乐推送 + 定时队列插件。"""
@@ -433,6 +518,11 @@ class XiYinPavilionPlugin(NekoPluginBase):
         self._original_push_message = None
         self._push_mapper_installed = False
         self._attach_prompt_on_push = _DEFAULT_ATTACH_PROMPT_ON_PUSH
+        
+        # HTTP服务器相关
+        self._music_server: HTTPServer | None = None
+        self._music_server_thread: threading.Thread | None = None
+        self._music_server_port = _DEFAULT_PLUGIN_SERVER_PORT
 
         self._playback_state: dict[str, Any] = {
             "status": "idle",
@@ -468,7 +558,53 @@ class XiYinPavilionPlugin(NekoPluginBase):
         return self.data_path(_LYRIC_MAP_FILE_NAME)
 
     def _build_ui_file_url(self, stored_filename: str) -> str:
-        return f"/plugin/{self.plugin_id}/ui/{_UPLOAD_SUBDIR}/{stored_filename}"
+        # 使用 /api/ 开头的URL格式，绕过前端安全拦截
+        return f"/api/plugin/{self.plugin_id}/music/{stored_filename}"
+    
+    def _start_music_server(self) -> bool:
+        """启动HTTP服务器提供音乐文件服务"""
+        if self._music_server is not None:
+            return True
+        
+        try:
+            # 设置处理器引用当前插件实例
+            MusicFileHandler.plugin_instance = self
+            
+            # 创建HTTP服务器
+            self._music_server = HTTPServer(
+                ('127.0.0.1', self._music_server_port),
+                MusicFileHandler
+            )
+            
+            # 在后台线程中运行服务器
+            self._music_server_thread = threading.Thread(
+                target=self._music_server.serve_forever,
+                daemon=True,
+                name=f"music-server-{self.plugin_id}"
+            )
+            self._music_server_thread.start()
+            
+            self.logger.info(f"音乐文件服务器已启动: http://127.0.0.1:{self._music_server_port}")
+            return True
+        except Exception as exc:
+            self.logger.warning(f"启动音乐文件服务器失败: {exc}")
+            self._music_server = None
+            self._music_server_thread = None
+            return False
+    
+    def _stop_music_server(self) -> None:
+        """停止HTTP服务器"""
+        if self._music_server is not None:
+            try:
+                self._music_server.shutdown()
+                self._music_server.server_close()
+                self.logger.info("音乐文件服务器已停止")
+            except Exception as exc:
+                self.logger.warning(f"停止音乐文件服务器时出现异常: {exc}")
+            finally:
+                self._music_server = None
+                self._music_server_thread = None
+                MusicFileHandler.plugin_instance = None
 
     def _copy_static_ui_assets(self) -> None:
         source_dir = self._source_static_dir
@@ -1915,6 +2051,8 @@ class XiYinPavilionPlugin(NekoPluginBase):
         self._register_writable_static_ui()
         self._scheduler_stop.clear()
         self._ensure_scheduler_task()
+        # 启动HTTP服务器提供音乐文件服务
+        self._start_music_server()
         return Ok("汐音阁已启动（含定时队列）")
 
     @lifecycle(id="shutdown")
@@ -1961,6 +2099,8 @@ class XiYinPavilionPlugin(NekoPluginBase):
             self._save_state_locked()
 
         self._uninstall_push_mapper()
+        # 停止HTTP服务器
+        self._stop_music_server()
 
     @plugin_entry(
         id="upload_music_file",
