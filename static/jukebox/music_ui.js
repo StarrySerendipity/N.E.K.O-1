@@ -1710,8 +1710,6 @@
         try {
             // 对内部代理路径直接放行（后端已做安全检查）
             if (url.startsWith('/api/')) return true;
-            // 对插件静态文件路径放行（插件上传的音乐文件走 /plugin/<id>/ui/ 路径）
-            if (url.startsWith('/plugin/')) return true;
             const parsed = new URL(url);
             if (!['http:', 'https:'].includes(parsed.protocol)) return false;
             const hostname = parsed.hostname;
