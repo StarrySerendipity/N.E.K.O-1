@@ -1,0 +1,1078 @@
+{
+  "reading_count": 13,
+  "readings": [
+    {
+      "spread": {
+        "name": "单牌占卜",
+        "description": "抽取一张牌，获得今日指引",
+        "count": 1
+      },
+      "question": "我的桃花运如何？",
+      "cards": [
+        {
+          "position": "今日指引",
+          "card": {
+            "id": 11,
+            "name": "正义",
+            "name_en": "Justice",
+            "number": "XI",
+            "arcana": "major",
+            "upright": [
+              "公正",
+              "真相",
+              "因果",
+              "法律"
+            ],
+            "reversed": [
+              "不公",
+              "欺骗",
+              "逃避责任"
+            ],
+            "description": "象征公正、真相和因果律。诚实面对自己和他人，正义终将到来。",
+            "element": "风",
+            "zodiac": "天秤座"
+          },
+          "is_reversed": false,
+          "orientation": "正位",
+          "keywords": [
+            "公正",
+            "真相",
+            "因果",
+            "法律"
+          ],
+          "interpretation": "今日塔罗指引：正义(Justice)正位。象征公正、真相和因果律。诚实面对自己和他人，正义终将到来。"
+        }
+      ],
+      "advice": "星辰为你指引方向，相信内心的声音。",
+      "lucky": {
+        "color": "红色",
+        "number": 9,
+        "direction": "西方",
+        "time": "下午"
+      },
+      "timestamp": "2026-05-01T02:29:51.984715+00:00"
+    },
+    {
+      "spread": {
+        "name": "三牌阵",
+        "description": "过去、现在、未来",
+        "count": 3
+      },
+      "question": "我的桃花运如何？",
+      "cards": [
+        {
+          "position": "过去",
+          "card": {
+            "id": 1,
+            "name": "魔术师",
+            "name_en": "The Magician",
+            "number": "I",
+            "arcana": "major",
+            "upright": [
+              "创造力",
+              "技能",
+              "意志力",
+              "专注"
+            ],
+            "reversed": [
+              "欺骗",
+              "操控",
+              "缺乏自信"
+            ],
+            "description": "象征创造力、技能和意志力。你拥有实现目标所需的一切资源。",
+            "element": "风",
+            "zodiac": "水星"
+          },
+          "is_reversed": true,
+          "orientation": "逆位",
+          "keywords": [
+            "欺骗",
+            "操控",
+            "缺乏自信"
+          ],
+          "interpretation": "在过去的位置，魔术师(The Magician)逆位暗示着一段影响深远的经历。象征创造力、技能和意志力。你拥有实现目标所需的一切资源。"
+        },
+        {
+          "position": "现在",
+          "card": {
+            "id": 20,
+            "name": "审判",
+            "name_en": "Judgement",
+            "number": "XX",
+            "arcana": "major",
+            "upright": [
+              "觉醒",
+              "重生",
+              "召唤",
+              "反思"
+            ],
+            "reversed": [
+              "自我怀疑",
+              "拒绝改变",
+              "忽视召唤"
+            ],
+            "description": "代表觉醒和重生。听从内心的召唤，迎接新的生命阶段。",
+            "element": "火",
+            "zodiac": "冥王星"
+          },
+          "is_reversed": false,
+          "orientation": "正位",
+          "keywords": [
+            "觉醒",
+            "重生",
+            "召唤",
+            "反思"
+          ],
+          "interpretation": "在现在的位置，审判(Judgement)正位提醒你关注当下。代表觉醒和重生。听从内心的召唤，迎接新的生命阶段。"
+        },
+        {
+          "position": "未来",
+          "card": {
+            "id": 0,
+            "name": "愚者",
+            "name_en": "The Fool",
+            "number": "0",
+            "arcana": "major",
+            "upright": [
+              "新的开始",
+              "冒险",
+              "天真",
+              "自发"
+            ],
+            "reversed": [
+              "鲁莽",
+              "冒险",
+              "犹豫不决"
+            ],
+            "description": "代表新的开始、无限可能性和冒险精神。愚者提醒我们要相信直觉，勇敢踏出第一步。",
+            "element": "风",
+            "zodiac": "天王星"
+          },
+          "is_reversed": false,
+          "orientation": "正位",
+          "keywords": [
+            "新的开始",
+            "冒险",
+            "天真",
+            "自发"
+          ],
+          "interpretation": "在未来的位置，愚者(The Fool)正位预示着即将到来的变化。代表新的开始、无限可能性和冒险精神。愚者提醒我们要相信直觉，勇敢踏出第一步。"
+        }
+      ],
+      "advice": "保持开放的心态，奇迹就在你身边。",
+      "lucky": {
+        "color": "粉色",
+        "number": 11,
+        "direction": "东方",
+        "time": "下午"
+      },
+      "timestamp": "2026-05-01T02:30:35.758571+00:00"
+    },
+    {
+      "spread": {
+        "name": "爱情牌阵",
+        "description": "你的感情、对方的感情、关系未来",
+        "count": 3
+      },
+      "question": "我的桃花运如何？",
+      "cards": [
+        {
+          "position": "你的感情",
+          "card": {
+            "id": 13,
+            "name": "死神",
+            "name_en": "Death",
+            "number": "XIII",
+            "arcana": "major",
+            "upright": [
+              "结束",
+              "转变",
+              "重生",
+              "放下"
+            ],
+            "reversed": [
+              "抗拒改变",
+              "恐惧",
+              "停滞"
+            ],
+            "description": "象征结束和转变。旧事物的消逝为新生命腾出空间。",
+            "element": "水",
+            "zodiac": "天蝎座"
+          },
+          "is_reversed": true,
+          "orientation": "逆位",
+          "keywords": [
+            "抗拒改变",
+            "恐惧",
+            "停滞"
+          ],
+          "interpretation": "关于你的感情，死神(Death)逆位揭示了你内心的真实感受。象征结束和转变。旧事物的消逝为新生命腾出空间。"
+        },
+        {
+          "position": "对方的感情",
+          "card": {
+            "id": 14,
+            "name": "节制",
+            "name_en": "Temperance",
+            "number": "XIV",
+            "arcana": "major",
+            "upright": [
+              "平衡",
+              "耐心",
+              "和谐",
+              "中庸"
+            ],
+            "reversed": [
+              "失衡",
+              "过度",
+              "不协调"
+            ],
+            "description": "代表平衡、耐心和和谐。在两极之间找到中庸之道。",
+            "element": "火",
+            "zodiac": "射手座"
+          },
+          "is_reversed": false,
+          "orientation": "正位",
+          "keywords": [
+            "平衡",
+            "耐心",
+            "和谐",
+            "中庸"
+          ],
+          "interpretation": "关于对方的感情，节制(Temperance)正位暗示了TA可能的想法和感受。代表平衡、耐心和和谐。在两极之间找到中庸之道。"
+        },
+        {
+          "position": "关系未来",
+          "card": {
+            "id": 20,
+            "name": "审判",
+            "name_en": "Judgement",
+            "number": "XX",
+            "arcana": "major",
+            "upright": [
+              "觉醒",
+              "重生",
+              "召唤",
+              "反思"
+            ],
+            "reversed": [
+              "自我怀疑",
+              "拒绝改变",
+              "忽视召唤"
+            ],
+            "description": "代表觉醒和重生。听从内心的召唤，迎接新的生命阶段。",
+            "element": "火",
+            "zodiac": "冥王星"
+          },
+          "is_reversed": false,
+          "orientation": "正位",
+          "keywords": [
+            "觉醒",
+            "重生",
+            "召唤",
+            "反思"
+          ],
+          "interpretation": "关于关系的未来，审判(Judgement)正位为你们的感情之路提供了启示。代表觉醒和重生。听从内心的召唤，迎接新的生命阶段。"
+        }
+      ],
+      "advice": "真诚的心能打动最坚硬的冰，勇敢表达。",
+      "lucky": {
+        "color": "红色",
+        "number": 3,
+        "direction": "西方",
+        "time": "傍晚"
+      },
+      "timestamp": "2026-05-01T02:30:52.677914+00:00"
+    },
+    {
+      "spread": {
+        "name": "爱情牌阵",
+        "description": "你的感情、对方的感情、关系未来",
+        "count": 3
+      },
+      "question": "????????",
+      "cards": [
+        {
+          "position": "你的感情",
+          "card": {
+            "id": 6,
+            "name": "恋人",
+            "name_en": "The Lovers",
+            "number": "VI",
+            "arcana": "major",
+            "upright": [
+              "爱情",
+              "和谐",
+              "选择",
+              "关系",
+              "价值观整合",
+              "吸引力"
+            ],
+            "reversed": [
+              "不和谐",
+              "失衡",
+              "错误选择",
+              "冲突",
+              "分离"
+            ],
+            "description": "代表爱情、和谐和重要的人生选择。跟随你的心，做出正确的决定。这张牌更多关乎价值观的选择而非单纯的爱情。",
+            "element": "风",
+            "zodiac": "双子座"
+          },
+          "is_reversed": false,
+          "orientation": "正位",
+          "keywords": [
+            "爱情",
+            "和谐",
+            "选择",
+            "关系",
+            "价值观整合",
+            "吸引力"
+          ],
+          "interpretation": "关于你的感情，恋人(The Lovers)正位揭示了你内心的真实感受。代表爱情、和谐和重要的人生选择。跟随你的心，做出正确的决定。这张牌更多关乎价值观的选择而非单纯的爱情。 关键词：爱情、和谐、选择、关系、价值观整合、吸引力"
+        },
+        {
+          "position": "对方的感情",
+          "card": {
+            "id": 7,
+            "name": "战车",
+            "name_en": "The Chariot",
+            "number": "VII",
+            "arcana": "major",
+            "upright": [
+              "胜利",
+              "决心",
+              "控制",
+              "意志力",
+              "前进",
+              "征服"
+            ],
+            "reversed": [
+              "失控",
+              "侵略",
+              "缺乏方向",
+              "冲突",
+              "挫败"
+            ],
+            "description": "象征胜利、决心和自我控制。坚定目标，你将克服一切障碍。战车代表意志的力量和向前推进的决心。",
+            "element": "水",
+            "zodiac": "巨蟹座"
+          },
+          "is_reversed": false,
+          "orientation": "正位",
+          "keywords": [
+            "胜利",
+            "决心",
+            "控制",
+            "意志力",
+            "前进",
+            "征服"
+          ],
+          "interpretation": "关于对方的感情，战车(The Chariot)正位暗示了TA可能的想法和感受。象征胜利、决心和自我控制。坚定目标，你将克服一切障碍。战车代表意志的力量和向前推进的决心。 关键词：胜利、决心、控制、意志力、前进、征服"
+        },
+        {
+          "position": "关系未来",
+          "card": {
+            "id": 8,
+            "name": "力量",
+            "name_en": "Strength",
+            "number": "VIII",
+            "arcana": "major",
+            "upright": [
+              "勇气",
+              "耐心",
+              "内在力量",
+              "温柔",
+              "自制",
+              "同情"
+            ],
+            "reversed": [
+              "自我怀疑",
+              "软弱",
+              "不安全感",
+              "暴力",
+              "压迫"
+            ],
+            "description": "代表内在的力量和勇气。真正的力量来自内心的平静与温柔。力量女神驯服猛兽，象征柔能克刚。",
+            "element": "火",
+            "zodiac": "狮子座"
+          },
+          "is_reversed": false,
+          "orientation": "正位",
+          "keywords": [
+            "勇气",
+            "耐心",
+            "内在力量",
+            "温柔",
+            "自制",
+            "同情"
+          ],
+          "interpretation": "关于关系的未来，力量(Strength)正位为你们的感情之路提供了启示。代表内在的力量和勇气。真正的力量来自内心的平静与温柔。力量女神驯服猛兽，象征柔能克刚。 关键词：勇气、耐心、内在力量、温柔、自制、同情"
+        }
+      ],
+      "advice": "缘分的丝线正在悄然编织，静待花开。",
+      "lucky": {
+        "color": "金色",
+        "number": 5,
+        "direction": "东方",
+        "time": "清晨"
+      },
+      "timestamp": "2026-05-01T02:41:24.492018+00:00"
+    },
+    {
+      "spread": {
+        "name": "凯尔特十字",
+        "description": "全面的命运解析",
+        "count": 6
+      },
+      "question": "我明天怎么样？",
+      "cards": [
+        {
+          "position": "现状",
+          "card": {
+            "id": 6,
+            "name": "恋人",
+            "name_en": "The Lovers",
+            "number": "VI",
+            "arcana": "major",
+            "upright": [
+              "爱情",
+              "和谐",
+              "选择",
+              "关系",
+              "价值观整合",
+              "吸引力"
+            ],
+            "reversed": [
+              "不和谐",
+              "失衡",
+              "错误选择",
+              "冲突",
+              "分离"
+            ],
+            "description": "代表爱情、和谐和重要的人生选择。跟随你的心，做出正确的决定。这张牌更多关乎价值观的选择而非单纯的爱情。",
+            "element": "风",
+            "zodiac": "双子座"
+          },
+          "is_reversed": false,
+          "orientation": "正位",
+          "keywords": [
+            "爱情",
+            "和谐",
+            "选择",
+            "关系",
+            "价值观整合",
+            "吸引力"
+          ],
+          "interpretation": "你目前的处境由恋人(The Lovers)正位所代表。代表爱情、和谐和重要的人生选择。跟随你的心，做出正确的决定。这张牌更多关乎价值观的选择而非单纯的爱情。 关键词：爱情、和谐、选择、关系、价值观整合、吸引力"
+        },
+        {
+          "position": "挑战",
+          "card": {
+            "id": 9,
+            "name": "隐者",
+            "name_en": "The Hermit",
+            "number": "IX",
+            "arcana": "major",
+            "upright": [
+              "内省",
+              "寻求真理",
+              "孤独",
+              "智慧",
+              "指导",
+              "反思"
+            ],
+            "reversed": [
+              "孤立",
+              "退缩",
+              "迷失",
+              "缺乏指导",
+              "逃避"
+            ],
+            "description": "象征内省和寻求真理。独处时你能找到内心真正的答案。隐者提灯照亮道路，代表智慧的引导。",
+            "element": "土",
+            "zodiac": "处女座"
+          },
+          "is_reversed": true,
+          "orientation": "逆位",
+          "keywords": [
+            "孤立",
+            "退缩",
+            "迷失",
+            "缺乏指导",
+            "逃避"
+          ],
+          "interpretation": "你面临的挑战与隐者(The Hermit)逆位有关。象征内省和寻求真理。独处时你能找到内心真正的答案。隐者提灯照亮道路，代表智慧的引导。 关键词：孤立、退缩、迷失、缺乏指导、逃避"
+        },
+        {
+          "position": "潜意识",
+          "card": {
+            "id": 3,
+            "name": "女皇",
+            "name_en": "The Empress",
+            "number": "III",
+            "arcana": "major",
+            "upright": [
+              "丰饶",
+              "母性",
+              "自然",
+              "感官享受",
+              "创造力",
+              "美丽"
+            ],
+            "reversed": [
+              "依赖",
+              "过度保护",
+              "空虚",
+              "创造性停滞",
+              "忽视需求"
+            ],
+            "description": "象征丰饶、母性和自然的力量。享受生活中的美好，滋养自己和他人。女皇代表生育力、创造力和大自然的慷慨馈赠。",
+            "element": "土",
+            "zodiac": "金星"
+          },
+          "is_reversed": true,
+          "orientation": "逆位",
+          "keywords": [
+            "依赖",
+            "过度保护",
+            "空虚",
+            "创造性停滞",
+            "忽视需求"
+          ],
+          "interpretation": "你的潜意识深处，女皇(The Empress)逆位在默默影响着你的决定。象征丰饶、母性和自然的力量。享受生活中的美好，滋养自己和他人。女皇代表生育力、创造力和大自然的慷慨馈赠。 关键词：依赖、过度保护、空虚、创造性停滞、忽视需求"
+        },
+        {
+          "position": "过去",
+          "card": {
+            "id": 20,
+            "name": "审判",
+            "name_en": "Judgement",
+            "number": "XX",
+            "arcana": "major",
+            "upright": [
+              "觉醒",
+              "重生",
+              "召唤",
+              "反思",
+              "宽恕",
+              "精神复苏"
+            ],
+            "reversed": [
+              "自我怀疑",
+              "拒绝改变",
+              "忽视召唤",
+              "内疚",
+              "评判"
+            ],
+            "description": "代表觉醒和重生。听从内心的召唤，迎接新的生命阶段。审判象征精神的复苏和新的开始。",
+            "element": "火",
+            "zodiac": "冥王星"
+          },
+          "is_reversed": false,
+          "orientation": "正位",
+          "keywords": [
+            "觉醒",
+            "重生",
+            "召唤",
+            "反思",
+            "宽恕",
+            "精神复苏"
+          ],
+          "interpretation": "在过去的位置，审判(Judgement)正位暗示着一段影响深远的经历。代表觉醒和重生。听从内心的召唤，迎接新的生命阶段。审判象征精神的复苏和新的开始。 关键词：觉醒、重生、召唤、反思、宽恕、精神复苏"
+        },
+        {
+          "position": "未来",
+          "card": {
+            "id": 0,
+            "name": "愚者",
+            "name_en": "The Fool",
+            "number": "0",
+            "arcana": "major",
+            "upright": [
+              "新的开始",
+              "冒险",
+              "天真",
+              "自发",
+              "潜力",
+              "自由"
+            ],
+            "reversed": [
+              "鲁莽",
+              "冒险",
+              "犹豫不决",
+              "缺乏方向",
+              "轻率"
+            ],
+            "description": "代表新的开始、无限可能性和冒险精神。愚者提醒我们要相信直觉，勇敢踏出第一步，虽然看似天真，但蕴含着巨大的潜力。",
+            "element": "风",
+            "zodiac": "天王星"
+          },
+          "is_reversed": false,
+          "orientation": "正位",
+          "keywords": [
+            "新的开始",
+            "冒险",
+            "天真",
+            "自发",
+            "潜力",
+            "自由"
+          ],
+          "interpretation": "在未来的位置，愚者(The Fool)正位预示着即将到来的变化。代表新的开始、无限可能性和冒险精神。愚者提醒我们要相信直觉，勇敢踏出第一步，虽然看似天真，但蕴含着巨大的潜力。 关键词：新的开始、冒险、天真、自发、潜力、自由"
+        },
+        {
+          "position": "建议",
+          "card": {
+            "id": 7,
+            "name": "战车",
+            "name_en": "The Chariot",
+            "number": "VII",
+            "arcana": "major",
+            "upright": [
+              "胜利",
+              "决心",
+              "控制",
+              "意志力",
+              "前进",
+              "征服"
+            ],
+            "reversed": [
+              "失控",
+              "侵略",
+              "缺乏方向",
+              "冲突",
+              "挫败"
+            ],
+            "description": "象征胜利、决心和自我控制。坚定目标，你将克服一切障碍。战车代表意志的力量和向前推进的决心。",
+            "element": "水",
+            "zodiac": "巨蟹座"
+          },
+          "is_reversed": false,
+          "orientation": "正位",
+          "keywords": [
+            "胜利",
+            "决心",
+            "控制",
+            "意志力",
+            "前进",
+            "征服"
+          ],
+          "interpretation": "塔罗给你的建议：战车(The Chariot)正位。象征胜利、决心和自我控制。坚定目标，你将克服一切障碍。战车代表意志的力量和向前推进的决心。 关键词：胜利、决心、控制、意志力、前进、征服"
+        }
+      ],
+      "advice": "星辰为你指引方向，相信内心的声音。",
+      "lucky": {
+        "color": "橙色",
+        "number": 15,
+        "direction": "西南",
+        "time": "下午"
+      },
+      "timestamp": "2026-05-01T02:48:02.428273+00:00"
+    },
+    {
+      "spread": {
+        "name": "单牌占卜",
+        "description": "抽取一张牌，获得今日指引",
+        "count": 1
+      },
+      "question": "???????",
+      "cards": [
+        {
+          "position": "今日指引",
+          "card": {
+            "id": 6,
+            "name": "恋人",
+            "name_en": "The Lovers",
+            "number": "VI",
+            "arcana": "major",
+            "upright": [
+              "爱情",
+              "和谐",
+              "选择",
+              "关系",
+              "价值观整合",
+              "吸引力"
+            ],
+            "reversed": [
+              "不和谐",
+              "失衡",
+              "错误选择",
+              "冲突",
+              "分离"
+            ],
+            "description": "代表爱情、和谐和重要的人生选择。跟随你的心，做出正确的决定。这张牌更多关乎价值观的选择而非单纯的爱情。",
+            "element": "风",
+            "zodiac": "双子座"
+          },
+          "is_reversed": false,
+          "orientation": "正位",
+          "keywords": [
+            "爱情",
+            "和谐",
+            "选择",
+            "关系",
+            "价值观整合",
+            "吸引力"
+          ],
+          "interpretation": "今日塔罗指引：恋人(The Lovers)正位。代表爱情、和谐和重要的人生选择。跟随你的心，做出正确的决定。这张牌更多关乎价值观的选择而非单纯的爱情。 关键词：爱情、和谐、选择、关系、价值观整合、吸引力"
+        }
+      ],
+      "advice": "保持开放的心态，奇迹就在你身边。",
+      "lucky": {
+        "color": "红色",
+        "number": 15,
+        "direction": "西南",
+        "time": "中午"
+      },
+      "timestamp": "2026-05-01T02:59:57.153239+00:00"
+    },
+    {
+      "spread": {
+        "name": "单牌占卜",
+        "description": "抽取一张牌，获得今日指引",
+        "count": 1
+      },
+      "question": "???????",
+      "cards": [
+        {
+          "position": "今日指引",
+          "card": {
+            "id": 21,
+            "name": "世界",
+            "name_en": "The World",
+            "number": "XXI",
+            "arcana": "major",
+            "upright": [
+              "完成",
+              "成就",
+              "旅行",
+              "圆满",
+              "成功",
+              "整合"
+            ],
+            "reversed": [
+              "未完成",
+              "延迟",
+              "缺乏成就",
+              "不完整",
+              "循环未闭"
+            ],
+            "description": "象征完成和成就。一个循环的结束，你即将达到圆满。世界代表目标的达成和旅程的完成。",
+            "element": "土",
+            "zodiac": "土星"
+          },
+          "is_reversed": false,
+          "orientation": "正位",
+          "keywords": [
+            "完成",
+            "成就",
+            "旅行",
+            "圆满",
+            "成功",
+            "整合"
+          ],
+          "interpretation": "今日塔罗指引：世界(The World)正位。象征完成和成就。一个循环的结束，你即将达到圆满。世界代表目标的达成和旅程的完成。 关键词：完成、成就、旅行、圆满、成功、整合"
+        }
+      ],
+      "advice": "宇宙的能量正在汇聚，好运即将来临。",
+      "lucky": {
+        "color": "粉色",
+        "number": 5,
+        "direction": "西北",
+        "time": "夜晚"
+      },
+      "timestamp": "2026-05-01T03:00:36.497168+00:00"
+    },
+    {
+      "spread": {
+        "name": "单牌占卜",
+        "description": "抽取一张牌，获得今日指引",
+        "count": 1
+      },
+      "question": "???????",
+      "cards": [
+        {
+          "position": "今日指引",
+          "card": {
+            "id": 2,
+            "name": "女祭司",
+            "name_en": "The High Priestess",
+            "number": "II",
+            "arcana": "major",
+            "upright": [
+              "直觉",
+              "潜意识",
+              "神秘",
+              "内在智慧",
+              "神圣知识",
+              "耐心"
+            ],
+            "reversed": [
+              "隐藏动机",
+              "冷漠",
+              "直觉受阻",
+              "秘密暴露",
+              "沟通中断"
+            ],
+            "description": "代表深层的直觉和潜意识智慧。倾听内心的声音，答案就在你心中。女祭司守护着神圣的知识，提醒我们信任内在的智慧。",
+            "element": "水",
+            "zodiac": "月亮"
+          },
+          "is_reversed": false,
+          "orientation": "正位",
+          "keywords": [
+            "直觉",
+            "潜意识",
+            "神秘",
+            "内在智慧",
+            "神圣知识",
+            "耐心"
+          ],
+          "interpretation": "今日塔罗指引：女祭司(The High Priestess)正位。代表深层的直觉和潜意识智慧。倾听内心的声音，答案就在你心中。女祭司守护着神圣的知识，提醒我们信任内在的智慧。 关键词：直觉、潜意识、神秘、内在智慧、神圣知识、耐心"
+        }
+      ],
+      "advice": "命运之轮已经开始转动，准备迎接变化。",
+      "lucky": {
+        "color": "橙色",
+        "number": 11,
+        "direction": "南方",
+        "time": "清晨"
+      },
+      "timestamp": "2026-05-01T03:01:12.781076+00:00"
+    },
+    {
+      "spread": {
+        "name": "单牌占卜",
+        "description": "抽取一张牌，获得今日指引",
+        "count": 1
+      },
+      "question": "明天怎么样？",
+      "cards": [
+        {
+          "position": "今日指引",
+          "card": {
+            "id": 5,
+            "name": "教皇",
+            "name_en": "The Hierophant",
+            "number": "V",
+            "arcana": "major",
+            "upright": [
+              "传统",
+              "信仰",
+              "指导",
+              "教育",
+              "精神指导",
+              "道德"
+            ],
+            "reversed": [
+              "反叛",
+              "打破常规",
+              "新信仰",
+              "非传统",
+              "个人信念"
+            ],
+            "description": "象征传统、信仰和精神指导。寻求智者的建议，遵循内心的信念。教皇代表传统的智慧和精神价值观。",
+            "element": "土",
+            "zodiac": "金牛座"
+          },
+          "is_reversed": true,
+          "orientation": "逆位",
+          "keywords": [
+            "反叛",
+            "打破常规",
+            "新信仰",
+            "非传统",
+            "个人信念"
+          ],
+          "interpretation": "今日塔罗指引：教皇(The Hierophant)逆位。象征传统、信仰和精神指导。寻求智者的建议，遵循内心的信念。教皇代表传统的智慧和精神价值观。 关键词：反叛、打破常规、新信仰、非传统、个人信念"
+        }
+      ],
+      "advice": "每一次选择都是新的开始，勇敢前行。",
+      "lucky": {
+        "color": "金色",
+        "number": 8,
+        "direction": "南方",
+        "time": "中午"
+      },
+      "timestamp": "2026-05-01T03:01:44.471152+00:00"
+    },
+    {
+      "spread": {
+        "name": "单牌占卜",
+        "description": "抽取一张牌，获得今日指引",
+        "count": 1
+      },
+      "question": "今天怎么样？",
+      "cards": [
+        {
+          "position": "今日指引",
+          "card": {
+            "id": 9,
+            "name": "隐者",
+            "name_en": "The Hermit",
+            "number": "IX",
+            "arcana": "major",
+            "upright": [
+              "内省",
+              "寻求真理",
+              "孤独",
+              "智慧",
+              "指导",
+              "反思"
+            ],
+            "reversed": [
+              "孤立",
+              "退缩",
+              "迷失",
+              "缺乏指导",
+              "逃避"
+            ],
+            "description": "象征内省和寻求真理。独处时你能找到内心真正的答案。隐者提灯照亮道路，代表智慧的引导。",
+            "element": "土",
+            "zodiac": "处女座"
+          },
+          "is_reversed": false,
+          "orientation": "正位",
+          "keywords": [
+            "内省",
+            "寻求真理",
+            "孤独",
+            "智慧",
+            "指导",
+            "反思"
+          ],
+          "interpretation": "今日塔罗指引：隐者(The Hermit)正位。象征内省和寻求真理。独处时你能找到内心真正的答案。隐者提灯照亮道路，代表智慧的引导。 关键词：内省、寻求真理、孤独、智慧、指导、反思"
+        }
+      ],
+      "advice": "每一次选择都是新的开始，勇敢前行。",
+      "lucky": {
+        "color": "金色",
+        "number": 15,
+        "direction": "东方",
+        "time": "傍晚"
+      },
+      "timestamp": "2026-05-01T03:04:23.319087+00:00"
+    },
+    {
+      "type": "birthday",
+      "birthday": "2026-05-01 00:00:00",
+      "result": "我的生日是2026-05-01 00:00:00。\n\n我请求你担任中国传统的生辰八字算命的角色。我将会给你我的生日，请你根据我的生日推算命盘，分析五行属性、吉凶祸福、财运、婚姻、健康、事业等方面的情况，并为其提供相应的指导和建议。",
+      "timestamp": "2026-05-01T04:06:32.137822+00:00"
+    },
+    {
+      "spread": {
+        "name": "单牌占卜",
+        "description": "抽取一张牌，获得今日指引",
+        "count": 1
+      },
+      "question": "今天怎么样？",
+      "cards": [
+        {
+          "position": "今日指引",
+          "card": {
+            "id": 8,
+            "name": "力量",
+            "name_en": "Strength",
+            "number": "VIII",
+            "arcana": "major",
+            "upright": [
+              "勇气",
+              "耐心",
+              "内在力量",
+              "温柔",
+              "自制",
+              "同情"
+            ],
+            "reversed": [
+              "自我怀疑",
+              "软弱",
+              "不安全感",
+              "暴力",
+              "压迫"
+            ],
+            "description": "代表内在的力量和勇气。真正的力量来自内心的平静与温柔。力量女神驯服猛兽，象征柔能克刚。",
+            "element": "火",
+            "zodiac": "狮子座"
+          },
+          "is_reversed": false,
+          "orientation": "正位",
+          "keywords": [
+            "勇气",
+            "耐心",
+            "内在力量",
+            "温柔",
+            "自制",
+            "同情"
+          ],
+          "interpretation": "今日塔罗指引：力量(Strength)正位。代表内在的力量和勇气。真正的力量来自内心的平静与温柔。力量女神驯服猛兽，象征柔能克刚。 关键词：勇气、耐心、内在力量、温柔、自制、同情"
+        }
+      ],
+      "advice": "保持开放的心态，奇迹就在你身边。",
+      "lucky": {
+        "color": "天蓝色",
+        "number": 11,
+        "direction": "南方",
+        "time": "中午"
+      },
+      "timestamp": "2026-05-01T04:15:57.182863+00:00"
+    },
+    {
+      "spread": {
+        "name": "单牌占卜",
+        "description": "抽取一张牌，获得今日指引",
+        "count": 1
+      },
+      "question": "",
+      "cards": [
+        {
+          "position": "今日指引",
+          "card": {
+            "id": 5,
+            "name": "教皇",
+            "name_en": "The Hierophant",
+            "number": "V",
+            "arcana": "major",
+            "upright": [
+              "传统",
+              "信仰",
+              "指导",
+              "教育",
+              "精神指导",
+              "道德"
+            ],
+            "reversed": [
+              "反叛",
+              "打破常规",
+              "新信仰",
+              "非传统",
+              "个人信念"
+            ],
+            "description": "象征传统、信仰和精神指导。寻求智者的建议，遵循内心的信念。教皇代表传统的智慧和精神价值观。",
+            "element": "土",
+            "zodiac": "金牛座"
+          },
+          "is_reversed": false,
+          "orientation": "正位",
+          "keywords": [
+            "传统",
+            "信仰",
+            "指导",
+            "教育",
+            "精神指导",
+            "道德"
+          ],
+          "interpretation": "今日塔罗指引：教皇(The Hierophant)正位。象征传统、信仰和精神指导。寻求智者的建议，遵循内心的信念。教皇代表传统的智慧和精神价值观。 关键词：传统、信仰、指导、教育、精神指导、道德"
+        }
+      ],
+      "advice": "星辰为你指引方向，相信内心的声音。",
+      "lucky": {
+        "color": "白色",
+        "number": 7,
+        "direction": "北方",
+        "time": "清晨"
+      },
+      "timestamp": "2026-05-01T05:03:08.385989+00:00"
+    }
+  ],
+  "updated_at": "2026-05-03T12:35:04.137478+00:00"
+}
