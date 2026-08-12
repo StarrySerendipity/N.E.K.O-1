@@ -86,22 +86,23 @@ class NekoDiaryPlugin:
                 visibility TEXT DEFAULT 'public'
             )
         """)
+        self._conn.commit()
 
-        # 创建索引
+        # 迁移：用 PRAGMA table_info 检查列是否存在（比 SELECT 更可靠）
+        cursor.execute("PRAGMA table_info(diary_entries)")
+        existing_cols = {row[1] for row in cursor.fetchall()}
+        if "visibility" not in existing_cols:
+            cursor.execute("ALTER TABLE diary_entries ADD COLUMN visibility TEXT DEFAULT 'public'")
+            # 把已有旧数据全部标记为 public
+            cursor.execute("UPDATE diary_entries SET visibility = 'public' WHERE visibility IS NULL")
+            self._conn.commit()
+
+        # 创建索引（此时 visibility 列必定存在）
         cursor.execute("CREATE INDEX IF NOT EXISTS idx_diary_date ON diary_entries(date)")
         cursor.execute("CREATE INDEX IF NOT EXISTS idx_diary_mood ON diary_entries(mood)")
         cursor.execute("CREATE INDEX IF NOT EXISTS idx_diary_deleted ON diary_entries(deleted)")
         cursor.execute("CREATE INDEX IF NOT EXISTS idx_diary_visibility ON diary_entries(visibility)")
-
         self._conn.commit()
-
-        # 迁移：如果表已存在但没有 visibility 字段，则添加
-        try:
-            cursor.execute("SELECT visibility FROM diary_entries LIMIT 1")
-        except sqlite3.OperationalError:
-            # 字段不存在，添加它
-            cursor.execute("ALTER TABLE diary_entries ADD COLUMN visibility TEXT DEFAULT 'public'")
-            self._conn.commit()
 
     def close(self) -> None:
         """关闭数据库连接"""

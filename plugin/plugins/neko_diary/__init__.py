@@ -444,7 +444,12 @@ class NekoDiaryPluginEntry(NekoPluginBase):
 
     @llm_tool(
         name="neko_diary_get_names",
-        description="获取猫娘对用户的称呼和猫娘自己的自称。",
+        description=(
+            "获取当前猫娘称呼用户的方式，以及猫娘对自己的自称。"
+            "master_name 是你对用户的称呼（默认'主人'），"
+            "catgirl_name 是你对自己的自称（默认'喵喵'）。"
+            "在和用户对话、写日记时，请使用这两个称呼而非固定词语。"
+        ),
         parameters={
             "type": "object",
             "properties": {},
@@ -476,12 +481,16 @@ class NekoDiaryPluginEntry(NekoPluginBase):
 
     @llm_tool(
         name="neko_diary_set_names",
-        description="设置猫娘对用户的称呼和/或猫娘自己的自称。",
+        description=(
+            "设置你称呼用户的方式（master_name）和/或你对自己的自称（catgirl_name）。"
+            "设置后会持久化保存，插件重载后依然生效，不会退回默认的'主人/喵喵'。"
+            "当你想换一种方式称呼用户或自己时调用此工具。留空的字段不会被修改。"
+        ),
         parameters={
             "type": "object",
             "properties": {
-                "master_name": {"type": "string", "description": "猫娘对用户的称呼"},
-                "catgirl_name": {"type": "string", "description": "猫娘的自称"},
+                "master_name": {"type": "string", "description": "你想怎么称呼用户（例如：主人、哥哥、那家伙…）"},
+                "catgirl_name": {"type": "string", "description": "你想怎么自称（例如：喵喵、小雪、本喵…）"},
             },
             "required": [],
         },
@@ -499,36 +508,43 @@ class NekoDiaryPluginEntry(NekoPluginBase):
             },
             "required": [],
         },
-        llm_result_fields=["success", "master_name", "catgirl_name"],
+        llm_result_fields=["success", "master_name", "catgirl_name", "updated"],
     )
     async def set_names(self, master_name: Optional[str] = None, catgirl_name: Optional[str] = None, **_):
-        """设置称呼配置"""
+        """设置称呼配置
+
+        持久化到插件配置文件，插件重载后不会退回默认值（主人/喵喵）。
+        空字符串会被忽略，避免误清称呼。
+        """
         try:
             plugin = self._get_plugin()
-            
+            updated: Dict[str, Any] = {}
+
             if master_name is not None:
-                plugin.master_name = master_name.strip()
+                name = str(master_name).strip()
+                if name:
+                    plugin.master_name = name
+                    updated["master_name"] = name
             if catgirl_name is not None:
-                plugin.catgirl_name = catgirl_name.strip()
-            
-            # 持久化到配置文件（使用扁平化键名，参考 catgirl_daily_planner 的实现）
-            try:
-                update_dict = {}
-                if master_name is not None:
-                    update_dict["neko_diary.master_name"] = plugin.master_name
-                if catgirl_name is not None:
-                    update_dict["neko_diary.catgirl_name"] = plugin.catgirl_name
-                
-                if update_dict:
-                    await self.config.update(update_dict, timeout=5.0)
-                    self.logger.info(f"称呼配置已持久化: {update_dict}")
-            except Exception as e:
-                self.logger.warning(f"持久化称呼配置失败: {e}")
-            
+                name = str(catgirl_name).strip()
+                if name:
+                    plugin.catgirl_name = name
+                    updated["catgirl_name"] = name
+
+            # 持久化到配置文件（扁平化键名，参考 catgirl_daily_planner 实现）
+            if updated:
+                persist = {f"neko_diary.{k}": v for k, v in updated.items()}
+                try:
+                    await self.config.update(persist, timeout=5.0)
+                    self.logger.info("称呼配置已持久化: {}", persist)
+                except Exception as e:
+                    self.logger.warning("持久化称呼配置失败: {}", e)
+
             return Ok({
                 "success": True,
                 "master_name": plugin.master_name,
                 "catgirl_name": plugin.catgirl_name,
+                "updated": list(updated.keys()),
             })
         except Exception as e:
             return Err(SdkError(f"设置称呼配置失败: {e}"))

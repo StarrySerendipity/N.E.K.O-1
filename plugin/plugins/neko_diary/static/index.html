@@ -3,857 +3,349 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>猫娘日记 - 回忆小盒子</title>
+    <title>猫娘日记 · 回忆小盒子</title>
     <style>
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }
+        @import url('https://fonts.googleapis.com/css2?family=Noto+Serif+SC:wght@400;600;700&display=swap');
+
+        * { margin: 0; padding: 0; box-sizing: border-box; }
 
         body {
-            font-family: 'Segoe UI', 'Microsoft YaHei', sans-serif;
-            background: linear-gradient(135deg, #e0f4ff 0%, #fff0f5 50%, #f0f8ff 100%);
+            font-family: 'Noto Serif SC', 'Microsoft YaHei', serif;
+            background: linear-gradient(160deg, #eef5fc 0%, #ffffff 30%, #fef6f9 70%, #f3f8ff 100%);
             min-height: 100vh;
-            color: #4a5568;
+            color: #4a6280;
             position: relative;
             overflow-x: hidden;
         }
 
-        /* 背景装饰 */
-        body::before {
-            content: '';
-            position: fixed;
-            top: -50%;
-            left: -50%;
-            width: 200%;
-            height: 200%;
-            background: 
-                radial-gradient(circle at 20% 30%, rgba(255, 182, 193, 0.15) 0%, transparent 50%),
-                radial-gradient(circle at 80% 70%, rgba(173, 216, 230, 0.15) 0%, transparent 50%),
-                radial-gradient(circle at 50% 50%, rgba(255, 192, 203, 0.1) 0%, transparent 50%);
-            animation: float 20s ease-in-out infinite;
-            pointer-events: none;
-            z-index: 0;
+        /* 漂浮装饰 */
+        .deco-layer {
+            position: fixed; inset: 0; pointer-events: none; z-index: 0; overflow: hidden;
+        }
+        .petal {
+            position: absolute; width: 12px; height: 12px; border-radius: 50% 0 50% 50%;
+            opacity: 0.12; animation: drift 18s ease-in-out infinite;
+        }
+        .petal:nth-child(1) { left: 8%; top: -20px; background: #f4a6c0; animation-delay: 0s; }
+        .petal:nth-child(2) { left: 25%; top: -20px; background: #7eb8e8; animation-delay: 3s; width: 8px; height: 8px; }
+        .petal:nth-child(3) { left: 50%; top: -20px; background: #f4a6c0; animation-delay: 6s; width: 14px; height: 14px; }
+        .petal:nth-child(4) { left: 70%; top: -20px; background: #b4a7e8; animation-delay: 9s; width: 10px; height: 10px; }
+        .petal:nth-child(5) { left: 90%; top: -20px; background: #7eb8e8; animation-delay: 12s; }
+        @keyframes drift {
+            0%   { transform: translateY(0) rotate(0deg); opacity: 0; }
+            10%  { opacity: 0.15; }
+            90%  { opacity: 0.1; }
+            100% { transform: translateY(100vh) rotate(360deg); opacity: 0; }
         }
 
-        @keyframes float {
-            0%, 100% { transform: translate(0, 0) rotate(0deg); }
-            50% { transform: translate(-20px, -20px) rotate(5deg); }
-        }
+        .container { max-width: 760px; margin: 0 auto; padding: 28px 20px 60px; position: relative; z-index: 1; }
 
-        .container {
-            max-width: 1000px;
-            margin: 0 auto;
-            padding: 20px;
-            position: relative;
-            z-index: 1;
-        }
-
-        /* 头部标题 */
+        /* 标题 */
         .header {
-            text-align: center;
-            padding: 40px 30px;
-            background: rgba(255, 255, 255, 0.95);
-            border-radius: 24px;
-            margin-bottom: 30px;
-            box-shadow: 0 8px 32px rgba(135, 180, 230, 0.2);
-            position: relative;
-            overflow: hidden;
+            text-align: center; padding: 48px 30px 36px; position: relative;
         }
-
-        .header::before {
-            content: '✨';
-            position: absolute;
-            top: 15px;
-            left: 30px;
-            font-size: 2em;
-            animation: sparkle 2s ease-in-out infinite;
-        }
-
-        .header::after {
-            content: '🌸';
-            position: absolute;
-            top: 15px;
-            right: 30px;
-            font-size: 2em;
-            animation: sparkle 2s ease-in-out infinite 0.5s;
-        }
-
-        @keyframes sparkle {
-            0%, 100% { opacity: 1; transform: scale(1); }
-            50% { opacity: 0.6; transform: scale(1.1); }
-        }
-
         .header h1 {
-            font-size: 2.8em;
-            background: linear-gradient(135deg, #667eea 0%, #f093fb 50%, #667eea 100%);
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
-            background-clip: text;
-            margin-bottom: 12px;
-            font-weight: 700;
-            letter-spacing: 2px;
-        }
-
-        .header p {
-            color: #718096;
-            font-size: 1.1em;
-            font-style: italic;
-        }
-
-        /* 标签页导航 */
-        .tabs {
-            display: flex;
-            gap: 12px;
-            margin-bottom: 24px;
-            background: rgba(255, 255, 255, 0.9);
-            padding: 8px;
-            border-radius: 16px;
-            box-shadow: 0 4px 16px rgba(135, 180, 230, 0.15);
-        }
-
-        .tab-btn {
-            flex: 1;
-            padding: 12px 20px;
-            border: none;
-            background: transparent;
-            color: #718096;
-            font-size: 1em;
-            font-weight: 600;
-            cursor: pointer;
-            border-radius: 12px;
-            transition: all 0.3s;
-        }
-
-        .tab-btn:hover {
-            background: rgba(102, 126, 234, 0.1);
-            color: #667eea;
-        }
-
-        .tab-btn.active {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            color: white;
-            box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3);
-        }
-
-        /* 标签页内容 */
-        .tab-content {
-            display: none;
-            animation: fadeIn 0.3s ease-in;
-        }
-
-        .tab-content.active {
-            display: block;
-        }
-
-        @keyframes fadeIn {
-            from { opacity: 0; transform: translateY(10px); }
-            to { opacity: 1; transform: translateY(0); }
-        }
-
-        /* 写日记区域 */
-        .write-section {
-            background: rgba(255, 255, 255, 0.95);
-            border-radius: 20px;
-            padding: 30px;
-            box-shadow: 0 8px 32px rgba(135, 180, 230, 0.15);
-        }
-
-        .section-title {
-            font-size: 1.6em;
-            color: #5a67d8;
-            margin-bottom: 24px;
-            display: flex;
-            align-items: center;
-            gap: 10px;
-        }
-
-        .section-title::before {
-            content: '✍️';
-            font-size: 1.2em;
-        }
-
-        .form-group {
-            margin-bottom: 20px;
-        }
-
-        .form-group label {
-            display: block;
+            font-size: 2.4em; font-weight: 700; letter-spacing: 3px;
+            background: linear-gradient(135deg, #5ba4e5 0%, #7eb8e8 40%, #f4a6c0 100%);
+            -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;
             margin-bottom: 10px;
-            color: #4a5568;
-            font-weight: 600;
-            font-size: 1.05em;
+        }
+        .header .subtitle {
+            color: #9bb0c8; font-size: 0.95em; font-weight: 400; letter-spacing: 1px;
+        }
+        .header .subtitle::before { content: '— '; color: #c8d6e8; }
+        .header .subtitle::after { content: ' —'; color: #c8d6e8; }
+
+        /* 导航 */
+        .nav {
+            display: flex; gap: 6px; margin-bottom: 28px;
+            background: rgba(255,255,255,0.7); backdrop-filter: blur(12px);
+            padding: 6px; border-radius: 18px;
+            box-shadow: 0 2px 20px rgba(126,184,232,0.12);
+            border: 1px solid rgba(255,255,255,0.8);
+        }
+        .nav-btn {
+            flex: 1; padding: 11px 16px; border: none; background: transparent;
+            color: #8ba0b8; font-size: 0.95em; font-weight: 600; cursor: pointer;
+            border-radius: 14px; transition: all 0.35s ease; font-family: inherit;
+        }
+        .nav-btn:hover { color: #5ba4e5; }
+        .nav-btn.active {
+            background: linear-gradient(135deg, #6cb4e8 0%, #94c8ef 100%);
+            color: white; box-shadow: 0 3px 14px rgba(108,180,232,0.35);
         }
 
-        .form-group input,
-        .form-group textarea,
-        .form-group select {
-            width: 100%;
-            padding: 14px 18px;
-            border: 2px solid #e2e8f0;
-            border-radius: 12px;
-            font-size: 1em;
-            transition: all 0.3s;
+        /* 标签页 */
+        .tab-pane { display: none; animation: fadeIn 0.4s ease; }
+        .tab-pane.active { display: block; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+
+        /* 玻璃卡片 */
+        .glass {
+            background: rgba(255,255,255,0.75); backdrop-filter: blur(16px);
+            border-radius: 22px; border: 1px solid rgba(255,255,255,0.9);
+            box-shadow: 0 6px 30px rgba(126,184,232,0.1);
+        }
+
+        /* 写日记 */
+        .write-card { padding: 34px 32px; }
+        .write-card h2 {
+            font-size: 1.3em; color: #5ba4e5; margin-bottom: 24px; font-weight: 600;
+            display: flex; align-items: center; gap: 8px;
+        }
+        .write-card h2::before { content: '✎'; font-size: 1.1em; opacity: 0.6; }
+
+        .field { margin-bottom: 22px; }
+        .field label { display: block; margin-bottom: 8px; font-size: 0.9em; color: #7a92a8; font-weight: 600; }
+        .field input, .field textarea {
+            width: 100%; padding: 13px 16px; border: 2px solid #e8f0f8; border-radius: 14px;
+            font-size: 1em; font-family: inherit; background: rgba(255,255,255,0.8);
+            transition: all 0.3s; color: #4a6280;
+        }
+        .field input:focus, .field textarea:focus {
+            outline: none; border-color: #94c8ef; box-shadow: 0 0 0 4px rgba(108,180,232,0.08);
             background: white;
         }
+        .field textarea { resize: vertical; min-height: 130px; line-height: 1.8; }
 
-        .form-group input:focus,
-        .form-group textarea:focus,
-        .form-group select:focus {
-            outline: none;
-            border-color: #667eea;
-            box-shadow: 0 0 0 4px rgba(102, 126, 234, 0.1);
+        /* 心情选择 */
+        .mood-row { display: flex; gap: 8px; flex-wrap: wrap; }
+        .mood-chip {
+            display: flex; flex-direction: column; align-items: center; gap: 2px;
+            padding: 12px 14px; border: 2px solid #e8f0f8; border-radius: 16px;
+            cursor: pointer; transition: all 0.3s; background: rgba(255,255,255,0.6);
+            min-width: 64px;
         }
-
-        .form-group textarea {
-            resize: vertical;
-            min-height: 140px;
-            font-family: inherit;
-            line-height: 1.6;
+        .mood-chip:hover { border-color: #c8def0; transform: translateY(-2px); }
+        .mood-chip.selected {
+            border-color: #6cb4e8; background: linear-gradient(135deg, #f0f7ff, #fef6f9);
+            box-shadow: 0 4px 16px rgba(108,180,232,0.18); transform: translateY(-2px);
         }
-
-        /* 心情选择器 */
-        .mood-selector {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(100px, 1fr));
-            gap: 12px;
-        }
-
-        .mood-option {
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            padding: 16px 12px;
-            border: 2px solid #e2e8f0;
-            border-radius: 14px;
-            cursor: pointer;
-            transition: all 0.3s;
-            background: white;
-        }
-
-        .mood-option:hover {
-            transform: translateY(-3px);
-            box-shadow: 0 6px 16px rgba(0, 0, 0, 0.1);
-            border-color: #cbd5e0;
-        }
-
-        .mood-option.selected {
-            border-color: #667eea;
-            background: linear-gradient(135deg, #f0f4ff 0%, #fff0f5 100%);
-            box-shadow: 0 6px 20px rgba(102, 126, 234, 0.2);
-            transform: translateY(-3px);
-        }
-
-        .mood-option .emoji {
-            font-size: 2.5em;
-            margin-bottom: 6px;
-        }
-
-        .mood-option .label {
-            font-size: 0.9em;
-            color: #718096;
-            font-weight: 500;
-        }
+        .mood-chip .emoji { font-size: 1.8em; }
+        .mood-chip .name { font-size: 0.78em; color: #8ba0b8; }
+        .mood-chip.selected .name { color: #5ba4e5; }
 
         /* 标签输入 */
-        .tags-input {
-            display: flex;
-            gap: 10px;
-            flex-wrap: wrap;
-            align-items: center;
-            padding: 12px;
-            border: 2px solid #e2e8f0;
-            border-radius: 12px;
-            background: white;
-            min-height: 50px;
+        .tag-box {
+            display: flex; gap: 8px; flex-wrap: wrap; align-items: center;
+            padding: 10px 14px; border: 2px solid #e8f0f8; border-radius: 14px;
+            background: rgba(255,255,255,0.8); min-height: 48px;
         }
-
-        .tag {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            color: white;
-            padding: 8px 14px;
-            border-radius: 20px;
-            font-size: 0.9em;
-            display: inline-flex;
-            align-items: center;
-            gap: 8px;
-            box-shadow: 0 2px 8px rgba(102, 126, 234, 0.2);
+        .tag-box:focus-within { border-color: #94c8ef; box-shadow: 0 0 0 4px rgba(108,180,232,0.08); }
+        .tag-pill {
+            background: linear-gradient(135deg, #6cb4e8, #94c8ef); color: white;
+            padding: 5px 12px; border-radius: 14px; font-size: 0.85em;
+            display: inline-flex; align-items: center; gap: 6px; font-weight: 500;
         }
-
-        .tag .remove {
-            cursor: pointer;
-            font-weight: bold;
-            font-size: 1.2em;
-            line-height: 1;
-        }
-
-        .tag .remove:hover {
-            color: #fed7d7;
-        }
-
-        .tag-input {
-            flex: 1;
-            min-width: 150px;
-            padding: 8px 12px;
-            border: none;
-            font-size: 0.95em;
-            background: transparent;
-        }
-
-        .tag-input:focus {
-            outline: none;
-        }
+        .tag-pill .x { cursor: pointer; opacity: 0.7; font-weight: bold; }
+        .tag-pill .x:hover { opacity: 1; }
+        .tag-box input { flex: 1; min-width: 120px; border: none; background: transparent; font-family: inherit; font-size: 0.95em; color: #4a6280; }
+        .tag-box input:focus { outline: none; }
 
         /* 提交按钮 */
-        .submit-btn {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            color: white;
-            border: none;
-            padding: 16px 40px;
-            border-radius: 14px;
-            font-size: 1.15em;
-            font-weight: 600;
-            cursor: pointer;
-            transition: all 0.3s;
-            box-shadow: 0 6px 20px rgba(102, 126, 234, 0.3);
-            width: 100%;
-            margin-top: 10px;
+        .btn-primary {
+            width: 100%; padding: 15px; border: none; border-radius: 16px;
+            background: linear-gradient(135deg, #6cb4e8 0%, #94c8ef 50%, #f4a6c0 100%);
+            color: white; font-size: 1.05em; font-weight: 600; cursor: pointer;
+            font-family: inherit; letter-spacing: 1px; transition: all 0.3s;
+            box-shadow: 0 5px 20px rgba(108,180,232,0.28);
         }
-
-        .submit-btn:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 8px 24px rgba(102, 126, 234, 0.4);
-        }
-
-        .submit-btn:active {
-            transform: translateY(0);
-        }
+        .btn-primary:hover { transform: translateY(-2px); box-shadow: 0 8px 26px rgba(108,180,232,0.38); }
+        .btn-primary:active { transform: translateY(0); }
 
         /* 日记列表 */
-        .diary-list {
-            display: flex;
-            flex-direction: column;
-            gap: 20px;
-        }
+        .timeline { display: flex; flex-direction: column; gap: 16px; }
 
-        .diary-entry {
-            background: rgba(255, 255, 255, 0.95);
-            border-radius: 18px;
-            padding: 24px;
-            box-shadow: 0 6px 24px rgba(135, 180, 230, 0.15);
-            transition: all 0.3s;
-            border-left: 4px solid transparent;
+        .diary-card {
+            background: rgba(255,255,255,0.8); backdrop-filter: blur(12px);
+            border-radius: 20px; padding: 24px 26px;
+            border: 1px solid rgba(255,255,255,0.9);
+            box-shadow: 0 4px 24px rgba(126,184,232,0.08);
+            transition: all 0.35s ease; position: relative;
+            border-left: 3px solid transparent;
         }
+        .diary-card:hover { transform: translateY(-3px); box-shadow: 0 8px 30px rgba(126,184,232,0.15); }
 
-        .diary-entry:hover {
-            transform: translateY(-3px);
-            box-shadow: 0 8px 28px rgba(135, 180, 230, 0.2);
+        .dc-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
+        .dc-date { font-size: 0.85em; color: #9bb0c8; font-weight: 400; }
+        .dc-mood {
+            display: inline-flex; align-items: center; gap: 5px;
+            padding: 4px 12px; border-radius: 14px; font-size: 0.85em; font-weight: 600;
         }
-
-        .entry-header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 14px;
+        .dc-title { font-size: 1.25em; color: #3a5278; margin-bottom: 10px; font-weight: 600; }
+        .dc-body { color: #5a7090; line-height: 1.9; white-space: pre-wrap; font-size: 1em; }
+        .dc-tags { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 12px; }
+        .dc-tag {
+            background: linear-gradient(135deg, #f0f7ff, #fef6f9);
+            color: #6cb4e8; padding: 4px 11px; border-radius: 12px; font-size: 0.8em; font-weight: 500;
         }
-
-        .entry-date {
-            color: #718096;
-            font-size: 0.95em;
-            font-weight: 500;
+        .dc-foot { display: flex; gap: 8px; margin-top: 14px; padding-top: 14px; border-top: 1px solid #f0f4f8; }
+        .dc-btn {
+            background: transparent; border: 1.5px solid #e8f0f8; padding: 6px 14px;
+            border-radius: 10px; cursor: pointer; font-size: 0.85em; color: #8ba0b8;
+            font-family: inherit; transition: all 0.3s;
         }
+        .dc-btn:hover { border-color: #f4a6c0; color: #e89ab5; background: rgba(244,166,192,0.05); }
 
-        .entry-mood {
-            display: flex;
-            align-items: center;
-            gap: 8px;
-            padding: 6px 14px;
-            border-radius: 20px;
-            font-size: 0.95em;
-            font-weight: 600;
-        }
-
-        .entry-title {
-            font-size: 1.4em;
-            color: #2d3748;
-            margin-bottom: 12px;
-            font-weight: 600;
-        }
-
-        .entry-content {
-            color: #4a5568;
-            line-height: 1.8;
-            margin-bottom: 14px;
-            white-space: pre-wrap;
-            font-size: 1.05em;
-        }
-
-        .entry-tags {
-            display: flex;
-            gap: 8px;
-            flex-wrap: wrap;
-            margin-top: 12px;
-        }
-
-        .entry-tag {
-            background: linear-gradient(135deg, #e0f4ff 0%, #fff0f5 100%);
-            color: #5a67d8;
-            padding: 6px 12px;
-            border-radius: 14px;
-            font-size: 0.85em;
-            font-weight: 500;
-        }
-
-        .entry-actions {
-            display: flex;
-            gap: 10px;
-            margin-top: 16px;
-            padding-top: 16px;
-            border-top: 1px solid #e2e8f0;
-        }
-
-        .action-btn {
-            background: white;
-            border: 2px solid #e2e8f0;
-            padding: 8px 16px;
-            border-radius: 10px;
-            cursor: pointer;
-            transition: all 0.3s;
-            font-size: 0.9em;
-            font-weight: 500;
-        }
-
-        .action-btn:hover {
-            background: #f7fafc;
-            border-color: #cbd5e0;
-        }
-
-        .action-btn.delete:hover {
-            background: #fed7d7;
-            border-color: #f56565;
-            color: #c53030;
-        }
-
-        /* 可见性过滤 */
-        .visibility-filter {
-            display: flex;
-            gap: 12px;
-            margin-bottom: 20px;
-            background: rgba(255, 255, 255, 0.9);
-            padding: 8px;
-            border-radius: 16px;
-            box-shadow: 0 4px 16px rgba(135, 180, 230, 0.15);
-        }
-
-        .filter-btn {
-            flex: 1;
-            padding: 12px 20px;
-            border: none;
-            background: transparent;
-            color: #718096;
-            font-size: 1em;
-            font-weight: 600;
-            cursor: pointer;
-            border-radius: 12px;
+        /* 搜索 */
+        .search-wrap { padding: 20px 24px; margin-bottom: 18px; }
+        .search-wrap input {
+            width: 100%; padding: 13px 16px; border: 2px solid #e8f0f8; border-radius: 14px;
+            font-size: 1em; font-family: inherit; background: rgba(255,255,255,0.8); color: #4a6280;
             transition: all 0.3s;
         }
+        .search-wrap input:focus { outline: none; border-color: #94c8ef; box-shadow: 0 0 0 4px rgba(108,180,232,0.08); }
 
-        .filter-btn:hover {
-            background: rgba(102, 126, 234, 0.1);
-            color: #667eea;
+        /* 统计 */
+        .stat-row { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; margin-bottom: 18px; }
+        .stat-box { padding: 24px 16px; text-align: center; }
+        .stat-num {
+            font-size: 2.2em; font-weight: 700;
+            background: linear-gradient(135deg, #5ba4e5, #f4a6c0);
+            -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;
+            margin-bottom: 4px;
         }
+        .stat-lbl { color: #9bb0c8; font-size: 0.88em; }
 
-        .filter-btn.active {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            color: white;
-            box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3);
-        }
-
-        /* 可见性标签 */
-        .visibility-badge {
-            display: inline-flex;
-            align-items: center;
-            gap: 4px;
-            padding: 4px 10px;
-            border-radius: 12px;
-            font-size: 0.8em;
-            font-weight: 600;
-            margin-left: 8px;
-        }
-
-        .visibility-badge.public {
-            background: rgba(72, 187, 120, 0.15);
-            color: #2f855a;
-        }
-
-        .visibility-badge.private {
-            background: rgba(245, 101, 101, 0.15);
-            color: #c53030;
-        }
-
-        /* 搜索框 */
-        .search-box {
-            background: rgba(255, 255, 255, 0.95);
-            border-radius: 16px;
-            padding: 20px;
-            margin-bottom: 20px;
-            box-shadow: 0 4px 16px rgba(135, 180, 230, 0.15);
-        }
-
-        .search-input {
-            width: 100%;
-            padding: 14px 18px;
-            border: 2px solid #e2e8f0;
-            border-radius: 12px;
-            font-size: 1em;
-            transition: all 0.3s;
-        }
-
-        .search-input:focus {
-            outline: none;
-            border-color: #667eea;
-            box-shadow: 0 0 0 4px rgba(102, 126, 234, 0.1);
-        }
-
-        /* 统计卡片 */
-        .stats-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-            gap: 16px;
-            margin-bottom: 24px;
-        }
-
-        .stat-card {
-            background: rgba(255, 255, 255, 0.95);
-            border-radius: 16px;
-            padding: 20px;
-            box-shadow: 0 4px 16px rgba(135, 180, 230, 0.15);
-            text-align: center;
-        }
-
-        .stat-value {
-            font-size: 2.5em;
-            font-weight: 700;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
-            background-clip: text;
-            margin-bottom: 8px;
-        }
-
-        .stat-label {
-            color: #718096;
-            font-size: 0.95em;
-        }
-
-        /* 心情分布 */
-        .mood-distribution {
-            background: rgba(255, 255, 255, 0.95);
-            border-radius: 16px;
-            padding: 24px;
-            box-shadow: 0 4px 16px rgba(135, 180, 230, 0.15);
-        }
-
-        .mood-bar {
-            display: flex;
-            align-items: center;
-            gap: 12px;
-            margin-bottom: 12px;
-        }
-
-        .mood-bar-label {
-            min-width: 80px;
-            font-weight: 500;
-        }
-
-        .mood-bar-track {
-            flex: 1;
-            height: 24px;
-            background: #f0f4ff;
-            border-radius: 12px;
-            overflow: hidden;
-        }
-
-        .mood-bar-fill {
-            height: 100%;
-            border-radius: 12px;
-            transition: width 0.5s ease-out;
-        }
-
-        .mood-bar-count {
-            min-width: 40px;
-            text-align: right;
-            font-weight: 600;
-            color: #5a67d8;
-        }
+        .mood-stats { padding: 26px 28px; }
+        .mood-stats h3 { font-size: 1.1em; color: #5ba4e5; margin-bottom: 18px; font-weight: 600; }
+        .mood-bar { display: flex; align-items: center; gap: 12px; margin-bottom: 10px; }
+        .mood-bar-lbl { min-width: 72px; font-size: 0.88em; font-weight: 500; }
+        .mood-bar-track { flex: 1; height: 20px; background: #f3f8ff; border-radius: 10px; overflow: hidden; }
+        .mood-bar-fill { height: 100%; border-radius: 10px; transition: width 0.6s ease-out; }
+        .mood-bar-num { min-width: 28px; text-align: right; font-weight: 600; color: #6cb4e8; font-size: 0.88em; }
 
         /* 空状态 */
-        .empty-state {
-            text-align: center;
-            padding: 80px 20px;
-            color: #a0aec0;
-        }
+        .empty { text-align: center; padding: 70px 20px; color: #b8c8d8; }
+        .empty .ico { font-size: 4em; margin-bottom: 16px; animation: floatUp 3s ease-in-out infinite; }
+        @keyframes floatUp { 0%,100% { transform: translateY(0); } 50% { transform: translateY(-8px); } }
+        .empty p { font-size: 1.05em; }
 
-        .empty-state .emoji {
-            font-size: 5em;
-            margin-bottom: 20px;
-            animation: bounce 2s ease-in-out infinite;
-        }
-
-        @keyframes bounce {
-            0%, 100% { transform: translateY(0); }
-            50% { transform: translateY(-10px); }
-        }
-
-        .empty-state p {
-            font-size: 1.1em;
-        }
-
-        /* 加载状态 */
-        .loading {
-            text-align: center;
-            padding: 60px;
-            color: #718096;
-            font-size: 1.1em;
-        }
+        .loading { text-align: center; padding: 50px; color: #b8c8d8; font-size: 1em; }
 
         /* 分页 */
-        .pagination {
-            display: flex;
-            justify-content: center;
-            gap: 12px;
-            margin-top: 30px;
+        .pager { display: flex; justify-content: center; gap: 10px; margin-top: 24px; }
+        .pager button {
+            background: rgba(255,255,255,0.8); border: 1.5px solid #e8f0f8;
+            padding: 9px 18px; border-radius: 12px; cursor: pointer; font-family: inherit;
+            font-size: 0.9em; color: #6cb4e8; transition: all 0.3s;
         }
+        .pager button:hover:not(:disabled) { border-color: #94c8ef; background: white; }
+        .pager button:disabled { opacity: 0.4; cursor: not-allowed; }
 
-        .page-btn {
-            background: white;
-            border: 2px solid #e2e8f0;
-            padding: 10px 20px;
-            border-radius: 10px;
-            cursor: pointer;
-            transition: all 0.3s;
-            font-weight: 500;
-        }
-
-        .page-btn:hover:not(:disabled) {
-            border-color: #667eea;
-            background: #f0f4ff;
-        }
-
-        .page-btn:disabled {
-            opacity: 0.5;
-            cursor: not-allowed;
-        }
-
-        /* 消息提示 */
+        /* Toast */
         .toast {
-            position: fixed;
-            top: 20px;
-            right: 20px;
-            background: white;
-            padding: 18px 28px;
-            border-radius: 14px;
-            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.15);
-            z-index: 1000;
-            animation: slideIn 0.3s ease-out;
-            font-weight: 500;
+            position: fixed; top: 24px; right: 24px; z-index: 999;
+            background: rgba(255,255,255,0.95); backdrop-filter: blur(12px);
+            padding: 14px 24px; border-radius: 16px; font-weight: 500; font-family: inherit;
+            box-shadow: 0 8px 32px rgba(126,184,232,0.2);
+            border: 1px solid rgba(255,255,255,0.9);
+            animation: toastIn 0.35s ease; font-size: 0.95em;
         }
+        @keyframes toastIn { from { transform: translateX(120%); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
+        .toast.ok { border-left: 3px solid #6cb4e8; color: #4a9fdf; }
+        .toast.err { border-left: 3px solid #f4a6c0; color: #e89ab5; }
 
-        @keyframes slideIn {
-            from {
-                transform: translateX(400px);
-                opacity: 0;
-            }
-            to {
-                transform: translateX(0);
-                opacity: 1;
-            }
-        }
-
-        .toast.success {
-            border-left: 4px solid #48bb78;
-            color: #2f855a;
-        }
-
-        .toast.error {
-            border-left: 4px solid #f56565;
-            color: #c53030;
-        }
-
-        /* 响应式 */
-        @media (max-width: 768px) {
-            .container {
-                padding: 12px;
-            }
-
-            .header h1 {
-                font-size: 2em;
-            }
-
-            .mood-selector {
-                grid-template-columns: repeat(auto-fit, minmax(80px, 1fr));
-            }
-
-            .mood-option {
-                padding: 12px 8px;
-            }
-
-            .mood-option .emoji {
-                font-size: 2em;
-            }
-
-            .stats-grid {
-                grid-template-columns: 1fr;
-            }
+        @media (max-width: 600px) {
+            .container { padding: 16px 12px 40px; }
+            .header h1 { font-size: 1.9em; }
+            .stat-row { grid-template-columns: 1fr; }
+            .mood-chip { min-width: 52px; padding: 10px 8px; }
+            .write-card { padding: 24px 20px; }
         }
     </style>
 </head>
 <body>
+    <div class="deco-layer">
+        <div class="petal"></div><div class="petal"></div><div class="petal"></div>
+        <div class="petal"></div><div class="petal"></div>
+    </div>
+
     <div class="container">
-        <!-- 头部 -->
         <div class="header">
-            <h1>📔 猫娘日记</h1>
-            <p>记录每天的小事，珍藏每一份回忆喵~</p>
+            <h1>猫娘日记</h1>
+            <div class="subtitle">记录每一天的小事，珍藏每一份回忆</div>
         </div>
 
-        <!-- 标签页导航 -->
-        <div class="tabs">
-            <button class="tab-btn active" data-tab="write">✍️ 写日记</button>
-            <button class="tab-btn" data-tab="browse">📖 浏览日记</button>
-            <button class="tab-btn" data-tab="search">🔍 搜索</button>
-            <button class="tab-btn" data-tab="stats">📊 统计</button>
+        <div class="nav">
+            <button class="nav-btn active" data-tab="write">写日记</button>
+            <button class="nav-btn" data-tab="browse">回忆时光</button>
+            <button class="nav-btn" data-tab="search">寻找回忆</button>
+            <button class="nav-btn" data-tab="stats">心情点滴</button>
         </div>
 
         <!-- 写日记 -->
-        <div id="writeTab" class="tab-content active">
-            <div class="write-section">
-                <div class="section-title">写一篇日记</div>
+        <div id="writeTab" class="tab-pane active">
+            <div class="glass write-card">
+                <h2>写下今天</h2>
                 <form id="diaryForm">
-                    <div class="form-group">
+                    <div class="field">
                         <label>标题（可选）</label>
-                        <input type="text" id="title" placeholder="给今天起个小标题吧~">
+                        <input type="text" id="title" placeholder="给今天起个小标题吧">
                     </div>
-
-                    <div class="form-group">
+                    <div class="field">
                         <label>今天的心情</label>
-                        <div class="mood-selector" id="moodSelector">
-                            <div class="mood-option" data-mood="happy">
-                                <span class="emoji">😊</span>
-                                <span class="label">开心</span>
-                            </div>
-                            <div class="mood-option" data-mood="calm">
-                                <span class="emoji">😌</span>
-                                <span class="label">平静</span>
-                            </div>
-                            <div class="mood-option selected" data-mood="neutral">
-                                <span class="emoji">😐</span>
-                                <span class="label">一般</span>
-                            </div>
-                            <div class="mood-option" data-mood="excited">
-                                <span class="emoji">🤩</span>
-                                <span class="label">兴奋</span>
-                            </div>
-                            <div class="mood-option" data-mood="sad">
-                                <span class="emoji">😢</span>
-                                <span class="label">难过</span>
-                            </div>
-                            <div class="mood-option" data-mood="tired">
-                                <span class="emoji">😴</span>
-                                <span class="label">疲惫</span>
-                            </div>
-                            <div class="mood-option" data-mood="angry">
-                                <span class="emoji">😠</span>
-                                <span class="label">生气</span>
-                            </div>
-                            <div class="mood-option" data-mood="anxious">
-                                <span class="emoji">😰</span>
-                                <span class="label">焦虑</span>
-                            </div>
+                        <div class="mood-row" id="moodSelector">
+                            <div class="mood-chip" data-mood="happy"><span class="emoji">😊</span><span class="name">开心</span></div>
+                            <div class="mood-chip" data-mood="calm"><span class="emoji">😌</span><span class="name">平静</span></div>
+                            <div class="mood-chip selected" data-mood="neutral"><span class="emoji">😐</span><span class="name">日常</span></div>
+                            <div class="mood-chip" data-mood="excited"><span class="emoji">🤩</span><span class="name">兴奋</span></div>
+                            <div class="mood-chip" data-mood="sad"><span class="emoji">😢</span><span class="name">难过</span></div>
+                            <div class="mood-chip" data-mood="tired"><span class="emoji">😴</span><span class="name">疲惫</span></div>
+                            <div class="mood-chip" data-mood="angry"><span class="emoji">😠</span><span class="name">生气</span></div>
+                            <div class="mood-chip" data-mood="anxious"><span class="emoji">😰</span><span class="name">焦虑</span></div>
                         </div>
                     </div>
-
-                    <div class="form-group">
+                    <div class="field">
                         <label>今天发生了什么</label>
-                        <textarea id="content" placeholder="记下今天的小事，哪怕只是一句话也好~" required></textarea>
+                        <textarea id="content" placeholder="记下今天的小事，哪怕只是一句话也好" required></textarea>
                     </div>
-
-                    <div class="form-group">
+                    <div class="field">
                         <label>标签（按回车添加）</label>
-                        <div class="tags-input" id="tagsInput">
-                            <input type="text" class="tag-input" id="tagInput" placeholder="输入标签后按回车">
+                        <div class="tag-box" id="tagsInput">
+                            <input type="text" id="tagInput" placeholder="输入标签后按回车">
                         </div>
                     </div>
-
-                    <div class="form-group">
-                        <label>可见性</label>
-                        <div class="mood-selector" id="visibilitySelector" style="grid-template-columns: repeat(2, 1fr);">
-                            <div class="mood-option selected" data-visibility="public">
-                                <span class="emoji">🌍</span>
-                                <span class="label">公开</span>
-                            </div>
-                            <div class="mood-option" data-visibility="private">
-                                <span class="emoji">🔒</span>
-                                <span class="label">仅自己可见</span>
-                            </div>
-                        </div>
-                    </div>
-
-                    <button type="submit" class="submit-btn">💝 保存日记</button>
+                    <button type="submit" class="btn-primary">保存日记</button>
                 </form>
             </div>
         </div>
 
         <!-- 浏览日记 -->
-        <div id="browseTab" class="tab-content">
-            <!-- 可见性过滤 -->
-            <div class="visibility-filter">
-                <button class="filter-btn active" data-visibility="all">📖 全部</button>
-                <button class="filter-btn" data-visibility="public">🌍 公开</button>
-                <button class="filter-btn" data-visibility="private">🔒 仅自己可见</button>
+        <div id="browseTab" class="tab-pane">
+            <div id="diaryList" class="timeline">
+                <div class="loading">轻轻翻开日记本...</div>
             </div>
-            
-            <div id="diaryList" class="diary-list">
-                <div class="loading">加载中...</div>
-            </div>
-            <div class="pagination" id="pagination" style="display: none;">
-                <button class="page-btn" id="prevBtn">← 上一页</button>
-                <button class="page-btn" id="nextBtn">下一页 →</button>
+            <div class="pager" id="pager" style="display:none;">
+                <button id="prevBtn">上一页</button>
+                <button id="nextBtn">下一页</button>
             </div>
         </div>
 
         <!-- 搜索 -->
-        <div id="searchTab" class="tab-content">
-            <div class="search-box">
-                <input type="text" class="search-input" id="searchInput" placeholder="搜索日记内容、标题或标签...">
+        <div id="searchTab" class="tab-pane">
+            <div class="glass search-wrap">
+                <input type="text" id="searchInput" placeholder="搜索日记内容、标题或标签...">
             </div>
-            <div id="searchResults" class="diary-list"></div>
+            <div id="searchResults" class="timeline"></div>
         </div>
 
         <!-- 统计 -->
-        <div id="statsTab" class="tab-content">
-            <div class="stats-grid" id="statsGrid">
-                <div class="loading">加载中...</div>
-            </div>
-            <div class="mood-distribution" id="moodDistribution">
-                <div class="loading">加载中...</div>
-            </div>
+        <div id="statsTab" class="tab-pane">
+            <div class="stat-row" id="statRow"><div class="loading">统计中...</div></div>
+            <div class="glass mood-stats" id="moodStats"><div class="loading">加载中...</div></div>
         </div>
     </div>
 
     <script>
         const PLUGIN_ID = "neko_diary";
-
-        // 全局状态
         let selectedMood = 'neutral';
-        let selectedVisibility = 'public'; // 写日记时的可见性
         let tags = [];
         let currentOffset = 0;
-        const pageSize = 20;
-        let searchTimeout = null;
-        let currentVisibility = 'all'; // 浏览时的可见性过滤 'all', 'public', 'private'
+        const PAGE_SIZE = 20;
+        let searchTimer = null;
 
-        // ===== 插件 API 调用（/runs 模式） =====
+        // ===== 插件 API（/runs 轮询模式） =====
         async function callPlugin(entry, args) {
             try {
                 const r = await fetch("/runs", {
@@ -861,13 +353,12 @@
                     headers: {"Content-Type": "application/json"},
                     body: JSON.stringify({plugin_id: PLUGIN_ID, entry_id: entry, args: args || {}}),
                 });
-                if (!r.ok) return {ok: false, error: `HTTP ${r.status}: ${r.statusText}`};
+                if (!r.ok) return {ok: false, error: `HTTP ${r.status}`};
                 const cd = await r.json();
                 const runId = cd.run_id;
                 if (!runId) return {ok: false, error: "未拿到 run_id"};
-                // 轮询最多 150 次（15秒）
-                for (let i = 0; i < 150; i++) {
-                    await new Promise((r) => setTimeout(r, 100));
+                for (let i = 0; i < 200; i++) {
+                    await new Promise(r => setTimeout(r, 100));
                     const sr = await fetch("/runs/" + runId);
                     if (!sr.ok) continue;
                     const sd = await sr.json();
@@ -877,24 +368,20 @@
                             try {
                                 const ed = await er.json();
                                 if (ed.items && ed.items.length > 0) {
-                                    const ti = ed.items.find((x) => x.label === "trigger_response");
+                                    const ti = ed.items.find(x => x.label === "trigger_response");
                                     if (ti && ti.json) {
                                         const j = ti.json;
-                                        if (j && j.success) {
-                                            return {ok: true, value: j.data !== undefined ? j.data : null};
-                                        }
-                                        const errObj = j && j.error || {};
-                                        const errMsg = (errObj && (errObj.message || errObj.code)) || "插件返回失败";
-                                        return {ok: false, error: String(errMsg)};
+                                        if (j && j.success) return {ok: true, value: j.data !== undefined ? j.data : null};
+                                        const e = j && j.error || {};
+                                        return {ok: false, error: String(e.message || e.code || "插件返回失败")};
                                     }
                                 }
                             } catch (_) {}
                         }
                         return {ok: true, value: null};
-                    } else if (["failed", "canceled", "timeout"].includes(sd.status)) {
-                        const errObj = sd.error || {};
-                        const errMsg = (errObj && (errObj.message || errObj.code)) || `run ${sd.status}`;
-                        return {ok: false, error: String(errMsg)};
+                    } else if (["failed","canceled","timeout"].includes(sd.status)) {
+                        const e = sd.error || {};
+                        return {ok: false, error: String(e.message || e.code || `run ${sd.status}`)};
                     }
                 }
                 return {ok: false, error: "轮询超时"};
@@ -903,377 +390,208 @@
             }
         }
 
-        // 标签页切换
-        document.querySelectorAll('.tab-btn').forEach(btn => {
+        // 导航
+        document.querySelectorAll('.nav-btn').forEach(btn => {
             btn.addEventListener('click', () => {
                 const tab = btn.dataset.tab;
-                
-                // 切换按钮状态
-                document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+                document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
                 btn.classList.add('active');
-                
-                // 切换内容
-                document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+                document.querySelectorAll('.tab-pane').forEach(c => c.classList.remove('active'));
                 document.getElementById(tab + 'Tab').classList.add('active');
-                
-                // 加载对应数据
                 if (tab === 'browse') { currentOffset = 0; loadDiaries(); }
                 if (tab === 'stats') loadStats();
             });
         });
 
-        // 可见性过滤按钮
-        document.querySelectorAll('.filter-btn').forEach(btn => {
-            btn.addEventListener('click', () => {
-                document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
-                btn.classList.add('active');
-                currentVisibility = btn.dataset.visibility;
-                currentOffset = 0;
-                loadDiaries();
-            });
-        });
-
         // 心情选择
-        document.getElementById('moodSelector').addEventListener('click', (e) => {
-            const option = e.target.closest('.mood-option');
-            if (!option) return;
-
-            document.querySelectorAll('#moodSelector .mood-option').forEach(el => el.classList.remove('selected'));
-            option.classList.add('selected');
-            selectedMood = option.dataset.mood;
+        document.getElementById('moodSelector').addEventListener('click', e => {
+            const chip = e.target.closest('.mood-chip');
+            if (!chip) return;
+            document.querySelectorAll('#moodSelector .mood-chip').forEach(c => c.classList.remove('selected'));
+            chip.classList.add('selected');
+            selectedMood = chip.dataset.mood;
         });
 
-        // 可见性选择（写日记时）
-        document.getElementById('visibilitySelector').addEventListener('click', (e) => {
-            const option = e.target.closest('.mood-option');
-            if (!option) return;
-
-            document.querySelectorAll('#visibilitySelector .mood-option').forEach(el => el.classList.remove('selected'));
-            option.classList.add('selected');
-            selectedVisibility = option.dataset.visibility;
-        });
-
-        // 标签输入
-        document.getElementById('tagInput').addEventListener('keydown', (e) => {
+        // 标签
+        document.getElementById('tagInput').addEventListener('keydown', e => {
             if (e.key === 'Enter') {
                 e.preventDefault();
-                const input = e.target;
-                const tag = input.value.trim();
-                
-                if (tag && !tags.includes(tag)) {
-                    tags.push(tag);
-                    renderTags();
-                    input.value = '';
-                }
+                const v = e.target.value.trim();
+                if (v && !tags.includes(v)) { tags.push(v); renderTags(); e.target.value = ''; }
             }
         });
-
         function renderTags() {
-            const container = document.getElementById('tagsInput');
+            const box = document.getElementById('tagsInput');
             const input = document.getElementById('tagInput');
-            
-            // 移除所有标签元素
-            container.querySelectorAll('.tag').forEach(el => el.remove());
-            
-            // 添加标签
-            tags.forEach((tag, index) => {
-                const tagEl = document.createElement('span');
-                tagEl.className = 'tag';
-                tagEl.innerHTML = `${tag} <span class="remove" data-index="${index}">×</span>`;
-                container.insertBefore(tagEl, input);
+            box.querySelectorAll('.tag-pill').forEach(el => el.remove());
+            tags.forEach((t, i) => {
+                const el = document.createElement('span');
+                el.className = 'tag-pill';
+                el.innerHTML = `${t} <span class="x" data-i="${i}">×</span>`;
+                box.insertBefore(el, input);
             });
         }
+        document.getElementById('tagsInput').addEventListener('click', e => {
+            if (e.target.classList.contains('x')) { tags.splice(+e.target.dataset.i, 1); renderTags(); }
+        });
 
-        // 删除标签
-        document.getElementById('tagsInput').addEventListener('click', (e) => {
-            if (e.target.classList.contains('remove')) {
-                const index = parseInt(e.target.dataset.index);
-                tags.splice(index, 1);
-                renderTags();
+        // 提交
+        document.getElementById('diaryForm').addEventListener('submit', async e => {
+            e.preventDefault();
+            const content = document.getElementById('content').value.trim();
+            if (!content) { showToast('日记内容不能为空', 'err'); return; }
+            const title = document.getElementById('title').value.trim();
+            const result = await callPlugin('write', {
+                content, title: title || null, mood: selectedMood,
+                tags: tags.length > 0 ? tags : null,
+            });
+            if (result.ok && result.value) {
+                showToast(result.value.message || '日记已保存', 'ok');
+                document.getElementById('diaryForm').reset();
+                tags = []; renderTags();
+                selectedMood = 'neutral';
+                document.querySelectorAll('#moodSelector .mood-chip').forEach(c => c.classList.remove('selected'));
+                document.querySelector('#moodSelector [data-mood="neutral"]').classList.add('selected');
+            } else {
+                showToast(result.error || '保存失败', 'err');
             }
         });
 
-        // 提交表单
-        document.getElementById('diaryForm').addEventListener('submit', async (e) => {
-            e.preventDefault();
-            
-            const content = document.getElementById('content').value.trim();
-            if (!content) {
-                showToast('日记内容不能为空喵~', 'error');
+        // 加载日记（前端只查 public）
+        async function loadDiaries() {
+            const el = document.getElementById('diaryList');
+            el.innerHTML = '<div class="loading">轻轻翻开日记本...</div>';
+            const result = await callPlugin('browse', {
+                limit: PAGE_SIZE, offset: currentOffset, visibility: 'public'
+            });
+            if (!result.ok) {
+                el.innerHTML = `<div class="empty"><div class="ico">😿</div><p>${result.error}</p></div>`;
                 return;
             }
-
-            const title = document.getElementById('title').value.trim();
-            
-            try {
-                const result = await callPlugin('write', {
-                    content,
-                    title: title || null,
-                    mood: selectedMood,
-                    tags: tags.length > 0 ? tags : null,
-                    visibility: selectedVisibility,
-                });
-                
-                if (result.ok && result.value) {
-                    const data = result.value;
-                    showToast(data.message || '日记已保存喵~', 'success');
-                    // 清空表单
-                    document.getElementById('diaryForm').reset();
-                    tags = [];
-                    renderTags();
-                    selectedMood = 'neutral';
-                    selectedVisibility = 'public';
-                    // 重置心情选择
-                    document.querySelectorAll('#moodSelector .mood-option').forEach(el => el.classList.remove('selected'));
-                    document.querySelector('#moodSelector [data-mood="neutral"]').classList.add('selected');
-                    // 重置可见性选择
-                    document.querySelectorAll('#visibilitySelector .mood-option').forEach(el => el.classList.remove('selected'));
-                    document.querySelector('#visibilitySelector [data-visibility="public"]').classList.add('selected');
-                } else {
-                    showToast(result.error || '保存失败', 'error');
-                }
-            } catch (error) {
-                showToast('保存失败: ' + error.message, 'error');
+            const data = result.value || {};
+            if (!data.entries || data.entries.length === 0) {
+                el.innerHTML = '<div class="empty"><div class="ico">📔</div><p>还没有日记呢，快写下第一篇吧</p></div>';
+                document.getElementById('pager').style.display = 'none';
+                return;
             }
-        });
-
-        // 加载日记列表
-        async function loadDiaries() {
-            try {
-                const args = { limit: pageSize, offset: currentOffset };
-                if (currentVisibility !== 'all') {
-                    args.visibility = currentVisibility;
-                }
-                
-                const result = await callPlugin('browse', args);
-                
-                if (!result.ok) {
-                    document.getElementById('diaryList').innerHTML = `<div class="empty-state"><div class="emoji">😿</div><p>${result.error}</p></div>`;
-                    return;
-                }
-
-                const data = result.value || {};
-                if (!data.entries || data.entries.length === 0) {
-                    let message = '还没有日记呢，快写下第一篇吧~';
-                    if (currentVisibility === 'public') {
-                        message = '还没有公开的日记呢~';
-                    } else if (currentVisibility === 'private') {
-                        message = '还没有私密的日记呢~';
-                    }
-                    
-                    document.getElementById('diaryList').innerHTML = `
-                        <div class="empty-state">
-                            <div class="emoji">📝</div>
-                            <p>${message}</p>
-                        </div>
-                    `;
-                    document.getElementById('pagination').style.display = 'none';
-                    return;
-                }
-
-                renderDiaryList(data.entries, 'diaryList');
-                
-                // 分页
-                const pagination = document.getElementById('pagination');
-                if (data.total > pageSize) {
-                    pagination.style.display = 'flex';
-                    document.getElementById('prevBtn').disabled = currentOffset === 0;
-                    document.getElementById('nextBtn').disabled = currentOffset + pageSize >= data.total;
-                } else {
-                    pagination.style.display = 'none';
-                }
-            } catch (error) {
-                document.getElementById('diaryList').innerHTML = `<div class="empty-state"><div class="emoji">😿</div><p>加载失败: ${error.message}</p></div>`;
-            }
+            renderList(data.entries, 'diaryList');
+            const pager = document.getElementById('pager');
+            if (data.total > PAGE_SIZE) {
+                pager.style.display = 'flex';
+                document.getElementById('prevBtn').disabled = currentOffset === 0;
+                document.getElementById('nextBtn').disabled = currentOffset + PAGE_SIZE >= data.total;
+            } else { pager.style.display = 'none'; }
         }
 
-        function renderDiaryList(entries, containerId) {
-            const container = document.getElementById(containerId);
-            container.innerHTML = entries.map(entry => `
-                <div class="diary-entry" data-id="${entry.id}">
-                    <div class="entry-header">
-                        <span class="entry-date">${formatDate(entry.date, entry.created_at)}</span>
-                        <div style="display: flex; align-items: center; gap: 8px;">
-                            <span class="visibility-badge ${entry.visibility}">
-                                ${entry.visibility === 'private' ? '🔒' : '🌍'} ${entry.visibility_label}
-                            </span>
-                            <span class="entry-mood" style="background: ${entry.mood_color}20; color: ${entry.mood_color}">
-                                ${entry.mood_emoji} ${entry.mood_label}
-                            </span>
-                        </div>
+        function renderList(entries, containerId) {
+            const c = document.getElementById(containerId);
+            c.innerHTML = entries.map(e => `
+                <div class="diary-card" style="border-left-color: ${e.mood_color || '#94c8ef'};" data-id="${e.id}">
+                    <div class="dc-head">
+                        <span class="dc-date">${fmtDate(e.date, e.created_at)}</span>
+                        <span class="dc-mood" style="background:${(e.mood_color||'#94c8ef')}1a; color:${e.mood_color||'#5ba4e5'}">
+                            ${e.mood_emoji||'😐'} ${e.mood_label||'日常'}
+                        </span>
                     </div>
-                    ${entry.title ? `<div class="entry-title">${escapeHtml(entry.title)}</div>` : ''}
-                    <div class="entry-content">${escapeHtml(entry.content)}</div>
-                    ${entry.tags && entry.tags.length > 0 ? `
-                        <div class="entry-tags">
-                            ${entry.tags.map(tag => `<span class="entry-tag">${escapeHtml(tag)}</span>`).join('')}
-                        </div>
-                    ` : ''}
-                    <div class="entry-actions">
-                        <button class="action-btn delete" onclick="deleteDiary('${entry.id}')">🗑️ 删除</button>
+                    ${e.title ? `<div class="dc-title">${esc(e.title)}</div>` : ''}
+                    <div class="dc-body">${esc(e.content)}</div>
+                    ${e.tags && e.tags.length ? `<div class="dc-tags">${e.tags.map(t=>`<span class="dc-tag">${esc(t)}</span>`).join('')}</div>` : ''}
+                    <div class="dc-foot">
+                        <button class="dc-btn" onclick="deleteDiary('${e.id}')">删除</button>
                     </div>
                 </div>
             `).join('');
         }
 
         // 搜索
-        document.getElementById('searchInput').addEventListener('input', (e) => {
-            clearTimeout(searchTimeout);
-            searchTimeout = setTimeout(() => {
-                const keyword = e.target.value.trim();
-                if (keyword) {
-                    searchDiaries(keyword);
-                } else {
-                    document.getElementById('searchResults').innerHTML = '';
-                }
-            }, 300);
+        document.getElementById('searchInput').addEventListener('input', e => {
+            clearTimeout(searchTimer);
+            searchTimer = setTimeout(() => {
+                const kw = e.target.value.trim();
+                if (kw) searchDiaries(kw);
+                else document.getElementById('searchResults').innerHTML = '';
+            }, 350);
         });
-
-        async function searchDiaries(keyword) {
-            try {
-                const result = await callPlugin('search', { keyword, limit: 50 });
-                
-                if (!result.ok) {
-                    document.getElementById('searchResults').innerHTML = `<div class="empty-state"><div class="emoji">😿</div><p>${result.error}</p></div>`;
-                    return;
-                }
-
-                const data = result.value || {};
-                if (!data.entries || data.entries.length === 0) {
-                    document.getElementById('searchResults').innerHTML = `
-                        <div class="empty-state">
-                            <div class="emoji">🔍</div>
-                            <p>没有找到匹配的日记~</p>
-                        </div>
-                    `;
-                    return;
-                }
-
-                renderDiaryList(data.entries, 'searchResults');
-            } catch (error) {
-                document.getElementById('searchResults').innerHTML = `<div class="empty-state"><div class="emoji">😿</div><p>搜索失败: ${error.message}</p></div>`;
+        async function searchDiaries(kw) {
+            const el = document.getElementById('searchResults');
+            el.innerHTML = '<div class="loading">搜索中...</div>';
+            const result = await callPlugin('search', { keyword: kw, limit: 50 });
+            if (!result.ok) { el.innerHTML = `<div class="empty"><div class="ico">😿</div><p>${result.error}</p></div>`; return; }
+            const data = result.value || {};
+            if (!data.entries || !data.entries.length) {
+                el.innerHTML = '<div class="empty"><div class="ico">🔍</div><p>没有找到匹配的日记</p></div>';
+                return;
             }
+            renderList(data.entries, 'searchResults');
         }
 
-        // 加载统计
+        // 统计
         async function loadStats() {
-            try {
-                const result = await callPlugin('get_mood_stats', { days: 30 });
-                
-                if (!result.ok) {
-                    document.getElementById('statsGrid').innerHTML = `<div class="empty-state"><div class="emoji">😿</div><p>${result.error}</p></div>`;
-                    return;
-                }
-
-                const data = result.value || {};
-
-                // 统计卡片
-                document.getElementById('statsGrid').innerHTML = `
-                    <div class="stat-card">
-                        <div class="stat-value">${data.total_entries || 0}</div>
-                        <div class="stat-label">日记总数</div>
-                    </div>
-                    <div class="stat-card">
-                        <div class="stat-value">${data.dominant_mood?.emoji || '😐'}</div>
-                        <div class="stat-label">主要心情</div>
-                    </div>
-                    <div class="stat-card">
-                        <div class="stat-value">${data.dominant_mood?.label || '一般'}</div>
-                        <div class="stat-label">最常心情</div>
-                    </div>
-                `;
-
-                // 心情分布
-                if (data.mood_distribution && data.mood_distribution.length > 0) {
-                    const maxCount = Math.max(...data.mood_distribution.map(m => m.count));
-                    document.getElementById('moodDistribution').innerHTML = `
-                        <div class="section-title">心情分布（近30天）</div>
-                        ${data.mood_distribution.map(mood => `
-                            <div class="mood-bar">
-                                <div class="mood-bar-label">${mood.emoji} ${mood.label}</div>
-                                <div class="mood-bar-track">
-                                    <div class="mood-bar-fill" style="width: ${(mood.count / maxCount * 100)}%; background: ${mood.color}"></div>
-                                </div>
-                                <div class="mood-bar-count">${mood.count}</div>
-                            </div>
-                        `).join('')}
-                    `;
-                } else {
-                    document.getElementById('moodDistribution').innerHTML = `
-                        <div class="empty-state">
-                            <div class="emoji">📊</div>
-                            <p>还没有心情数据~</p>
+            const result = await callPlugin('get_mood_stats', { days: 30 });
+            const sr = document.getElementById('statRow');
+            const ms = document.getElementById('moodStats');
+            if (!result.ok) { sr.innerHTML = `<div class="empty"><div class="ico">😿</div><p>${result.error}</p></div>`; return; }
+            const d = result.value || {};
+            sr.innerHTML = `
+                <div class="glass stat-box"><div class="stat-num">${d.total_entries||0}</div><div class="stat-lbl">日记总数</div></div>
+                <div class="glass stat-box"><div class="stat-num">${d.dominant_mood?.emoji||'😐'}</div><div class="stat-lbl">主要心情</div></div>
+                <div class="glass stat-box"><div class="stat-num" style="font-size:1.4em;">${d.dominant_mood?.label||'日常'}</div><div class="stat-lbl">最常心情</div></div>
+            `;
+            if (d.mood_distribution && d.mood_distribution.length) {
+                const max = Math.max(...d.mood_distribution.map(m=>m.count));
+                ms.innerHTML = `
+                    <h3>心情分布 · 近30天</h3>
+                    ${d.mood_distribution.map(m => `
+                        <div class="mood-bar">
+                            <div class="mood-bar-lbl">${m.emoji} ${m.label}</div>
+                            <div class="mood-bar-track"><div class="mood-bar-fill" style="width:${m.count/max*100}%;background:${m.color}"></div></div>
+                            <div class="mood-bar-num">${m.count}</div>
                         </div>
-                    `;
-                }
-            } catch (error) {
-                document.getElementById('statsGrid').innerHTML = `<div class="empty-state"><div class="emoji">😿</div><p>加载统计失败: ${error.message}</p></div>`;
+                    `).join('')}
+                `;
+            } else {
+                ms.innerHTML = '<div class="empty"><div class="ico">📊</div><p>还没有心情数据</p></div>';
             }
         }
 
-        function formatDate(date, createdAt) {
-            const d = new Date(createdAt);
-            const now = new Date();
-            const diff = now - d;
-            
+        // 工具函数
+        function fmtDate(date, created) {
+            const d = new Date(created);
+            const diff = Date.now() - d.getTime();
             if (diff < 60000) return '刚刚';
-            if (diff < 3600000) return `${Math.floor(diff / 60000)}分钟前`;
-            if (diff < 86400000) return `${Math.floor(diff / 3600000)}小时前`;
-            
+            if (diff < 3600000) return Math.floor(diff/60000) + '分钟前';
+            if (diff < 86400000) return Math.floor(diff/3600000) + '小时前';
             return date;
         }
+        function esc(text) { const d = document.createElement('div'); d.textContent = text; return d.innerHTML; }
 
-        function escapeHtml(text) {
-            const div = document.createElement('div');
-            div.textContent = text;
-            return div.innerHTML;
-        }
-
-        // 删除日记
         async function deleteDiary(id) {
             if (!confirm('确定要删除这篇日记吗？')) return;
-            
-            try {
-                const result = await callPlugin('delete', { entry_id: id, permanent: false });
-                
-                if (result.ok && result.value && result.value.success) {
-                    showToast(result.value.message || '已删除', 'success');
-                    loadDiaries();
-                } else {
-                    showToast(result.error || '删除失败', 'error');
-                }
-            } catch (error) {
-                showToast('删除失败: ' + error.message, 'error');
-            }
-        }
-
-        // 分页
-        document.getElementById('prevBtn').addEventListener('click', () => {
-            if (currentOffset > 0) {
-                currentOffset -= pageSize;
+            const result = await callPlugin('delete', { entry_id: id, permanent: false });
+            if (result.ok && result.value && result.value.success) {
+                showToast(result.value.message || '已删除', 'ok');
                 loadDiaries();
-            }
-        });
-
-        document.getElementById('nextBtn').addEventListener('click', () => {
-            currentOffset += pageSize;
-            loadDiaries();
-        });
-
-        // 消息提示
-        function showToast(message, type = 'success') {
-            const toast = document.createElement('div');
-            toast.className = `toast ${type}`;
-            toast.textContent = message;
-            document.body.appendChild(toast);
-            
-            setTimeout(() => {
-                toast.style.animation = 'slideIn 0.3s ease-out reverse';
-                setTimeout(() => toast.remove(), 300);
-            }, 3000);
+            } else { showToast(result.error || '删除失败', 'err'); }
         }
 
-        // 初始加载浏览页
+        document.getElementById('prevBtn').addEventListener('click', () => {
+            if (currentOffset > 0) { currentOffset -= PAGE_SIZE; loadDiaries(); }
+        });
+        document.getElementById('nextBtn').addEventListener('click', () => {
+            currentOffset += PAGE_SIZE; loadDiaries();
+        });
+
+        function showToast(msg, type = 'ok') {
+            const t = document.createElement('div');
+            t.className = `toast ${type}`;
+            t.textContent = msg;
+            document.body.appendChild(t);
+            setTimeout(() => {
+                t.style.animation = 'toastIn 0.3s ease reverse';
+                setTimeout(() => t.remove(), 300);
+            }, 2800);
+        }
+
         loadDiaries();
     </script>
 </body>
