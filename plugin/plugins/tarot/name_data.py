@@ -135,9 +135,20 @@ KNOWN_STROKES.update(SURNAME_STROKES)
 KNOWN_STROKES.update(COMMON_STROKES)
 KNOWN_STROKES.update({ch: v[0] for ch, v in NAME_CHARS.items()})
 
+# 全量汉字笔画兜底字库（Unihan kTotalStrokes，约 2 万字）
+try:
+    from . import stroke_data as _stroke_data
+except ImportError:  # 独立加载时降级为无兜底
+    _stroke_data = None
+
 
 def stroke_of(ch: str) -> int | None:
-    return KNOWN_STROKES.get(ch)
+    s = KNOWN_STROKES.get(ch)
+    if s is not None:
+        return s
+    if _stroke_data is not None:
+        return _stroke_data.STROKES.get(ch)
+    return None
 
 
 # ─────────────────────────────────────────────────────────────
@@ -214,12 +225,12 @@ def compute_five_grids(surname: str, given: str) -> dict[str, int] | None:
     五格剖象法（熊崎氏）规则：
     - 天格：单姓 = 姓笔画 + 1；复姓 = 姓氏两字笔画之和
     - 人格：姓氏末字 + 名字首字
-    - 地格：单名 = 名字笔画 + 1；双名 = 名字两字笔画之和
+    - 地格：单名 = 名字笔画 + 1；双名及以上 = 名字各字笔画之和
     - 外格：单姓单名惯例为 2；其余 = 总格 − 人格 + 1
     - 总格：全部字笔画之和
     """
     sl, gl = len(surname), len(given)
-    if sl not in (1, 2) or gl not in (1, 2):
+    if sl not in (1, 2) or not (1 <= gl <= 3):
         return None
     strokes = []
     for ch in surname + given:
@@ -231,7 +242,7 @@ def compute_five_grids(surname: str, given: str) -> dict[str, int] | None:
     g_sum = sum(strokes[sl:])
     tian = s_sum + 1 if sl == 1 else s_sum
     ren = strokes[sl - 1] + strokes[sl]
-    di = strokes[sl] + 1 if gl == 1 else strokes[sl] + strokes[sl + 1]
+    di = strokes[sl] + 1 if gl == 1 else g_sum
     zong = s_sum + g_sum
     wai = 2 if (sl == 1 and gl == 1) else zong - ren + 1
     return {"天格": tian, "人格": ren, "地格": di, "外格": wai, "总格": zong}

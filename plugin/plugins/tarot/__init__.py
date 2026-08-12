@@ -28,12 +28,13 @@ from plugin.sdk.plugin import (
 
 from . import dream_dict as _dream_dict
 from . import name_data as _name_data
+from . import tarot_minor_data as _tarot_minor
 from . import yijing_data as _yijing
 
 # 源项目的 TAROT_PROMPT
 TAROT_PROMPT = """我请求你担任塔罗占卜师的角色。您将接受我的问题并使用虚拟塔罗牌进行塔罗牌阅读。不要忘记洗牌并介绍您在本套牌中使用的套牌。请帮我抽3张随机卡。拿到卡片后，请您仔细说明它们的意义，解释哪张卡片属于未来或现在或过去，结合我的问题来解释它们，并给我有用的建议或我现在应该做的事情。"""
 
-# 22张大阿卡纳塔罗牌
+# 22 张大阿卡纳塔罗牌
 _TAROT_CARDS = [
     {"id": 0, "name": "愚者", "name_en": "The Fool", "number": "0", "arcana": "major",
      "upright": ["新的开始", "冒险", "天真", "自发", "潜力", "自由"], "reversed": ["鲁莽", "冒险", "犹豫不决", "缺乏方向", "轻率"],
@@ -124,6 +125,11 @@ _TAROT_CARDS = [
      "description": "象征完成和成就。一个循环的结束，你即将达到圆满。世界代表目标的达成和旅程的完成。",
      "element": "土", "zodiac": "土星"},
 ]
+
+# 为大阿卡纳注入牌面图片（公版 RWS 扫描图），并合并 56 张小阿卡纳组成 78 张全卡组
+for _c in _TAROT_CARDS:
+    _c["image"] = f"rws/m{_c['id']:02d}.jpg"
+_TAROT_CARDS.extend(_tarot_minor.MINOR_CARDS)
 
 # ═══════════════════════════════════════════════════════════════
 # 13 张黄金裔塔罗牌（翁法罗斯·逐火之旅）
@@ -1898,6 +1904,16 @@ def _build_new_name_reading(surname: str, birthday: str, sex: str, prompt: str) 
     return "\n".join(parts)
 
 
+def _hex_lines_art(upper: str, lower: str, moving: int = 0) -> str:
+    """以 Unicode 重横线绘制六爻卦象图（阳爻实、阴爻断），moving>0 时标注动爻"""
+    six = list(_yijing.TRIGRAMS[lower]["lines"]) + list(_yijing.TRIGRAMS[upper]["lines"])
+    rows = []
+    for i in range(5, -1, -1):
+        row = "━━━━━━━" if six[i] else "━━━　　━━━"
+        rows.append(f"`{row}`　← 动爻" if i + 1 == moving else f"`{row}`")
+    return "  \n".join(rows)
+
+
 def _build_plum_reading(num1: int, num2: int) -> str:
     r = _yijing.divine(num1, num2)
     upper_info = _yijing.TRIGRAMS[r.upper]
@@ -1909,6 +1925,7 @@ def _build_plum_reading(num1: int, num2: int) -> str:
         f"**所报之数**: {r.num1}、{r.num2}", "",
         "---", "",
         f"### ☯ 本卦 · {r.hexagram_name}（{r.upper}上{r.lower}下） —— **{r.fortune}**", "",
+        _hex_lines_art(r.upper, r.lower, r.moving_line), "",
         f"> {r.hexagram_text}", "",
         f"上卦{r.upper}（{upper_info['nature']}·属{upper_info['element']}）：{upper_info['image']}",
         f"下卦{r.lower}（{lower_info['nature']}·属{lower_info['element']}）：{lower_info['image']}", "",
@@ -1916,8 +1933,10 @@ def _build_plum_reading(num1: int, num2: int) -> str:
         f"**体卦** {r.body_trigram}（属{body_info['element']}） · **用卦** {r.use_trigram}（属{use_info['element']}） · **动爻** 第{r.moving_line}爻", "",
         r.relation, "", _yijing.moving_line_meaning(r.moving_line), "",
         f"### 🔄 变卦 · {r.changed_name} —— {r.changed_fortune}", "",
+        _hex_lines_art(r.changed_upper, r.changed_lower), "",
         f"> {r.changed_text}", "",
         f"### 🔗 互卦 · {r.mutual_name} —— {r.mutual_fortune}", "",
+        _hex_lines_art(r.mutual_upper, r.mutual_lower), "",
         f"> {r.mutual_text}", "",
         "### 📜 总断", "", r.verdict, "",
         "### 💡 建议", "", _yijing.fortune_advice(r.fortune), "",

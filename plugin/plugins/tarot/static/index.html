@@ -1035,7 +1035,7 @@
                             if (ti) { const j = ti.json || {}; if (j.data) { if (j.data.data) return j.data.data; return j.data; } if (j.plugin_response) return j.plugin_response; return j; }
                         }
                         return ed;
-                    } else if (['failed','canceled','timeout'].includes(sd.status)) return null;
+                    } else if (['failed','canceled','timeout'].includes(sd.status)) return {error: (sd.error && sd.error.message) || ''};
                     await new Promise(r => setTimeout(r, 150));
                 }
                 return null;
@@ -1168,6 +1168,20 @@
             const r = data.reading;
             let html = '';
             if (r.question) { html += '<div style="margin-bottom:10px;color:var(--text-secondary);">问题：' + escapeHtml(r.question) + '</div>'; }
+            html += '<div class="golden-result-cards">';
+            for (const c of r.cards) {
+                const card = c.card;
+                const imgSrc = card.image ? '/plugin/tarot/ui/image/' + encodeURIComponent(card.image) : '';
+                const rot = c.is_reversed ? 'transform:rotate(180deg);' : '';
+                html += '<div class="golden-result-card">';
+                html += '<div class="grc-position">' + escapeHtml(c.position) + '</div>';
+                if (imgSrc) { html += '<img src="' + imgSrc + '" alt="' + escapeHtml(card.name) + '" style="' + rot + '" onerror="this.style.display=\'none\'">'; }
+                html += '<div class="grc-name">' + escapeHtml(card.name) + ' · ' + escapeHtml(card.name_en) + '</div>';
+                html += '<div class="grc-orient ' + (c.is_reversed ? 'down' : 'up') + '">' + c.orientation + '</div>';
+                html += '<div class="grc-keywords">' + c.keywords.join('、') + '</div>';
+                html += '</div>';
+            }
+            html += '</div>';
             for (const c of r.cards) {
                 html += '<div style="margin:12px 0;padding:12px;background:rgba(139,92,246,0.06);border-radius:12px;border:1px solid var(--border-subtle);">';
                 html += '<strong style="color:var(--accent-gold,#a78bfa);">' + c.position + ' · ' + c.card.name + '（' + c.card.name_en + '）' + c.orientation + '</strong><br>';

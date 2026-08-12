@@ -120,6 +120,10 @@ class PlumReading:
     mutual_name: str
     mutual_text: str
     mutual_fortune: str
+    changed_upper: str        # 变卦上卦
+    changed_lower: str        # 变卦下卦
+    mutual_upper: str         # 互卦上卦
+    mutual_lower: str         # 互卦下卦
     relation: str             # 体用关系描述
     verdict: str              # 总断
 
@@ -141,6 +145,13 @@ def _mutual_hexagram(upper: str, lower: str) -> tuple[str, str]:
     m_lower = _LINES_TO_TRIGRAM[tuple(six[1:4])]
     m_upper = _LINES_TO_TRIGRAM[tuple(six[2:5])]
     return m_upper, m_lower
+
+
+def _changed_trigrams(upper: str, lower: str, moving: int) -> tuple[str, str]:
+    """动爻互变后的 (新上卦, 新下卦)"""
+    if moving <= 3:
+        return upper, _LINES_TO_TRIGRAM[_flip_line(TRIGRAMS[lower]["lines"], moving - 1)]
+    return _LINES_TO_TRIGRAM[_flip_line(TRIGRAMS[upper]["lines"], moving - 4)], lower
 
 
 def _body_use_relation(body: str, use: str) -> tuple[str, str]:
@@ -193,12 +204,7 @@ def divine(num1: int, num2: int) -> PlumReading:
         use, body = upper, lower
 
     # 变卦：动爻互变
-    if moving <= 3:
-        new_lower = _LINES_TO_TRIGRAM[_flip_line(TRIGRAMS[lower]["lines"], moving - 1)]
-        new_upper = upper
-    else:
-        new_upper = _LINES_TO_TRIGRAM[_flip_line(TRIGRAMS[upper]["lines"], moving - 4)]
-        new_lower = lower
+    new_upper, new_lower = _changed_trigrams(upper, lower, moving)
     ch_name, ch_text, ch_fortune = _hexagram(new_upper, new_lower)
 
     m_upper, m_lower = _mutual_hexagram(upper, lower)
@@ -226,6 +232,8 @@ def divine(num1: int, num2: int) -> PlumReading:
         hexagram_name=name, hexagram_text=text, fortune=fortune,
         changed_name=ch_name, changed_text=ch_text, changed_fortune=ch_fortune,
         mutual_name=mu_name, mutual_text=mu_text, mutual_fortune=mu_fortune,
+        changed_upper=new_upper, changed_lower=new_lower,
+        mutual_upper=m_upper, mutual_lower=m_lower,
         relation=relation_desc, verdict=verdict,
     )
 
