@@ -1,8 +1,10 @@
 """
 猫娘邮件插件 - IMAP/SMTP 客户端
-负责邮件收发、文件夹管理、搜索
+负责邮件收发、文件夹管理、搜索、附件发送
 
-v0.2 优化:
+v0.3 优化:
+  - 添加附件发送功能（支持中文文件名 RFC 2231）
+  - base64 分行编码（RFC 2045），修复附件发送断连
   - 添加轻量级邮件头获取方法 (BODY.PEEK[HEADER])，速度提升10倍+
   - 支持已读+未读邮件列表
   - 优化连接超时和错误处理
@@ -10,11 +12,14 @@ v0.2 优化:
 
 import email
 import imaplib
+import os
 import re
 import smtplib
+import base64 as _b64
 from datetime import datetime, date
-from email.header import decode_header
-from email.utils import parseaddr, parsedate_to_datetime
+from email.header import decode_header, Header
+from email.utils import parseaddr, parsedate_to_datetime, formatdate, make_msgid
+from urllib.parse import quote as url_quote
 from typing import Optional
 from .models import EmailMessage, Attachment, FolderInfo
 from .parser import (
@@ -24,6 +29,33 @@ from .parser import (
     classify_priority,
     parse_attachment,
 )
+
+
+def _encode_filename_for_header(filename: str) -> str:
+    """编码文件名用于 Content-Disposition 头 (RFC 2231)
+
+    纯 ASCII 文件名直接使用，非 ASCII（如中文）使用 filename*=UTF-8'' 格式。
+    """
+    try:
+        filename.encode('ascii')
+        # 纯 ASCII，直接加引号
+        return f'filename="{filename}"'
+    except UnicodeEncodeError:
+        # 非 ASCII，使用 RFC 2231 编码
+        encoded = url_quote(filename, safe='')
+        return f"filename*=UTF-8''{encoded}"
+
+
+def _base64_encode_lines(data: bytes, line_length: int = 76) -> str:
+    """Base64 编码并按 RFC 2045 要求分行
+
+    RFC 2045 规定 base64 编码每行不超过 76 个字符。
+    SMTP 服务器对单行过长（通常 >998 字符）会断开连接。
+    """
+    encoded = _b64.b64encode(data).decode('ascii')
+    # 每 line_length 个字符切一行
+    chunks = [encoded[i:i+line_length] for i in range(0, len(encoded), line_length)]
+    return "\r\n".join(chunks)
 
 
 class NekoMailClient:
@@ -685,15 +717,21 @@ class NekoMailClient:
         body: str,
         cc: Optional[list[str]] = None,
         html: bool = False,
+        attachments: Optional[list[str]] = None,
     ) -> bool:
-        """发送邮件 - 手动构建邮件格式，不依赖 email.mime 模块"""
+        """发送邮件 - 手动构建邮件格式，不依赖 email.mime 模块
+
+        Args:
+            to: 收件人邮箱地址
+            subject: 邮件主题
+            body: 邮件正文
+            cc: 抄送列表
+            html: 是否为 HTML 格式
+            attachments: 附件文件路径列表
+        """
         try:
-            from email.utils import formatdate, make_msgid
-            from email.header import Header
-            
             # 手动构建邮件内容
             boundary = "----=_NextPart_" + make_msgid().replace('<', '').replace('>', '')
-            
             lines = []
             lines.append(f"From: {self.email_addr}")
             lines.append(f"To: {to}")
@@ -703,35 +741,56 @@ class NekoMailClient:
             lines.append(f"Date: {formatdate()}")
             lines.append(f"Message-ID: {make_msgid()}")
             lines.append("MIME-Version: 1.0")
-            lines.append(f'Content-Type: multipart/alternative; boundary="{boundary}"')
-            lines.append("")
-            lines.append(f"--{boundary}")
-            
-            if html:
-                lines.append("Content-Type: text/html; charset=utf-8")
+
+            has_attachments = attachments and len(attachments) > 0
+
+            if has_attachments:
+                lines.append(f'Content-Type: multipart/mixed; boundary="{boundary}"')
+                lines.append("")
+                lines.append(f"--{boundary}")
+                content_type = "text/html" if html else "text/plain"
+                lines.append(f"Content-Type: {content_type}; charset=utf-8")
                 lines.append("Content-Transfer-Encoding: base64")
                 lines.append("")
-                import base64
-                lines.append(base64.b64encode(body.encode('utf-8')).decode('ascii'))
+                # RFC 2045: base64 每行不超过 76 字符
+                lines.append(_base64_encode_lines(body.encode('utf-8')))
+
+                for file_path in attachments:
+                    if not os.path.exists(file_path):
+                        continue
+                    filename = os.path.basename(file_path)
+                    lines.append(f"--{boundary}")
+                    lines.append("Content-Type: application/octet-stream")
+                    lines.append(f'Content-Disposition: attachment; {_encode_filename_for_header(filename)}')
+                    lines.append("Content-Transfer-Encoding: base64")
+                    lines.append("")
+                    with open(file_path, 'rb') as f:
+                        file_data = f.read()
+                    # RFC 2045: base64 每行不超过 76 字符，避免行过长导致 SMTP 断连
+                    lines.append(_base64_encode_lines(file_data))
+
+                lines.append(f"--{boundary}--")
             else:
-                lines.append("Content-Type: text/plain; charset=utf-8")
+                lines.append(f'Content-Type: multipart/alternative; boundary="{boundary}"')
+                lines.append("")
+                lines.append(f"--{boundary}")
+                content_type = "text/html" if html else "text/plain"
+                lines.append(f"Content-Type: {content_type}; charset=utf-8")
                 lines.append("Content-Transfer-Encoding: base64")
                 lines.append("")
-                import base64
-                lines.append(base64.b64encode(body.encode('utf-8')).decode('ascii'))
-            
-            lines.append(f"--{boundary}--")
-            
+                lines.append(_base64_encode_lines(body.encode('utf-8')))
+                lines.append(f"--{boundary}--")
+
             msg_str = "\r\n".join(lines)
-            
+
             recipients = [to]
             if cc:
                 recipients.extend(cc)
-            
+
             with smtplib.SMTP_SSL(self.smtp_server, self.smtp_port) as server:
                 server.login(self.email_addr, self.auth_code)
                 server.sendmail(self.email_addr, recipients, msg_str)
-            
+
             return True
         except Exception as e:
             raise RuntimeError(f"发送邮件失败: {e}")

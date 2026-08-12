@@ -254,15 +254,33 @@ class NekoMailPlugin:
         subject: str,
         body: str,
         cc: Optional[list[str]] = None,
+        html: bool = False,
+        attachments: Optional[list[str]] = None,
     ) -> dict:
-        """发送邮件"""
+        """发送邮件
+
+        Args:
+            to: 收件人邮箱地址
+            subject: 邮件主题
+            body: 邮件正文
+            cc: 抄送列表
+            html: 是否为 HTML 格式
+            attachments: 附件文件路径列表
+        """
         try:
-            success = self.client.send(to=to, subject=subject, body=body, cc=cc)
+            success = self.client.send(
+                to=to,
+                subject=subject,
+                body=body,
+                cc=cc,
+                html=html,
+                attachments=attachments,
+            )
             if success:
                 self.op_log.log_operation(
                     operation_type="send_email",
                     description=f"发送邮件给 {to}",
-                    details={"to": to, "subject": subject, "cc": cc}
+                    details={"to": to, "subject": subject, "cc": cc, "has_attachments": bool(attachments)}
                 )
             return {"success": success, "to": to, "subject": subject}
         except Exception as e:

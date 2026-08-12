@@ -89,6 +89,9 @@ class NekoMailPluginEntry(NekoPluginBase):
         master_name = str(section.get("master_name", "主人")).strip()
         catgirl_name = str(section.get("catgirl_name", "喵喵")).strip()
 
+        # 轮询间隔配置（秒），默认 300 秒（5 分钟）
+        polling_interval = int(section.get("polling_interval", 300))
+
         if not email_addr or not auth_code:
             self.logger.error("QQ_EMAIL or QQ_AUTH_CODE not configured")
             return Err(SdkError("邮箱配置缺失: 请在 plugin.toml 中配置 neko_mail.email_addr 和 neko_mail.auth_code"))
@@ -114,20 +117,20 @@ class NekoMailPluginEntry(NekoPluginBase):
             "NekoMail started: email={}, imap={}:{}, smtp={}:{}, master_name={}, catgirl_name={}",
             email_addr, imap_server, imap_port, smtp_server, smtp_port, master_name, catgirl_name,
         )
-        
-        # 自动启动轮询监听（每5分钟检查一次新邮件）
+
+        # 自动启动轮询监听
         try:
             polling_result = self._mail_plugin.start_polling(
-                interval_seconds=300,
+                interval_seconds=polling_interval,
                 callback=self._push_new_email_notification
             )
             if "error" not in polling_result:
-                self.logger.info("邮件轮询已自动启动，间隔 300 秒")
+                self.logger.info(f"邮件轮询已自动启动，间隔 {polling_interval} 秒")
             else:
                 self.logger.warning(f"邮件轮询启动失败: {polling_result['error']}")
         except Exception as e:
             self.logger.warning(f"邮件轮询自动启动异常: {e}")
-        
+
         return Ok({"status": "running", "version": "0.1.0", "email": email_addr})
 
     @lifecycle(id="shutdown")
@@ -570,7 +573,7 @@ class NekoMailPluginEntry(NekoPluginBase):
 
     @llm_tool(
         name="neko_mail_send",
-        description="发送邮件。可以指定收件人、主题、正文,可选抄送。",
+        description="发送邮件。可以指定收件人、主题、正文,可选抄送和附件。",
         parameters={
             "type": "object",
             "properties": {
@@ -578,6 +581,8 @@ class NekoMailPluginEntry(NekoPluginBase):
                 "subject": {"type": "string", "description": "邮件主题"},
                 "body": {"type": "string", "description": "邮件正文"},
                 "cc": {"type": "array", "items": {"type": "string"}, "description": "抄送列表(可选)"},
+                "html": {"type": "boolean", "description": "是否为 HTML 格式(可选,默认 false)"},
+                "attachments": {"type": "array", "items": {"type": "string"}, "description": "附件文件路径列表(可选)"},
             },
             "required": ["to", "subject", "body"],
         },
@@ -586,7 +591,7 @@ class NekoMailPluginEntry(NekoPluginBase):
     @plugin_entry(
         id="send",
         name="发送邮件",
-        description="发送邮件",
+        description="发送邮件，支持附件",
         input_schema={
             "type": "object",
             "properties": {
@@ -594,16 +599,18 @@ class NekoMailPluginEntry(NekoPluginBase):
                 "subject": {"type": "string"},
                 "body": {"type": "string"},
                 "cc": {"type": "array", "items": {"type": "string"}},
+                "html": {"type": "boolean"},
+                "attachments": {"type": "array", "items": {"type": "string"}},
             },
             "required": ["to", "subject", "body"],
         },
         llm_result_fields=["success"],
     )
-    async def send(self, to: str, subject: str, body: str, cc: Optional[list] = None, **_):
-        """发送邮件"""
+    async def send(self, to: str, subject: str, body: str, cc: Optional[list] = None, html: bool = False, attachments: Optional[list] = None, **_):
+        """发送邮件，支持附件"""
         try:
             plugin = self._get_plugin()
-            result = plugin.send(to=to, subject=subject, body=body, cc=cc)
+            result = plugin.send(to=to, subject=subject, body=body, cc=cc, html=html, attachments=attachments)
             if "error" in result:
                 return Err(SdkError(result["error"]))
             return Ok(result)

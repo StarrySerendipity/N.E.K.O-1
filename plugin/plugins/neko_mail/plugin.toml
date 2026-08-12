@@ -3,7 +3,7 @@ name = "猫娘邮件秘书"
 description = "让猫娘帮你管理QQ邮箱,生成邮件摘要、判断优先级、标记已读、发送邮件。清新诗意的前端界面,支持i18n多语言。"
 short_description = "Catgirl mail secretary — QQ mailbox summaries, priority classification, mark read, and send emails."
 keywords = ["邮件", "邮箱", "email", "mail", "QQ邮箱", "IMAP", "SMTP", "摘要", "猫娘", "メール", "메일", "почта", "correo"]
-version = "0.1.0"
+version = "0.2.0"
 id = "neko_mail"
 entry = "plugin.plugins.neko_mail:NekoMailPluginEntry"
 
@@ -44,3 +44,5 @@ ignore_folders = ""
 master_name = "主人"
 # 猫娘的自称
 catgirl_name = "喵喵"
+# 新邮件轮询间隔（秒），默认 300 秒（5 分钟）
+polling_interval = 300
