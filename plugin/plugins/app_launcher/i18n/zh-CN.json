@@ -1,10 +1,8 @@
 {
   "plugin.name": "应用启动器",
-  "plugin.description": "管理软件快捷方式和可执行文件路径，让猫娘可以帮主人打开指定软件，支持开机自启功能。",
-  
+  "plugin.description": "管理软件快捷方式和可执行文件路径，让猫娘可以帮主人打开指定软件，支持开机自启功能。内置猫娘专属工具：可直接把文件路径发给猫娘完成设置（名称可商量或由猫娘取名）、按精准名称启动、查询可启动应用列表、语音删除已设置应用，操作后前端界面实时同步。",
   "entry.list_apps.name": "列出已注册软件",
   "entry.list_apps.description": "获取用户已注册的所有软件列表，包含名称、路径、别名、开机自启状态等信息。",
-  
   "entry.add_app.name": "添加软件",
   "entry.add_app.description": "注册一个新的软件到启动器。name 是软件显示名称，path 是完整路径（支持 .exe、.lnk 快捷方式等），aliases 是可选的别名列表方便识别。",
   "entry.add_app.param.name": "软件名称，例如：Steam、Chrome、网易云音乐",
@@ -12,19 +10,15 @@
   "entry.add_app.param.aliases": "别名列表，方便猫娘识别，例如：[\"steam\", \"游戏平台\"]",
   "entry.add_app.param.description": "软件描述（可选）",
   "entry.add_app.param.autostart": "是否设置开机自启（可选，默认 false，仅支持 .exe 文件）",
-  
   "entry.remove_app.name": "删除软件",
   "entry.remove_app.description": "根据 app_id 删除已注册的软件。",
   "entry.remove_app.param.app_id": "要删除的软件 ID",
-  
   "entry.launch_app.name": "启动软件",
   "entry.launch_app.description": "根据 app_id 或软件名称/别名启动对应的软件。优先使用 app_id 精确匹配，否则尝试名称/别名模糊匹配。",
   "entry.launch_app.param.app_id": "软件 ID（优先）",
   "entry.launch_app.param.name": "软件名称或别名（当 app_id 未提供时使用）",
-  
   "entry.get_available_apps.name": "获取可用软件列表",
   "entry.get_available_apps.description": "获取当前已注册且文件存在的软件列表，供猫娘了解可以打开哪些软件。返回软件名称、别名和开机自启状态。",
-  
   "entry.update_app.name": "更新软件信息",
   "entry.update_app.description": "更新已注册软件的信息（名称、路径、别名、描述）。",
   "entry.update_app.param.app_id": "要更新的软件 ID",
@@ -32,16 +26,13 @@
   "entry.update_app.param.path": "新路径（可选）",
   "entry.update_app.param.aliases": "新别名列表（可选，会覆盖原有）",
   "entry.update_app.param.description": "新描述（可选）",
-  
   "entry.set_autostart.name": "设置开机自启",
   "entry.set_autostart.description": "为已注册的软件设置开机自启功能。通过修改 Windows 注册表实现，支持开启或关闭。猫娘可以通过此功能帮主人设置软件开机自动启动。",
   "entry.set_autostart.param.app_id": "要设置的软件 ID",
   "entry.set_autostart.param.enabled": "True=开启开机自启, False=关闭开机自启",
-  
   "entry.get_autostart_status.name": "获取开机自启状态",
   "entry.get_autostart_status.description": "获取指定软件的开机自启状态。猫娘可以通过此功能查询软件是否设置了开机自动启动。",
   "entry.get_autostart_status.param.app_id": "要查询的软件 ID",
-  
   "entry.get_all_autostart_status.name": "获取所有软件开机自启状态",
   "entry.get_all_autostart_status.description": "获取所有已注册软件的开机自启状态列表。猫娘可以通过此功能了解哪些软件设置了开机自启。",
   "entry.get_recent_apps.name": "获取最近使用记录",
@@ -50,7 +41,6 @@
   "entry.get_categories.description": "获取所有可用的软件分类，用于组织和管理软件。",
   "entry.export_apps.name": "导出软件配置",
   "entry.export_apps.description": "导出所有已注册软件的配置信息，方便备份或迁移。",
-  
   "error.name_empty": "软件名称不能为空",
   "error.path_invalid": "路径无效或不是绝对路径: {path}",
   "error.app_not_found": "未找到软件: {app_id}",
@@ -59,7 +49,6 @@
   "error.autostart_failed": "设置开机自启失败: {error}",
   "error.autostart_permission": "没有权限修改注册表",
   "error.autostart_not_windows": "开机自启仅支持 Windows 系统",
-  
   "success.app_added": "已成功添加软件「{name}」，ID: {app_id}",
   "success.app_removed": "已删除软件「{name}」",
   "success.app_launched": "已成功打开「{name}」",
@@ -67,10 +56,8 @@
   "success.autostart_enabled": "已为「{name}」开启开机自启",
   "success.autostart_disabled": "已为「{name}」关闭开机自启",
   "success.autostart_already_disabled": "「{name}」原本就没有开机自启",
-  
   "status.autostart_enabled": "已开启",
   "status.autostart_disabled": "未开启",
-  
   "ui.title": "🚀 应用启动器",
   "ui.subtitle": "在这里添加你电脑上常用的软件，猫娘就能帮你打开它们啦~",
   "ui.stat.registered": "已注册",
@@ -156,7 +143,6 @@
   "ui.success.add": "✅ 添加成功",
   "ui.success.update": "✅ 更新成功",
   "ui.warning.update_autostart_failed": "⚠️ 更新成功，但开机自启设置失败: {error}",
-  
   "tutorial.title": "📚 使用教程",
   "tutorial.subtitle": "跟着教程，轻松学会使用应用启动器~",
   "tutorial.close": "关闭教程",
@@ -174,5 +160,11 @@
   "tutorial.tip.path": "支持带双引号的路径，直接粘贴即可，无需手动删除引号",
   "tutorial.tip.alias": "设置多个别名，猫娘更容易识别",
   "tutorial.tip.autostart": ".exe 文件可设置开机自启",
+  "tutorial.step3.title": "🐱 方法三：直接和猫娘对话管理（最推荐）",
+  "tutorial.step3.1": "把软件的文件路径直接发给猫娘，例如「帮我设置这个应用：D:\\Tools\\Music.exe」，名称可以和猫娘商量，也可以由猫娘自动取名",
+  "tutorial.step3.2": "设置完成后，猫娘会告诉你以后怎么唤起，比如对它说「打开 音乐」即可启动",
+  "tutorial.step3.3": "随时可以问猫娘「你能打开哪些应用？」，它会列出全部已设置的应用",
+  "tutorial.step3.4": "不想要了就说「删除 XX 应用」，猫娘会帮你移除（包括开机自启项），页面列表也会实时同步更新",
+  "tutorial.tip.realtime": "猫娘增删、启动应用后，本页列表会实时自动同步",
   "tutorial.btn.show": "📚 查看教程"
 }

@@ -1003,6 +1003,26 @@
                 </div>
             </div>
 
+            <div class="tutorial-section">
+                <h4 data-i18n="tutorial.step3.title">🐱 方法三：直接和猫娘对话管理（最推荐）</h4>
+                <div class="tutorial-step">
+                    <span class="step-number">1</span>
+                    <span class="step-text" data-i18n="tutorial.step3.1">把软件的文件路径直接发给猫娘，例如「帮我设置这个应用：D:\Tools\Music.exe」，名称可以和猫娘商量，也可以由猫娘自动取名</span>
+                </div>
+                <div class="tutorial-step">
+                    <span class="step-number">2</span>
+                    <span class="step-text" data-i18n="tutorial.step3.2">设置完成后，猫娘会告诉你以后怎么唤起，比如对它说「打开 音乐」即可启动</span>
+                </div>
+                <div class="tutorial-step">
+                    <span class="step-number">3</span>
+                    <span class="step-text" data-i18n="tutorial.step3.3">随时可以问猫娘「你能打开哪些应用？」，它会列出全部已设置的应用</span>
+                </div>
+                <div class="tutorial-step">
+                    <span class="step-number">4</span>
+                    <span class="step-text" data-i18n="tutorial.step3.4">不想要了就说「删除 XX 应用」，猫娘会帮你移除（包括开机自启项），页面列表也会实时同步更新</span>
+                </div>
+            </div>
+
             <div class="tutorial-tip">
                 <h4 data-i18n="tutorial.tip.title">💡 小贴士</h4>
                 <div class="tip-item">
@@ -1016,6 +1036,10 @@
                 <div class="tip-item">
                     <span class="tip-icon">⚡</span>
                     <span data-i18n="tutorial.tip.autostart">.exe 文件可设置开机自启</span>
+                </div>
+                <div class="tip-item">
+                    <span class="tip-icon">🐱</span>
+                    <span data-i18n="tutorial.tip.realtime">猫娘增删、启动应用后，本页列表会实时自动同步</span>
                 </div>
             </div>
         </div>
@@ -1547,8 +1571,8 @@
         }
     }
 
-    document.getElementById('searchInput').addEventListener('input', (e) => {
-        const query = e.target.value.toLowerCase().trim();
+    function applySearchFilter() {
+        const query = (document.getElementById('searchInput').value || '').toLowerCase().trim();
         if (!query) {
             renderAppList(allApps);
             return;
@@ -1560,7 +1584,9 @@
             return nameMatch || aliasMatch || pathMatch;
         });
         renderAppList(filtered);
-    });
+    }
+
+    document.getElementById('searchInput').addEventListener('input', applySearchFilter);
 
     document.getElementById('addAppBtn').addEventListener('click', () => openModal());
     document.getElementById('refreshBtn').addEventListener('click', loadApps);
@@ -1587,10 +1613,60 @@
         updateModalAutostartState();
     });
 
+    // ===== SSE 实时同步：猫娘在后端增删/启动应用后，前端自动刷新 =====
+    const SSE_MUTATION_TYPES = ['app_added', 'app_removed', 'app_updated', 'app_launched', 'autostart_changed'];
+    let sseReloadTimer = null;
+
+    async function silentReload() {
+        // 不打断状态栏的静默刷新：保持 UI 与后端数据一致
+        try {
+            const data = await callPlugin('list_apps', {});
+            allApps = data.apps || [];
+            updateStats(data.count || 0, allApps);
+            applySearchFilter();
+            await loadRecentApps();
+        } catch (err) {
+            console.error('Silent reload failed:', err);
+        }
+    }
+
+    function scheduleSilentReload() {
+        // 防抖：猫娘连续多次操作时合并为一次刷新
+        if (sseReloadTimer) clearTimeout(sseReloadTimer);
+        sseReloadTimer = setTimeout(() => {
+            sseReloadTimer = null;
+            silentReload();
+        }, 400);
+    }
+
+    function connectSSE() {
+        try {
+            const source = new EventSource(`/plugin/${PLUGIN_ID}/ui-api/events`);
+            source.onmessage = (event) => {
+                let data = {};
+                try { data = JSON.parse(event.data); } catch (err) { return; }
+                if (!data || data.type === 'hello') return;
+                if (SSE_MUTATION_TYPES.includes(data.type)) {
+                    scheduleSilentReload();
+                }
+                if (data.text) {
+                    showMessage(`🐱 ${data.text}，列表已同步`, 'success');
+                }
+            };
+            source.onerror = () => {
+                // EventSource 自带重连，静默等待恢复即可
+                console.warn('Realtime sync connection interrupted, reconnecting...');
+            };
+        } catch (err) {
+            console.warn('Realtime sync unavailable:', err);
+        }
+    }
+
     document.addEventListener('DOMContentLoaded', async () => {
         await loadI18n();
         applyI18n();
         await loadApps();
+        connectSSE();
     });
 </script>
 </body>

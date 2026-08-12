@@ -1,10 +1,8 @@
 {
   "plugin.name": "Inicializador de Apps",
-  "plugin.description": "Gerencia atalhos de software e caminhos de executáveis para que a Neko possa abrir apps para você, com suporte a inicialização automática.",
-
+  "plugin.description": "Gerencie atalhos e caminhos de executáveis para a Neko abrir aplicativos para você, com inicialização automática. Ferramentas exclusivas da Neko: envie o caminho do arquivo para registrar um app (nome negociável ou automático), inicie pelo nome exato, liste apps disponíveis e remova por voz — a interface sincroniza em tempo real.",
   "entry.list_apps.name": "Listar Apps Registrados",
   "entry.list_apps.description": "Obtém a lista de todos os softwares registrados pelo usuário, incluindo nome, caminho, aliases, status de inicialização automática etc.",
-
   "entry.add_app.name": "Adicionar App",
   "entry.add_app.description": "Registra um novo software no inicializador. name é o nome exibido, path é o caminho completo (suporta .exe, atalhos .lnk etc.) e aliases é uma lista opcional de aliases para facilitar o reconhecimento.",
   "entry.add_app.param.name": "Nome do software, por exemplo: Steam, Chrome, Spotify",
@@ -12,19 +10,15 @@
   "entry.add_app.param.aliases": "Lista de aliases para reconhecimento, por exemplo: [\"steam\", \"plataforma de jogos\"]",
   "entry.add_app.param.description": "Descrição (opcional)",
   "entry.add_app.param.autostart": "Se deve ativar a inicialização automática (opcional, padrão false, somente .exe)",
-
   "entry.remove_app.name": "Remover App",
   "entry.remove_app.description": "Exclui um software registrado pelo app_id.",
   "entry.remove_app.param.app_id": "ID do app a excluir",
-
   "entry.launch_app.name": "Abrir App",
   "entry.launch_app.description": "Abre o software pelo app_id ou por nome/alias. Usa primeiro a correspondência exata por app_id e, depois, tenta correspondência aproximada por nome/alias.",
   "entry.launch_app.param.app_id": "ID do app (prioritário)",
   "entry.launch_app.param.name": "Nome do software ou alias (usado quando app_id não for informado)",
-
   "entry.get_available_apps.name": "Obter Apps Disponíveis",
   "entry.get_available_apps.description": "Obtém a lista de softwares registrados que existem no disco, para que a Neko saiba quais apps pode abrir. Retorna nome, aliases e status de inicialização automática.",
-
   "entry.update_app.name": "Atualizar App",
   "entry.update_app.description": "Atualiza as informações do software registrado (nome, caminho, aliases, descrição).",
   "entry.update_app.param.app_id": "ID do app a atualizar",
@@ -32,16 +26,13 @@
   "entry.update_app.param.path": "Novo caminho (opcional)",
   "entry.update_app.param.aliases": "Nova lista de aliases (opcional, substitui a atual)",
   "entry.update_app.param.description": "Nova descrição (opcional)",
-
   "entry.set_autostart.name": "Configurar Inicialização Automática",
   "entry.set_autostart.description": "Ativa ou desativa a inicialização automática para o software registrado. Funciona pelo Registro do Windows. A Neko pode ajudar a configurar apps para iniciar automaticamente ao ligar o sistema.",
   "entry.set_autostart.param.app_id": "ID do app a configurar",
   "entry.set_autostart.param.enabled": "True=ativar inicialização automática, False=desativar inicialização automática",
-
   "entry.get_autostart_status.name": "Obter Status de Inicialização Automática",
   "entry.get_autostart_status.description": "Obtém o status de inicialização automática do software especificado. A Neko pode consultar se um app está configurado para iniciar automaticamente.",
   "entry.get_autostart_status.param.app_id": "ID do app a consultar",
-
   "entry.get_all_autostart_status.name": "Obter Status de Inicialização Automática de Todos",
   "entry.get_all_autostart_status.description": "Obtém a lista de status de inicialização automática de todos os softwares registrados. A Neko pode ver quais apps têm inicialização automática ativada.",
   "entry.get_recent_apps.name": "Obter Apps Recentes",
@@ -50,7 +41,6 @@
   "entry.get_categories.description": "Obtém todas as categorias disponíveis para organizar e gerenciar softwares.",
   "entry.export_apps.name": "Exportar Configuração de Apps",
   "entry.export_apps.description": "Exporta as configurações de todos os apps registrados para backup ou migração.",
-
   "error.name_empty": "O nome do software não pode ficar vazio",
   "error.path_invalid": "Caminho inválido ou não absoluto: {path}",
   "error.app_not_found": "App não encontrado: {app_id}",
@@ -59,7 +49,6 @@
   "error.autostart_failed": "Falha ao configurar inicialização automática: {error}",
   "error.autostart_permission": "Sem permissão para modificar o Registro",
   "error.autostart_not_windows": "Inicialização automática só é suportada no Windows",
-
   "success.app_added": "App「{name}」 adicionado com sucesso, ID: {app_id}",
   "success.app_removed": "App「{name}」 excluído",
   "success.app_launched": "「{name}」 aberto com sucesso",
@@ -67,10 +56,8 @@
   "success.autostart_enabled": "Inicialização automática ativada para 「{name}」",
   "success.autostart_disabled": "Inicialização automática desativada para 「{name}」",
   "success.autostart_already_disabled": "「{name}」 já estava com inicialização automática desativada",
-
   "status.autostart_enabled": "Ativada",
   "status.autostart_disabled": "Desativada",
-
   "ui.title": "🚀 Inicializador de Apps",
   "ui.subtitle": "Adicione aqui seus softwares mais usados, e a Neko poderá abri-los para você~",
   "ui.stat.registered": "Registrados",
@@ -156,7 +143,6 @@
   "ui.success.add": "✅ Adicionado com sucesso",
   "ui.success.update": "✅ Atualizado com sucesso",
   "ui.warning.update_autostart_failed": "⚠️ Atualizado com sucesso, mas a configuração de inicialização falhou: {error}",
-
   "tutorial.title": "📚 Tutorial",
   "tutorial.subtitle": "Siga o tutorial para aprender a usar o Inicializador de Apps~",
   "tutorial.close": "Fechar Tutorial",
@@ -174,5 +160,11 @@
   "tutorial.tip.path": "Caminhos com aspas são suportados: cole diretamente, sem remover as aspas",
   "tutorial.tip.alias": "Defina vários aliases para melhorar o reconhecimento",
   "tutorial.tip.autostart": "Arquivos .exe podem ser configurados para inicialização automática",
+  "tutorial.step3.title": "🐱 Método 3: gerenciar conversando com a Neko (recomendado)",
+  "tutorial.step3.1": "Envie o caminho do arquivo do app para a Neko, ex.: 'Registre este app: D:\\Tools\\Music.exe'. O nome pode ser combinado com ela ou gerado automaticamente",
+  "tutorial.step3.2": "Após registrar, a Neko explica como iniciar: por exemplo, diga 'Abrir Música'",
+  "tutorial.step3.3": "Pergunte 'Quais apps você pode abrir?' e ela listará todos os registrados",
+  "tutorial.step3.4": "Diga 'Remover o app XX' para excluí-lo (incluindo a inicialização automática); a lista da página sincroniza em tempo real",
+  "tutorial.tip.realtime": "A lista desta página sincroniza automaticamente após a Neko adicionar/remover/iniciar apps",
   "tutorial.btn.show": "📚 Ver Tutorial"
 }

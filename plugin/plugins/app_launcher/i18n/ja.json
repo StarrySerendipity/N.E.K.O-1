@@ -1,10 +1,8 @@
 {
   "plugin.name": "アプリ起動器",
-  "plugin.description": "ソフトウェアのショートカットと実行ファイルパスを管理し、猫娘があなたのためにアプリを起動できるようにします。自動起動機能をサポート。",
-  
+  "plugin.description": "ソフトのショートカットや実行ファイルのパスを管理し、ネコちゃんが指定アプリを起動。自動起動に対応。ネコちゃん専用ツールを内蔵：ファイルパスを送るだけで登録（名前は相談または自動命名）、正確な名前で起動、起動可能アプリ一覧、音声で削除、操作後UIをリアルタイム同期。",
   "entry.list_apps.name": "登録済みアプリ一覧",
   "entry.list_apps.description": "ユーザーが登録したすべてのソフトウェアリストを取得します。名前、パス、エイリアス、自動起動状態などを含みます。",
-  
   "entry.add_app.name": "アプリ追加",
   "entry.add_app.description": "ランチャーに新しいソフトウェアを登録します。nameは表示名、pathは完全なパス（.exe、.lnkショートカットなどに対応）、aliasesは認識しやすいようにオプションのエイリアスリストです。",
   "entry.add_app.param.name": "ソフトウェア名、例：Steam、Chrome、Spotify",
@@ -12,19 +10,15 @@
   "entry.add_app.param.aliases": "エイリアスリスト、例：[\"steam\", \"ゲームプラットフォーム\"]",
   "entry.add_app.param.description": "説明（オプション）",
   "entry.add_app.param.autostart": "自動起動を設定するかどうか（任意、既定は false、.exe のみ対応）",
-  
   "entry.remove_app.name": "アプリ削除",
   "entry.remove_app.description": "app_idで登録済みソフトウェアを削除します。",
   "entry.remove_app.param.app_id": "削除するアプリID",
-  
   "entry.launch_app.name": "アプリ起動",
   "entry.launch_app.description": "app_idまたは名前/エイリアスでソフトウェアを起動します。まずapp_idで正確に一致を試み、次に名前/エイリアスのあいまい一致を試みます。",
   "entry.launch_app.param.app_id": "アプリID（優先）",
   "entry.launch_app.param.name": "ソフトウェア名またはエイリアス（app_idが提供されない場合に使用）",
-  
   "entry.get_available_apps.name": "利用可能なアプリ一覧",
   "entry.get_available_apps.description": "ディスクに存在する登録済みソフトウェアのリストを取得します。猫娘がどのアプリを起動できるかを把握するために使用します。名前、エイリアス、自動起動状態を返します。",
-  
   "entry.update_app.name": "アプリ更新",
   "entry.update_app.description": "登録済みソフトウェアの情報（名前、パス、エイリアス、説明）を更新します。",
   "entry.update_app.param.app_id": "更新するアプリID",
@@ -32,16 +26,13 @@
   "entry.update_app.param.path": "新しいパス（オプション）",
   "entry.update_app.param.aliases": "新しいエイリアスリスト（オプション、既存を上書き）",
   "entry.update_app.param.description": "新しい説明（オプション）",
-  
   "entry.set_autostart.name": "自動起動設定",
   "entry.set_autostart.description": "登録済みソフトウェアの自動起動を有効または無効にします。Windowsレジストリを介して動作します。猫娘がアプリの自動起動を設定できます。",
   "entry.set_autostart.param.app_id": "設定するアプリID",
   "entry.set_autostart.param.enabled": "True=自動起動を有効、False=自動起動を無効",
-  
   "entry.get_autostart_status.name": "自動起動状態取得",
   "entry.get_autostart_status.description": "指定されたソフトウェアの自動起動状態を取得します。猫娘がアプリが自動起動に設定されているかを照会できます。",
   "entry.get_autostart_status.param.app_id": "照会するアプリID",
-  
   "entry.get_all_autostart_status.name": "全アプリ自動起動状態取得",
   "entry.get_all_autostart_status.description": "すべての登録済みソフトウェアの自動起動状態リストを取得します。猫娘がどのアプリが自動起動されているかを把握できます。",
   "entry.get_recent_apps.name": "最近使用したアプリを取得",
@@ -50,7 +41,6 @@
   "entry.get_categories.description": "ソフトウェアの整理と管理に使えるすべてのカテゴリを取得します。",
   "entry.export_apps.name": "アプリ設定をエクスポート",
   "entry.export_apps.description": "バックアップや移行のため、登録済みアプリの設定情報をすべてエクスポートします。",
-  
   "error.name_empty": "ソフトウェア名は空にできません",
   "error.path_invalid": "無効なパスまたは絶対パスではありません: {path}",
   "error.app_not_found": "アプリが見つかりません: {app_id}",
@@ -59,7 +49,6 @@
   "error.autostart_failed": "自動起動の設定に失敗しました: {error}",
   "error.autostart_permission": "レジストリを変更する権限がありません",
   "error.autostart_not_windows": "自動起動はWindowsのみサポート",
-  
   "success.app_added": "アプリ「{name}」を正常に追加しました。ID: {app_id}",
   "success.app_removed": "アプリ「{name}」を削除しました",
   "success.app_launched": "アプリ「{name}」を正常に起動しました",
@@ -67,10 +56,8 @@
   "success.autostart_enabled": "アプリ「{name}」の自動起動を有効にしました",
   "success.autostart_disabled": "アプリ「{name}」の自動起動を無効にしました",
   "success.autostart_already_disabled": "「{name}」は既に自動起動が無効です",
-  
   "status.autostart_enabled": "有効",
   "status.autostart_disabled": "無効",
-  
   "ui.title": "🚀 アプリ起動器",
   "ui.subtitle": "ここに常用のソフトウェアを追加すると、猫娘が起動できます~",
   "ui.stat.registered": "登録済み",
@@ -156,7 +143,6 @@
   "ui.success.add": "✅ 追加しました",
   "ui.success.update": "✅ 更新しました",
   "ui.warning.update_autostart_failed": "⚠️ 更新しましたが、自動起動の設定に失敗しました: {error}",
-  
   "tutorial.title": "📚 チュートリアル",
   "tutorial.subtitle": "チュートリアルに沿って、アプリ起動器の使い方を学びましょう~",
   "tutorial.close": "チュートリアルを閉じる",
@@ -174,5 +160,11 @@
   "tutorial.tip.path": "引用符付きパス対応：そのまま貼り付け即可、引用符を削除する必要なし",
   "tutorial.tip.alias": "複数のエイリアスを設定すると認識しやすくなります",
   "tutorial.tip.autostart": ".exeファイルは自動起動を設定可能",
+  "tutorial.step3.title": "🐱 方法3：ネコちゃんと会話で管理（おすすめ）",
+  "tutorial.step3.1": "アプリのファイルパスをネコちゃんに送るだけ。例：「このアプリを設定して：D:\\Tools\\Music.exe」。名前は相談しても自動命名でもOK",
+  "tutorial.step3.2": "設定後、ネコちゃんが起動方法を教えてくれます。例えば「音楽を開いて」で起動",
+  "tutorial.step3.3": "「どのアプリを開ける？」と聞くと、登録済みアプリをすべて一覧表示",
+  "tutorial.step3.4": "「XXアプリを削除して」と言えば削除（自動起動項目を含む）。リストもリアルタイム同期",
+  "tutorial.tip.realtime": "ネコちゃんがアプリを追加・削除・起動すると、このページのリストはリアルタイムで同期されます",
   "tutorial.btn.show": "📚 チュートリアルを見る"
 }

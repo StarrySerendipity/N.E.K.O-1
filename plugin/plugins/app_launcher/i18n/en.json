@@ -1,10 +1,8 @@
 {
   "plugin.name": "App Launcher",
-  "plugin.description": "Manage software shortcuts and executable paths, allowing Neko to launch apps for you, with autostart support.",
-  
+  "plugin.description": "Manage software shortcuts and executable paths so Neko can launch apps for you, with autostart support. Built-in Neko tools: send a file path to Neko to register an app (name negotiable or auto-picked), launch by exact name, list launchable apps, and remove apps by voice — the UI syncs in realtime.",
   "entry.list_apps.name": "List Registered Apps",
   "entry.list_apps.description": "Get all registered software list, including name, path, aliases, autostart status, etc.",
-  
   "entry.add_app.name": "Add App",
   "entry.add_app.description": "Register a new software to the launcher. name is display name, path is full path (supports .exe, .lnk shortcuts, etc.), aliases is optional alias list for easy recognition.",
   "entry.add_app.param.name": "Software name, e.g.: Steam, Chrome, Spotify",
@@ -12,19 +10,15 @@
   "entry.add_app.param.aliases": "Alias list for easy recognition, e.g.: [\"steam\", \"gaming platform\"]",
   "entry.add_app.param.description": "Description (optional)",
   "entry.add_app.param.autostart": "Whether to enable autostart (optional, default false, .exe only)",
-  
   "entry.remove_app.name": "Remove App",
   "entry.remove_app.description": "Delete registered software by app_id.",
   "entry.remove_app.param.app_id": "App ID to delete",
-  
   "entry.launch_app.name": "Launch App",
   "entry.launch_app.description": "Launch software by app_id or name/alias. Uses app_id for exact match first, then tries name/alias fuzzy match.",
   "entry.launch_app.param.app_id": "App ID (priority)",
   "entry.launch_app.param.name": "Software name or alias (used when app_id not provided)",
-  
   "entry.get_available_apps.name": "Get Available Apps",
   "entry.get_available_apps.description": "Get list of registered software that exist on disk, for Neko to know which apps can be launched. Returns name, aliases and autostart status.",
-  
   "entry.update_app.name": "Update App",
   "entry.update_app.description": "Update registered software info (name, path, aliases, description).",
   "entry.update_app.param.app_id": "App ID to update",
@@ -32,16 +26,13 @@
   "entry.update_app.param.path": "New path (optional)",
   "entry.update_app.param.aliases": "New alias list (optional, will override existing)",
   "entry.update_app.param.description": "New description (optional)",
-  
   "entry.set_autostart.name": "Set Autostart",
   "entry.set_autostart.description": "Enable or disable autostart for registered software. Works via Windows Registry. Neko can help you set apps to start automatically on boot.",
   "entry.set_autostart.param.app_id": "App ID to set",
   "entry.set_autostart.param.enabled": "True=enable autostart, False=disable autostart",
-  
   "entry.get_autostart_status.name": "Get Autostart Status",
   "entry.get_autostart_status.description": "Get autostart status for specified software. Neko can query whether an app is set to start automatically.",
   "entry.get_autostart_status.param.app_id": "App ID to query",
-  
   "entry.get_all_autostart_status.name": "Get All Autostart Status",
   "entry.get_all_autostart_status.description": "Get autostart status list for all registered software. Neko can see which apps have autostart enabled.",
   "entry.get_recent_apps.name": "Get Recent Apps",
@@ -50,7 +41,6 @@
   "entry.get_categories.description": "Get all available app categories for organizing and managing software.",
   "entry.export_apps.name": "Export App Config",
   "entry.export_apps.description": "Export configuration for all registered apps for backup or migration.",
-  
   "error.name_empty": "Software name cannot be empty",
   "error.path_invalid": "Invalid path or not absolute path: {path}",
   "error.app_not_found": "App not found: {app_id}",
@@ -59,7 +49,6 @@
   "error.autostart_failed": "Failed to set autostart: {error}",
   "error.autostart_permission": "No permission to modify registry",
   "error.autostart_not_windows": "Autostart only supports Windows",
-  
   "success.app_added": "Successfully added app「{name}」, ID: {app_id}",
   "success.app_removed": "Deleted app「{name}」",
   "success.app_launched": "Successfully launched「{name}」",
@@ -67,10 +56,8 @@
   "success.autostart_enabled": "Enabled autostart for「{name}」",
   "success.autostart_disabled": "Disabled autostart for「{name}」",
   "success.autostart_already_disabled": "「{name}」already has autostart disabled",
-  
   "status.autostart_enabled": "Enabled",
   "status.autostart_disabled": "Disabled",
-  
   "ui.title": "🚀 App Launcher",
   "ui.subtitle": "Add your commonly used software here, and Neko can launch them for you~",
   "ui.stat.registered": "Registered",
@@ -156,7 +143,6 @@
   "ui.success.add": "✅ Added successfully",
   "ui.success.update": "✅ Updated successfully",
   "ui.warning.update_autostart_failed": "⚠️ Updated successfully, but autostart setup failed: {error}",
-  
   "tutorial.title": "📚 Tutorial",
   "tutorial.subtitle": "Follow the tutorial to learn how to use App Launcher~",
   "tutorial.close": "Close Tutorial",
@@ -174,5 +160,11 @@
   "tutorial.tip.path": "Supports quoted paths - paste directly, no need to remove quotes",
   "tutorial.tip.alias": "Set multiple aliases for better recognition",
   "tutorial.tip.autostart": ".exe files can be set to autostart",
+  "tutorial.step3.title": "🐱 Method 3: Manage by chatting with Neko (recommended)",
+  "tutorial.step3.1": "Send the app's file path directly to Neko, e.g. 'Register this app for me: D:\\Tools\\Music.exe'. The name can be discussed with Neko or auto-picked",
+  "tutorial.step3.2": "After registering, Neko will tell you how to launch it later, e.g. say 'Open Music'",
+  "tutorial.step3.3": "Ask 'Which apps can you open?' anytime and Neko will list every registered app",
+  "tutorial.step3.4": "Say 'Remove the XX app' to delete it (autostart entry included); the page list syncs in realtime",
+  "tutorial.tip.realtime": "This page auto-syncs after Neko adds, removes or launches apps",
   "tutorial.btn.show": "📚 View Tutorial"
 }
