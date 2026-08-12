@@ -118,6 +118,111 @@ _TAROT_CARDS = [
      "element": "土", "zodiac": "土星"},
 ]
 
+# ═══════════════════════════════════════════════════════════════
+# 13 张黄金裔塔罗牌（翁法罗斯·逐火之旅）
+# ═══════════════════════════════════════════════════════════════
+_GOLDEN_CARDS = [
+    {"id": 1, "name": "阿格莱雅", "name_en": "Aglaea", "number": "I", "arcana": "golden",
+     "upright": ["美", "爱", "魅力", "感性", "创造", "审美"],
+     "reversed": ["虚荣", "肤浅", "迷失自我", "情感依赖", "人性流失"],
+     "description": "黄金之茧墨涅塔的继承者，掌管浪漫火种。她象征美与爱的力量，但也面临人性流失的考验——当承载过多神权，人的温度便会消退。",
+     "element": "雷", "zodiac": "记忆",
+     "image": "阿格莱雅_Aglaea.jpg", "titan": "墨涅塔", "fire_seed": "浪漫"},
+    {"id": 2, "name": "缇宝", "name_en": "Tribbie", "number": "II", "arcana": "golden",
+     "upright": ["通路", "连接", "选择", "指引", "多重身份", "传承"],
+     "reversed": ["迷失方向", "分身离散", "感官过载", "孤立", "神力耗尽"],
+     "description": "万径之门雅努斯的继承者，掌管门径火种。千年前祭司分裂自己创造分身，感官互通。当神力耗尽，分身便化为娃娃沉睡。",
+     "element": "量子", "zodiac": "同谐",
+     "image": "缇宝_Tribbie.jpg", "titan": "雅努斯", "fire_seed": "门径"},
+    {"id": 3, "name": "万敌", "name_en": "Mydei", "number": "III", "arcana": "golden",
+     "upright": ["勇气", "战斗", "守护", "不屈", "热血", "竞技"],
+     "reversed": ["暴力", "鲁莽", "不死诅咒", "弱点暴露", "孤立无援"],
+     "description": "天谴之矛尼卡多利的继承者，掌管纷争火种。受不死诅咒庇护，却有第十节胸椎的致命弱点。喜欢石榴汁和甜食的战士，曾被盗火行者击杀。",
+     "element": "虚数", "zodiac": "毁灭",
+     "image": "万敌_Mydei.jpg", "titan": "尼卡多利", "fire_seed": "纷争"},
+    {"id": 4, "name": "遐蝶", "name_en": "Castorice", "number": "IV", "arcana": "golden",
+     "upright": ["转变", "重生", "放下", "超越", "灵魂", "宁静"],
+     "reversed": ["恐惧死亡", "抗拒改变", "死亡之触", "孤独", "远离人群"],
+     "description": "灰黯之手塞纳托斯的继承者，掌管死亡火种。背负「死亡之触」诅咒，与他人保持距离是她的习惯。她召唤死龙共同战斗，是首位拥有「境界」效果的角色。",
+     "element": "量子", "zodiac": "记忆",
+     "image": "遐蝶_Castorice.png", "titan": "塞纳托斯", "fire_seed": "死亡"},
+    {"id": 5, "name": "那刻夏", "name_en": "Anaxa", "number": "V", "arcana": "golden",
+     "upright": ["智慧", "分析", "真理", "洞察", "独立思考", "逻辑"],
+     "reversed": ["冷漠", "偏执", "自我封闭", "不近人情", "最不像智识"],
+     "description": "裂分之枝瑟希斯的继承者，掌管理性火种。本名阿那克萨戈拉斯，不喜欢被叫那刻夏。他是最不像智识的智识角色，却有着独到的洞察力。",
+     "element": "风", "zodiac": "智识",
+     "image": "那刻夏_Anaxa.jpg", "titan": "瑟希斯", "fire_seed": "理性"},
+    {"id": 6, "name": "风堇", "name_en": "Hyacine", "number": "VI", "arcana": "golden",
+     "upright": ["希望", "治愈", "自由", "广阔", "守护", "新生"],
+     "reversed": ["逃避现实", "好高骛远", "治疗疲劳", "过度保护"],
+     "description": "晨昏之眼艾格勒的继承者，掌管天空火种。百眼巨鸟的化身，本名雅辛忒丝。喜欢在称呼后加「宝」字，打破了丰饶才有回复的刻板印象。",
+     "element": "风", "zodiac": "记忆",
+     "image": "风堇_Hyacine.jpg", "titan": "艾格勒", "fire_seed": "天空"},
+    {"id": 7, "name": "赛飞儿", "name_en": "Cipher", "number": "VII", "arcana": "golden",
+     "upright": ["机智", "灵活", "真相", "口才", "化险为夷", "牺牲"],
+     "reversed": ["谎言", "欺骗", "狡诈", "迷失", "言不由衷", "代价沉重"],
+     "description": "翻飞之币扎格列斯的继承者，掌管诡计火种。本名赛法利娅，游戏第一个猫娘角色。利用谎话成真特性，将翁法罗斯的白昼延长了三百年，直至牺牲时才失效。",
+     "element": "量子", "zodiac": "虚无",
+     "image": "赛飞儿_Cipher_重复2.jpg", "titan": "扎格列斯", "fire_seed": "诡计"},
+    {"id": 8, "name": "白厄", "name_en": "Phainon", "number": "VIII", "arcana": "golden",
+     "upright": ["使命", "担当", "完美", "轮回", "牺牲", "救赎"],
+     "reversed": ["完美即缺陷", "失去自我", "个人愿望无法诞生", "无尽轮回"],
+     "description": "全世之座刻法勒的继承者，掌管负世火种。本名卡厄斯兰那，被认为是最完美的黄金裔——但没有缺陷就是最大的缺陷。永劫回归33550337次，每一世都需要杀死昔涟以触发时间回溯。",
+     "element": "物理", "zodiac": "毁灭",
+     "image": "白厄_Phainon.jpg", "titan": "刻法勒", "fire_seed": "负世"},
+    {"id": 9, "name": "海瑟音", "name_en": "Hysilens", "number": "IX", "arcana": "golden",
+     "upright": ["深邃", "情感", "包容", "力量", "直觉", "净化"],
+     "reversed": ["情绪淹没", "无法自拔", "暗流涌动", "孤立感"],
+     "description": "满溢之杯法吉娜的继承者，掌管海洋火种。海妖一族公主，本名海列屈拉。她的加入盘活了持续伤害队，如同深海中涌动的暗流。",
+     "element": "物理", "zodiac": "虚无",
+     "image": "海瑟音_Hysilens.jpg", "titan": "法吉娜", "fire_seed": "海洋"},
+    {"id": 10, "name": "刻律德菈", "name_en": "Cerydra", "number": "X", "arcana": "golden",
+     "upright": ["秩序", "公正", "规则", "权威", "策略", "平衡"],
+     "reversed": ["僵化", "专制", "过度约束", "失去灵活性"],
+     "description": "公正之秤塔兰顿的继承者，掌管律法火种。代表物为棋子，事物内容体现国际象棋要素。她使队友连续施放两次战技，是策略型辅助角色。",
+     "element": "风", "zodiac": "同谐",
+     "image": "刻律德菈_Cerydra.jpg", "titan": "塔兰顿", "fire_seed": "律法"},
+    {"id": 11, "name": "长夜月", "name_en": "LongNight", "number": "XI", "arcana": "golden",
+     "upright": ["记忆", "时光", "执念", "力量", "守护", "等待"],
+     "reversed": ["遗忘", "执念成魔", "时间停滞", "记忆混乱"],
+     "description": "永夜之帷欧洛尼斯的继承者，掌管岁月火种。源自三月七的一道杀死「记忆」命途的深不见底的执念，战力已达到「令使级」。深红色无高光瞳孔，从未与人分离。",
+     "element": "冰", "zodiac": "记忆",
+     "image": "长夜月_LongNight.jpg", "titan": "欧洛尼斯", "fire_seed": "岁月"},
+    {"id": 12, "name": "丹恒·腾荒", "name_en": "DanHeng · Terrae", "number": "XII", "arcana": "golden",
+     "upright": ["稳固", "根基", "成长", "守护", "不朽", "蜕变"],
+     "reversed": ["停滞", "固守", "无法成长", "依赖他人"],
+     "description": "磐岩之脊吉奥里亚的继承者，掌管大地火种。为找回开拓者，在荒笛处继承大地火种，体型由青年变为成年。他是免费赠送的限定五星，象征着不朽与蜕变。",
+     "element": "物理", "zodiac": "存护",
+     "image": "丹恒·腾荒_DanHeng_Terrae.jpg", "titan": "吉奥里亚", "fire_seed": "大地"},
+    {"id": 13, "name": "昔涟", "name_en": "Cyrene", "number": "XIII", "arcana": "golden",
+     "upright": ["牺牲", "奉献", "锚定因果", "无私", "爱", "永恒"],
+     "reversed": ["自我牺牲过度", "迷失身份", "被遗忘", "孤独"],
+     "description": "第十三泰坦德谬歌的关联者，火种未知。爱莉希雅同位体，唯一没有保存在《如我所书》的黄金裔。自愿作为一簇记忆进入翁法罗斯的循环，在时间起点将自己的心识转化为PhiLia093以锚定因果。唯一没有纪念文的黄金裔。",
+     "element": "冰", "zodiac": "记忆",
+     "image": "昔涟_Cyrene.jpg", "titan": "德谬歌", "fire_seed": "未知"},
+]
+
+# 黄金裔专属牌阵
+_GOLDEN_SPREADS = {
+    "golden_single": {"name": "火种单抽", "description": "一位黄金裔为你指引方向", "count": 1},
+    "trinity_cycle": {"name": "三相轮回", "description": "过去之我、现在之我、未来之我", "count": 3},
+    "fire_journey": {"name": "逐火之旅", "description": "五牌阵解读你的逐火之旅", "count": 5},
+}
+
+# 黄金裔建议模板
+_GOLDEN_ADVICE_TEMPLATES = [
+    "黑潮虽蔓延，但火种永不熄灭。相信你内心的召唤。",
+    "三千万世的轮回，只为这一次破局的机会。",
+    "黄金裔从不等待火种被赐予——主动窃夺，才是英雄的宿命。",
+    "没有缺陷就是最大的缺陷。接受你的不完美，那才是力量的来源。",
+    "以牺牲换取时间，以谎言换取真相。你所付出的代价终将有意义。",
+    "执念化为力量，记忆铸就不朽。你心中的那道光，足以照亮翁法罗斯。",
+    "永劫回归的尽头未必是拯救，但停止轮回意味着放弃希望。",
+    "火种传承不是继承，是窃夺。你有勇气承担这份使命吗？",
+    "星月满天的明日，就在你迈出下一步的路上。",
+    "十二泰坦庇护的永恒之地，终将迎来新的黎明。",
+]
+
 # 牌阵定义
 _SPREADS = {
     "single": {"name": "单牌占卜", "description": "抽取一张牌，获得今日指引", "count": 1},
@@ -538,6 +643,161 @@ def _build_catgirl_message(reading: dict[str, Any]) -> str:
 
     # 引导猫娘回应
     lines.append("\n主人好像很在意这个结果呢，你觉得塔罗牌说得准不准呀？")
+
+    return "\n".join(lines)
+
+
+# ═══════════════════════════════════════════════════════════════
+# 黄金裔塔罗牌辅助函数
+# ═══════════════════════════════════════════════════════════════
+
+def _draw_golden_cards(count: int) -> list[dict]:
+    """从13张黄金裔牌中随机抽牌，不重复"""
+    drawn_ids = set()
+    result = []
+    for _ in range(count):
+        available = [c for c in _GOLDEN_CARDS if c["id"] not in drawn_ids]
+        if not available:
+            break
+        card = random.choice(available)
+        drawn_ids.add(card["id"])
+        is_reversed = random.random() < 0.3
+        result.append({
+            "card": card,
+            "is_reversed": is_reversed,
+            "position": None,
+        })
+    return result
+
+
+def _generate_golden_interpretation(card: dict, is_reversed: bool, position: str) -> str:
+    """生成黄金裔牌义解读，融入世界观"""
+    orientation = "逆位" if is_reversed else "正位"
+    keywords = card['reversed'] if is_reversed else card['upright']
+    keywords_str = "、".join(keywords)
+    titan = card.get('titan', '')
+    fire_seed = card.get('fire_seed', '')
+    titan_info = f"「{titan}」的火种" if titan else ""
+
+    interpretations = {
+        "今日火种指引": (
+            f"今日火种指引：{card['name']}({card['name_en']}){orientation}。"
+            f"{titan_info}「{fire_seed}」为你照亮前路。"
+            f"{card['description']} 关键词：{keywords_str}"
+        ),
+        "过去之我": (
+            f"在过去之我的位置，{card['name']}{orientation}暗示着上一世留下的印记。"
+            f"{card['description']} 关键词：{keywords_str}"
+        ),
+        "现在之我": (
+            f"在现在之我的位置，{card['name']}{orientation}揭示了你当前轮回中的状态。"
+            f"{card['description']} 关键词：{keywords_str}"
+        ),
+        "未来之我": (
+            f"在未来之我的位置，{card['name']}{orientation}预示着破局后的你。"
+            f"{card['description']} 关键词：{keywords_str}"
+        ),
+        "当下处境": (
+            f"你当前的处境由{card['name']}({card['name_en']}){orientation}所代表。"
+            f"{titan_info}「{fire_seed}」映照着你的逐火之旅。"
+            f"{card['description']} 关键词：{keywords_str}"
+        ),
+        "逐火挑战": (
+            f"阻碍你前进的「黑潮」与{card['name']}{orientation}有关。"
+            f"{card['description']} 关键词：{keywords_str}"
+        ),
+        "潜意识深处": (
+            f"你的潜意识深处，{card['name']}{orientation}如同永劫回归中被掩埋的记忆。"
+            f"{card['description']} 关键词：{keywords_str}"
+        ),
+        "火种使命": (
+            f"你所承载的使命与{card['name']}({fire_seed}){orientation}紧密相连。"
+            f"{card['description']} 关键词：{keywords_str}"
+        ),
+        "未来指引": (
+            f"破局之路由{card['name']}{orientation}为你指引。"
+            f"星月满天的明日，就在前方。"
+            f"{card['description']} 关键词：{keywords_str}"
+        ),
+    }
+    return interpretations.get(position, f"{card['name']}({card['name_en']}){orientation}。{card['description']} 关键词：{keywords_str}")
+
+
+def _build_golden_reading(spread_type: str, question: str = "") -> dict[str, Any]:
+    """构建完整的黄金裔占卜结果"""
+    spread = _GOLDEN_SPREADS[spread_type]
+    cards = _draw_golden_cards(spread["count"])
+
+    positions = {
+        "golden_single": ["今日火种指引"],
+        "trinity_cycle": ["过去之我", "现在之我", "未来之我"],
+        "fire_journey": ["当下处境", "逐火挑战", "潜意识深处", "火种使命", "未来指引"],
+    }
+
+    position_labels = positions.get(spread_type, [f"位置{i+1}" for i in range(spread["count"])])
+
+    reading_cards = []
+    for i, card_draw in enumerate(cards):
+        card_draw["position"] = position_labels[i] if i < len(position_labels) else f"位置{i+1}"
+        keywords = card_draw["card"]["reversed"] if card_draw["is_reversed"] else card_draw["card"]["upright"]
+        reading_cards.append({
+            "position": card_draw["position"],
+            "card": card_draw["card"],
+            "is_reversed": card_draw["is_reversed"],
+            "orientation": "逆位" if card_draw["is_reversed"] else "正位",
+            "keywords": keywords,
+            "interpretation": _generate_golden_interpretation(card_draw["card"], card_draw["is_reversed"], card_draw["position"]),
+        })
+
+    advice = random.choice(_GOLDEN_ADVICE_TEMPLATES)
+
+    lucky = {
+        "color": random.choice(_LUCKY_ELEMENTS["colors"]),
+        "number": random.choice(_LUCKY_ELEMENTS["numbers"]),
+        "direction": random.choice(_LUCKY_ELEMENTS["directions"]),
+        "time": random.choice(_LUCKY_ELEMENTS["times"]),
+    }
+
+    return {
+        "spread": spread,
+        "question": question,
+        "cards": reading_cards,
+        "advice": advice,
+        "lucky": lucky,
+        "timestamp": _iso(),
+    }
+
+
+def _build_golden_catgirl_message(reading: dict[str, Any]) -> str:
+    """构建发送给猫娘的黄金裔占卜消息"""
+    spread_name = reading["spread"]["name"]
+    question = reading.get("question", "")
+
+    if question:
+        intro = f"主人刚刚用黄金裔塔罗牌占卜了「{question}」，用的是{spread_name}牌阵呢～"
+    else:
+        intro = f"主人刚刚做了黄金裔塔罗牌的{spread_name}占卜～"
+
+    lines = [intro]
+
+    for c in reading["cards"]:
+        card = c["card"]
+        pos = c["position"]
+        orient = c["orientation"]
+        fire_seed = card.get('fire_seed', '')
+
+        if pos == "今日火种指引":
+            lines.append(f"抽到的是「{card['name']}」{orient}，火种是「{fire_seed}」～")
+        else:
+            lines.append(f"「{pos}」的位置是「{card['name']}」{orient}（{fire_seed}火种）")
+
+    lines.append(f"\n逐火之旅的启示：{reading['advice']}")
+
+    lucky = reading.get("lucky", {})
+    if lucky:
+        lines.append(f"今天的幸运色是{lucky.get('color', '')}，幸运数字是{lucky.get('number', '')}～")
+
+    lines.append("\n主人想知道黄金裔塔罗牌说了什么，你觉得准不准呀？")
 
     return "\n".join(lines)
 
@@ -1129,6 +1389,165 @@ class TarotReaderPlugin(NekoPluginBase):
         await self._save_state()
         await self._notify_catgirl_divination("抽签占卜", question or "无问题", result_text)
         return Ok({"success": True, "data": {"result": result_text}})
+
+    # ═══════════════════════════════════════════════════════════
+    # 黄金裔塔罗牌入口点
+    # ═══════════════════════════════════════════════════════════
+
+    async def _do_golden_reading(self, spread_type: str, question: str = "") -> dict:
+        """执行黄金裔占卜"""
+        reading = _build_golden_reading(spread_type, question)
+        self._reading_count += 1
+        self._readings.append(reading)
+        await self._save_state()
+        await self._notify_golden_catgirl(reading)
+        return reading
+
+    async def _notify_golden_catgirl(self, reading: dict[str, Any]) -> None:
+        """推送黄金裔占卜结果给猫娘"""
+        try:
+            message = _build_golden_catgirl_message(reading)
+            self.ctx.push_message(
+                source="golden_tarot",
+                ai_behavior="respond",
+                parts=[{"type": "text", "text": message}],
+                priority=5,
+            )
+            self.logger.info("[黄金裔塔罗] 已将占卜结果推送给猫娘")
+        except Exception as exc:
+            self.logger.warning(f"[黄金裔塔罗] 推送通知失败: {exc}")
+
+    @plugin_entry(
+        id="golden_daily_reading",
+        name="黄金裔每日指引",
+        description="抽取一张黄金裔塔罗牌，获得火种指引",
+        input_schema={
+            "type": "object",
+            "properties": {
+                "question": {"type": "string", "default": ""},
+            },
+        },
+        llm_result_fields=["cards", "advice", "lucky"],
+    )
+    async def golden_daily_reading(self, question: str = "", **_):
+        self.logger.info(f"[黄金裔每日指引] 问题: {question or '无'}")
+        reading = await self._do_golden_reading("golden_single", question)
+        return Ok({
+            "success": True,
+            "data": {
+                "reading": reading,
+                "reading_count": self._reading_count,
+            }
+        })
+
+    @plugin_entry(
+        id="golden_trinity_cycle",
+        name="三相轮回占卜",
+        description="过去、现在、未来的三相轮回牌阵，探索永劫回归的命运轨迹",
+        input_schema={
+            "type": "object",
+            "properties": {
+                "question": {"type": "string", "default": ""},
+            },
+        },
+        llm_result_fields=["cards", "advice"],
+    )
+    async def golden_trinity_cycle(self, question: str = "", **_):
+        self.logger.info(f"[三相轮回] 问题: {question or '无'}")
+        reading = await self._do_golden_reading("trinity_cycle", question)
+        return Ok({
+            "success": True,
+            "data": {
+                "reading": reading,
+                "reading_count": self._reading_count,
+            }
+        })
+
+    @plugin_entry(
+        id="golden_fire_journey",
+        name="逐火之旅占卜",
+        description="五牌阵解读你的逐火之旅，探索命运的破局之路",
+        input_schema={
+            "type": "object",
+            "properties": {
+                "question": {"type": "string", "default": ""},
+            },
+        },
+        llm_result_fields=["cards", "advice"],
+    )
+    async def golden_fire_journey(self, question: str = "", **_):
+        self.logger.info(f"[逐火之旅] 问题: {question or '无'}")
+        reading = await self._do_golden_reading("fire_journey", question)
+        return Ok({
+            "success": True,
+            "data": {
+                "reading": reading,
+                "reading_count": self._reading_count,
+            }
+        })
+
+    @plugin_entry(
+        id="list_golden_cards",
+        name="列出黄金裔塔罗牌",
+        description="获取全部13张黄金裔塔罗牌列表",
+        llm_result_fields=["total"],
+    )
+    async def list_golden_cards(self, **_):
+        cards_list = []
+        for card in _GOLDEN_CARDS:
+            cards_list.append({
+                "id": card["id"],
+                "number": card["number"],
+                "name": card["name"],
+                "name_en": card["name_en"],
+                "arcana": card["arcana"],
+                "fire_seed": card["fire_seed"],
+                "titan": card["titan"],
+                "image": card["image"],
+            })
+
+        return Ok({
+            "success": True,
+            "data": {
+                "cards": cards_list,
+                "total": len(cards_list),
+            }
+        })
+
+    @plugin_entry(
+        id="get_golden_card_info",
+        name="查询黄金裔牌义",
+        description="查询指定黄金裔塔罗牌的含义和解释",
+        input_schema={
+            "type": "object",
+            "properties": {
+                "card_name": {"type": "string"},
+            },
+            "required": ["card_name"],
+        },
+        llm_result_fields=["card"],
+    )
+    async def get_golden_card_info(self, card_name: str, **_):
+        name = str(card_name or "").strip()
+        if not name:
+            return Err(SdkError("请提供黄金裔塔罗牌名称"))
+
+        found = None
+        for card in _GOLDEN_CARDS:
+            if card["name"] == name or card["name_en"].lower() == name.lower():
+                found = card
+                break
+
+        if not found:
+            available = [c["name"] for c in _GOLDEN_CARDS]
+            return Err(SdkError(f"未找到牌 '{name}'。可选: {', '.join(available)}"))
+
+        return Ok({
+            "success": True,
+            "data": {
+                "card": found,
+            }
+        })
 
 
 def _weighted_draw_lottery() -> str:

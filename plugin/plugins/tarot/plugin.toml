@@ -1,9 +1,9 @@
 [plugin]
 id = "tarot"
 name = "塔罗牌占卜"
-description = "神秘的塔罗牌占卜插件，提供每日运势、情感分析、未来指引等服务。Web UI：http://127.0.0.1:48916/plugin/tarot/ui/"
-version = "2.0.0"
-entry = "plugin.plugins.tarot:TarotReaderPlugin"
+description = "神秘的塔罗牌占卜插件，提供标准塔罗牌、黄金裔塔罗牌（翁法罗斯·逐火之旅）、生辰八字、星座运势等占卜服务。Web UI：http://127.0.0.1:48916/plugin/tarot/ui/"
+version = "3.0.0"
+entry = "plugins.tarot:TarotReaderPlugin"
 
 [plugin.author]
 name = "N.E.K.O Team"
@@ -14,7 +14,7 @@ supported = ">=0.1.0,<0.3.0"
 
 [plugin_runtime]
 enabled = true
-auto_start = true
+auto_start = false
 
 [plugin.store]
 enabled = true
