@@ -817,21 +817,34 @@ class NekoMailClient:
         except Exception:
             return None
     
-    def get_new_emails_since_uid(self, last_uid: str, folder: str = "INBOX", limit: int = 20) -> list[dict]:
-        """获取自上次 UID 之后的新邮件（轻量级邮件头）"""
+    def get_new_emails_since_uid(
+        self,
+        last_uid: str,
+        folder: str = "INBOX",
+        limit: int = 20,
+        unread_only: bool = False,
+    ) -> list[dict]:
+        """获取自上次 UID 之后的新邮件（轻量级邮件头）
+
+        Args:
+            last_uid: 基线 UID，只返回 UID 大于此值的邮件
+            folder: 邮箱文件夹
+            limit: 最多返回数量
+            unread_only: 为 True 时只返回未读邮件（uid > baseline 且 \\Seen 不在 flags 中）
+        """
         self._ensure_connected()
-        
+
         try:
             self._imap.select(folder, readonly=True)
             status, messages = self._imap.search(None, 'ALL')
-            
+
             if status != 'OK' or not messages[0]:
                 return []
-            
+
             all_uids = messages[0].split()
             if not all_uids:
                 return []
-            
+
             # 找到 last_uid 之后的邮件
             new_uids = []
             found_last = False
@@ -842,23 +855,29 @@ class NekoMailClient:
                     continue
                 if found_last:
                     new_uids.append(uid)
-            
+
             # 如果没有找到 last_uid，说明是新连接，返回最新的几封
             if not found_last:
                 new_uids = all_uids[-limit:] if len(all_uids) > limit else all_uids
-            
+
             # 限制数量
             new_uids = new_uids[-limit:]
-            
+
             results = []
             for uid in new_uids:
                 try:
                     header_info = self._fetch_email_headers(uid, folder)
-                    if header_info:
-                        results.append(header_info)
+                    if not header_info:
+                        continue
+                    # unread_only 模式：跳过已读邮件
+                    if unread_only:
+                        flags = header_info.get("flags", [])
+                        if "\\Seen" in flags:
+                            continue
+                    results.append(header_info)
                 except Exception:
                     continue
-            
+
             return results
         except Exception as e:
             self._reconnect()

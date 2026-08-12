@@ -288,8 +288,15 @@ class NekoMailPlugin:
     
     # === 新邮件监听 ===
     
-    def check_new_emails(self, last_uid: Optional[str] = None, folder: str = "INBOX", limit: int = 20) -> dict:
-        """检查新邮件，返回自上次 UID 之后的新邮件"""
+    def check_new_emails(self, last_uid: Optional[str] = None, folder: str = "INBOX", limit: int = 20, unread_only: bool = True) -> dict:
+        """检查新邮件，返回自上次 UID 之后的新邮件
+
+        Args:
+            last_uid: 基线 UID，只返回 UID 大于此值的邮件
+            folder: 邮箱文件夹
+            limit: 最多返回数量
+            unread_only: 是否只返回未读邮件（默认 True），结合 uid 基线 + 已读状态双条件判定
+        """
         try:
             # 如果没有提供 last_uid，获取当前最新的
             if not last_uid:
@@ -300,12 +307,13 @@ class NekoMailPlugin:
                     "has_new": False,
                     "count": 0
                 }
-            
-            # 获取新邮件
+
+            # 获取新邮件（使用 unread_only 参数过滤已读邮件）
             new_headers = self.client.get_new_emails_since_uid(
-                last_uid=last_uid, 
-                folder=folder, 
-                limit=limit
+                last_uid=last_uid,
+                folder=folder,
+                limit=limit,
+                unread_only=unread_only
             )
             
             if not new_headers:
@@ -499,45 +507,61 @@ class NekoMailPlugin:
     
     # === 新邮件轮询监听 ===
     
-    def start_polling(self, interval_seconds: int = 300, callback=None):
+    def start_polling(self, interval_seconds: int = 300, callback=None, calibrate_baseline: bool = True):
         """
         启动新邮件轮询监听
-        
+
         Args:
             interval_seconds: 轮询间隔（秒），默认 300 秒（5 分钟）
             callback: 新邮件回调函数，签名 callback(new_emails: list[dict])
+            calibrate_baseline: 是否自动校准基线到当前最新 UID（默认 True），避免旧邮件重推
         """
         with self._polling_lock:
             if self._polling_thread and self._polling_thread.is_alive():
                 return {"error": "轮询已在运行中"}
-            
+
             self._polling_interval = interval_seconds
             self._new_email_callback = callback
             self._polling_stop_event.clear()
-            
+
             # 获取当前最新 UID 作为起点
             try:
-                self._last_known_uid = self.client.get_latest_uid(folder="INBOX")
+                latest_uid = self.client.get_latest_uid(folder="INBOX")
+                if calibrate_baseline:
+                    # 自动校准基线：将 last_uid 设置为当前最新，避免旧邮件重推
+                    self._last_known_uid = latest_uid
+                    self.op_log.log_operation(
+                        operation_type="baseline_calibrated",
+                        description=f"轮询启动时自动校准基线到最新 UID: {latest_uid}",
+                        details={"latest_uid": latest_uid}
+                    )
+                else:
+                    self._last_known_uid = latest_uid
             except Exception:
                 self._last_known_uid = None
-            
+
+            # 清空已处理 UID 缓存（重启后重新开始）
+            with self._processed_uids_lock:
+                self._processed_uids.clear()
+
             self._polling_thread = threading.Thread(
                 target=self._polling_worker,
                 name="NekoMailPollingThread",
                 daemon=True
             )
             self._polling_thread.start()
-            
+
             self.op_log.log_operation(
                 operation_type="polling_started",
                 description=f"启动新邮件轮询，间隔 {interval_seconds} 秒",
-                details={"interval": interval_seconds}
+                details={"interval": interval_seconds, "calibrated": calibrate_baseline}
             )
-            
+
             return {
                 "status": "started",
                 "interval": interval_seconds,
-                "last_uid": self._last_known_uid
+                "last_uid": self._last_known_uid,
+                "calibrated": calibrate_baseline
             }
     
     def stop_polling(self):
@@ -564,28 +588,66 @@ class NekoMailPlugin:
             "interval": self._polling_interval,
             "last_known_uid": self._last_known_uid
         }
+
+    def calibrate_baseline(self, folder: str = "INBOX") -> dict:
+        """手动校准基线到当前最新 UID
+
+        将 last_uid 基线同步到邮箱当前最新 UID，用于：
+        - 防止旧邮件被重复推送
+        - 用户主动重置轮询状态
+
+        注意：校准后，所有当前存在的邮件都不会再被当作「新邮件」推送。
+        如果有真正的新邮件尚未阅读，建议先查看未读邮件再校准。
+        """
+        try:
+            latest_uid = self.client.get_latest_uid(folder=folder)
+            if not latest_uid:
+                return {"error": "无法获取最新 UID"}
+
+            old_uid = self._last_known_uid
+            self._last_known_uid = latest_uid
+
+            # 清空已处理 UID 缓存
+            with self._processed_uids_lock:
+                self._processed_uids.clear()
+
+            self.op_log.log_operation(
+                operation_type="baseline_calibrated",
+                description=f"手动校准基线: {old_uid} -> {latest_uid}",
+                details={"old_uid": old_uid, "new_uid": latest_uid}
+            )
+
+            return {
+                "success": True,
+                "old_uid": old_uid,
+                "new_uid": latest_uid,
+                "message": f"基线已校准到最新 UID: {latest_uid}"
+            }
+        except Exception as e:
+            return {"error": str(e)}
     
     def _polling_worker(self):
         """轮询工作线程"""
         import logging
         logger = logging.getLogger("neko_mail.polling")
         logger.info("Polling worker started")
-        
+
         while not self._polling_stop_event.is_set():
             try:
-                # 检查新邮件
+                # 检查新邮件（使用 unread_only=True 双条件判定）
                 result = self.check_new_emails(
                     last_uid=self._last_known_uid,
                     folder="INBOX",
-                    limit=50
+                    limit=50,
+                    unread_only=True  # 关键：结合 uid 基线 + 已读状态双条件
                 )
-                
+
                 logger.info(f"Check result: has_new={result.get('has_new')}, count={result.get('count')}, error={result.get('error')}")
-                
+
                 if result.get("has_new") and result.get("new_emails"):
                     new_emails = result["new_emails"]
                     logger.info(f"Found {len(new_emails)} new emails")
-                    
+
                     # 过滤掉已处理的邮件（去重）
                     unprocessed_emails = []
                     with self._processed_uids_lock:
@@ -595,7 +657,7 @@ class NekoMailPlugin:
                                 unprocessed_emails.append(email_header)
                             elif uid:
                                 logger.info(f"Skipping already processed email uid={uid}")
-                    
+
                     if not unprocessed_emails:
                         logger.info("All emails already processed, skipping")
                         # 即使没有新邮件，也要更新 last_known_uid
@@ -604,7 +666,7 @@ class NekoMailPlugin:
                             logger.info(f"Updated latest_uid to {self._last_known_uid}")
                     else:
                         logger.info(f"Processing {len(unprocessed_emails)} unprocessed emails")
-                        
+
                         # 获取完整邮件详情（包含正文）用于推送
                         full_emails = []
                         for email_header in unprocessed_emails:
@@ -614,6 +676,14 @@ class NekoMailPlugin:
                                     logger.info(f"Fetching full detail for email uid={uid}")
                                     full_detail = self.get_email_detail(uid=uid, folder="INBOX")
                                     if "error" not in full_detail:
+                                        # 幂等校验：推送前再次确认邮件未读
+                                        flags = full_detail.get("flags", [])
+                                        if "\\Seen" in flags:
+                                            logger.info(f"Email uid={uid} already read, skipping push")
+                                            # 标记为已处理，避免下次重复检查
+                                            with self._processed_uids_lock:
+                                                self._processed_uids.add(uid)
+                                            continue
                                         full_emails.append(full_detail)
                                         logger.info(f"Got full detail for uid={uid}, subject={full_detail.get('subject')}")
                                     else:

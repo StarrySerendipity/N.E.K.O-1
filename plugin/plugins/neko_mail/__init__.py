@@ -1109,7 +1109,7 @@ class NekoMailPluginEntry(NekoPluginBase):
                 self.logger.warning(f"持久化称呼配置失败: {e},但内存中的称呼已更新")
             
             self.logger.info(f"称呼配置已更新: master_name={plugin.master_name}, catgirl_name={plugin.catgirl_name}")
-            
+
             return Ok({
                 "success": True,
                 "master_name": plugin.master_name,
@@ -1117,3 +1117,37 @@ class NekoMailPluginEntry(NekoPluginBase):
             })
         except Exception as e:
             return Err(SdkError(f"设置称呼配置失败: {e}"))
+
+    # ── 基线校准 ──
+
+    @llm_tool(
+        name="neko_mail_calibrate_baseline",
+        description="校准新邮件轮询基线到当前最新 UID。用于防止旧邮件被重复推送，或手动重置轮询状态。校准后，所有当前存在的邮件都不会再被当作「新邮件」推送。",
+        parameters={
+            "type": "object",
+            "properties": {},
+            "required": [],
+        },
+        timeout=10.0,
+    )
+    @plugin_entry(
+        id="calibrate_baseline",
+        name="校准轮询基线",
+        description="校准新邮件轮询基线到当前最新 UID，防止旧邮件重复推送",
+        input_schema={
+            "type": "object",
+            "properties": {},
+            "required": [],
+        },
+        llm_result_fields=["success", "old_uid", "new_uid", "message"],
+    )
+    async def calibrate_baseline(self, **_):
+        """校准轮询基线"""
+        try:
+            plugin = self._get_plugin()
+            result = plugin.calibrate_baseline(folder="INBOX")
+            if "error" in result:
+                return Err(SdkError(result["error"]))
+            return Ok(result)
+        except Exception as e:
+            return Err(SdkError(f"校准基线失败: {e}"))
