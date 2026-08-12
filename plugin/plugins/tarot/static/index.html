@@ -1109,7 +1109,7 @@
             birthday:{title:'生辰八字',desc:'根据生辰八字解读命运',api:'birthday_divination',validate:()=>{const b=document.getElementById('birthday_input').value;if(!b){alert('请选择出生日期');return null;}const d=new Date(b);const f=d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0')+' '+String(d.getHours()).padStart(2,'0')+':'+String(d.getMinutes()).padStart(2,'0')+':'+String(d.getSeconds()).padStart(2,'0');return{birthday:f};}},
             zodiac:{title:'星座运势',desc:'查询今日星座运势',api:'zodiac_horoscope',validate:()=>{return{sign:document.getElementById('zodiac_sign').value};}},
             stick:{title:'抽签占卜',desc:'虔诚求签，解读签文',api:'fortune_stick',validate:()=>{const q=document.getElementById('stick_question').value.trim();if(q&&STOP_WORDS.some(w=>q.toLowerCase().includes(w))){alert('输入包含不允许的词汇');return null;}return{question:q||''};}},
-            dream:{title:'周公解梦',desc:'解读梦境含义',api:'dream_interpretation',validate:()=>{const p=document.getElementById('dream_prompt').value.trim();if(!p){alert('请描述你的梦境');return null;}if(p.length>40){alert('梦境不能超过40字');return null;}if(STOP_WORDS.some(w=>p.toLowerCase().includes(w))){alert('输入包含不允许的词汇');return null;}return{prompt:p};}},
+            dream:{title:'周公解梦',desc:'解读梦境含义',api:'dream_interpretation',validate:()=>{const p=document.getElementById('dream_prompt').value.trim();if(!p){alert('请描述你的梦境');return null;}if(p.length>200){alert('梦境不能超过200字');return null;}if(STOP_WORDS.some(w=>p.toLowerCase().includes(w))){alert('输入包含不允许的词汇');return null;}return{prompt:p};}},
             name:{title:'姓名五格',desc:'分析姓名对运势的影响',api:'name_analysis',validate:()=>{const n=document.getElementById('name_input').value.trim();if(!n||n.length<1||n.length>10){alert('姓名长度1-10个字');return null;}if(STOP_WORDS.some(w=>n.toLowerCase().includes(w))){alert('输入包含不允许的词汇');return null;}return{name:n};}},
             new_name:{title:'起名取名',desc:'结合五行八字起名',api:'new_name_generation',validate:()=>{const s=document.getElementById('new_name_surname').value.trim();const b=document.getElementById('new_name_birthday').value;const x=document.getElementById('new_name_sex').value;const p=document.getElementById('new_name_prompt').value.trim();if(!s){alert('请输入姓氏');return null;}if(!b){alert('请选择出生日期');return null;}if(p.length>20){alert('要求不能超过20字');return null;}const d=new Date(b);const f=d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0')+' '+String(d.getHours()).padStart(2,'0')+':'+String(d.getMinutes()).padStart(2,'0')+':'+String(d.getSeconds()).padStart(2,'0');return{surname:s,birthday:f,sex:x,prompt:p};}},
             plum_flower:{title:'梅花易数',desc:'以数起卦，预测吉凶',api:'plum_flower_divination',validate:()=>{const n1=document.getElementById('plum_num1').value;const n2=document.getElementById('plum_num2').value;if(!n1||!n2){alert('请输入两个数');return null;}return{num1:parseInt(n1),num2:parseInt(n2)};}},
@@ -1161,6 +1161,31 @@
             return html;
         }
 
+        // ====== Tarot Result Renderer ======
+        function escapeHtml(s) { return String(s).replace(/[&<>"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m])); }
+        function renderTarotResult(data) {
+            if (!data || !data.reading) return null;
+            const r = data.reading;
+            let html = '';
+            if (r.question) { html += '<div style="margin-bottom:10px;color:var(--text-secondary);">问题：' + escapeHtml(r.question) + '</div>'; }
+            for (const c of r.cards) {
+                html += '<div style="margin:12px 0;padding:12px;background:rgba(139,92,246,0.06);border-radius:12px;border:1px solid var(--border-subtle);">';
+                html += '<strong style="color:var(--accent-gold,#a78bfa);">' + c.position + ' · ' + c.card.name + '（' + c.card.name_en + '）' + c.orientation + '</strong><br>';
+                html += '<span style="font-size:0.85em;color:var(--text-secondary);">关键词：' + c.keywords.join('、') + '</span><br>';
+                html += '<span style="font-size:0.9em;">' + c.interpretation + '</span>';
+                html += '</div>';
+            }
+            html += '<div style="margin:16px 0;padding:14px;background:rgba(168,85,247,0.08);border-radius:12px;border:1px solid var(--border-subtle);">';
+            html += '<strong>塔罗建议</strong><br>' + r.advice;
+            html += '</div>';
+            if (r.lucky) {
+                html += '<div style="margin:8px 0;font-size:0.88em;color:var(--text-secondary);">';
+                html += '幸运色: ' + r.lucky.color + ' | 幸运数字: ' + r.lucky.number + ' | 幸运方位: ' + r.lucky.direction;
+                html += '</div>';
+            }
+            return html;
+        }
+
         // ====== Start Divination ======
         async function startDivination() {
             const config = DIVINATION_CONFIGS[currentTab];
@@ -1180,6 +1205,11 @@
                         document.getElementById('drawerResultContent').innerHTML = html;
                         saveToHistory(currentTab, config.title, args, html);
                     } else { openDrawer(config.title, data?.error || '占卜失败，请稍后再试'); }
+                } else if (data && data.reading) {
+                    const html = renderTarotResult(data);
+                    openDrawer(config.title, '', false);
+                    document.getElementById('drawerResultContent').innerHTML = html;
+                    saveToHistory(currentTab, config.title, args, html);
                 } else if (data && data.result) {
                     typewriterToDrawer(data.result, config.title, 30, (fullText) => { saveToHistory(currentTab, config.title, args, fullText); });
                 } else { openDrawer(config.title, data?.error || '占卜失败，请稍后再试'); }
@@ -1195,7 +1225,7 @@
         function clearAllHistory(){if(!confirm('确定要清空所有占卜历史吗？'))return;try{const keys=[];for(let i=0;i<localStorage.length;i++){const key=localStorage.key(i);if(key&&key.startsWith(HISTORY_KEY_PREFIX))keys.push(key);}keys.forEach(k=>localStorage.removeItem(k));loadHistoryTab();}catch(e){console.error(e);}}
         function formatTime(isoStr){const d=new Date(isoStr);const now=new Date();const diff=now-d;const mins=Math.floor(diff/60000);const hours=Math.floor(diff/3600000);const days=Math.floor(diff/86400000);if(mins<1)return'刚刚';if(mins<60)return mins+'分钟前';if(hours<24)return hours+'小时前';if(days<7)return days+'天前';return d.toLocaleString('zh-CN',{month:'short',day:'numeric',hour:'2-digit',minute:'2-digit'});}
         function loadHistoryTab(){const all=getAllHistory();const list=document.getElementById('historyTabList');if(!all.length){list.innerHTML='<div class="history-empty"><div class="history-empty-icon">📜</div><p>暂无历史记录</p><p class="form-hint">开始占卜后会自动保存记录</p></div>';return;}list.innerHTML=all.map(item=>`<div class="history-item"><div class="history-info" onclick="showHistoryItem('${item.type}','${item.id}')"><div class="history-type">${item.title}</div>${item.prompt?'<div class="history-question">'+item.prompt+'</div>':''}</div><div class="history-meta"><span class="history-time">${formatTime(item.timestamp)}</span><button class="history-delete-btn" onclick="deleteHistoryItem('${item.id}','${item.type}')" title="删除">🗑️</button></div></div>`).join('');}
-        function showHistoryItem(type,id){const history=getHistoryByType(type);const item=history.find(x=>x.id===id);if(!item)return;const config=DIVINATION_CONFIGS[type]||{title:item.title};if(config.isGolden){openDrawer(config.title+' - '+(item.prompt||''),'',false);document.getElementById('drawerResultContent').innerHTML=item.result;}else{openDrawer(config.title+' - '+(item.prompt||''),item.result);}}
+        function showHistoryItem(type,id){const history=getHistoryByType(type);const item=history.find(x=>x.id===id);if(!item)return;const config=DIVINATION_CONFIGS[type]||{title:item.title};if(config.isGolden||(typeof item.result==='string'&&item.result.startsWith('<'))){openDrawer(config.title+' - '+(item.prompt||''),'',false);document.getElementById('drawerResultContent').innerHTML=item.result;}else{openDrawer(config.title+' - '+(item.prompt||''),item.result);}}
 
         // ====== Lunar Birthday ======
         function computeLunarBirthday(birthdayStr){try{const date=new Date(birthdayStr);const year=date.getFullYear();const month=date.getMonth()+1;const day=date.getDate();const hour=date.getHours();const stems=['甲','乙','丙','丁','戊','己','庚','辛','壬','癸'];const branches=['子','丑','寅','卯','辰','巳','午','未','申','酉','戌','亥'];const zodiacs=['鼠','牛','虎','兔','龙','蛇','马','羊','猴','鸡','狗','猪'];const months=['正','二','三','四','五','六','七','八','九','十','冬','腊'];const days=['初一','初二','初三','初四','初五','初六','初七','初八','初九','初十','十一','十二','十三','十四','十五','十六','十七','十八','十九','二十','廿一','廿二','廿三','廿四','廿五','廿六','廿七','廿八','廿九','三十'];const times=['子','丑','寅','卯','辰','巳','午','未','申','酉','戌','亥'];const yi=(year-4)%60;const si=yi%10;const bi=yi%12;return stems[si]+branches[bi]+'年（'+zodiacs[bi]+'年）'+months[Math.min(month,12)-1]+'月'+days[Math.max(0,Math.min(day-1,29))]+times[Math.floor(((hour+1)%24)/2)%12]+'时';}catch(e){return'转换失败';}}

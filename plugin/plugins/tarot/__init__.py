@@ -7,8 +7,10 @@ Tarot Reader Plugin
 
 from __future__ import annotations
 
+import hashlib
 import json
 import random
+import re
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
@@ -18,10 +20,15 @@ from plugin.sdk.plugin import (
     neko_plugin,
     plugin_entry,
     lifecycle,
+    llm_tool,
     Ok,
     Err,
     SdkError,
 )
+
+from . import dream_dict as _dream_dict
+from . import name_data as _name_data
+from . import yijing_data as _yijing
 
 # 源项目的 TAROT_PROMPT
 TAROT_PROMPT = """我请求你担任塔罗占卜师的角色。您将接受我的问题并使用虚拟塔罗牌进行塔罗牌阅读。不要忘记洗牌并介绍您在本套牌中使用的套牌。请帮我抽3张随机卡。拿到卡片后，请您仔细说明它们的意义，解释哪张卡片属于未来或现在或过去，结合我的问题来解释它们，并给我有用的建议或我现在应该做的事情。"""
@@ -143,25 +150,25 @@ _GOLDEN_CARDS = [
     {"id": 4, "name": "遐蝶", "name_en": "Castorice", "number": "IV", "arcana": "golden",
      "upright": ["转变", "重生", "放下", "超越", "灵魂", "宁静"],
      "reversed": ["恐惧死亡", "抗拒改变", "死亡之触", "孤独", "远离人群"],
-     "description": "灰黯之手塞纳托斯的继承者，掌管死亡火种。背负「死亡之触」诅咒，与他人保持距离是她的习惯。她召唤死龙共同战斗，是首位拥有「境界」效果的角色。",
+     "description": "灰黯之手塞纳托斯的继承者，掌管死亡火种。背负「死亡之触」诅咒的她习惯与他人保持距离，独自承载着终结与告别的重量，却仍愿意以温柔送别每一段旅途。",
      "element": "量子", "zodiac": "记忆",
      "image": "遐蝶_Castorice.png", "titan": "塞纳托斯", "fire_seed": "死亡"},
     {"id": 5, "name": "那刻夏", "name_en": "Anaxa", "number": "V", "arcana": "golden",
      "upright": ["智慧", "分析", "真理", "洞察", "独立思考", "逻辑"],
      "reversed": ["冷漠", "偏执", "自我封闭", "不近人情", "最不像智识"],
-     "description": "裂分之枝瑟希斯的继承者，掌管理性火种。本名阿那克萨戈拉斯，不喜欢被叫那刻夏。他是最不像智识的智识角色，却有着独到的洞察力。",
+     "description": "裂分之枝瑟希斯的继承者，掌管理性火种。本名阿那克萨戈拉斯，不喜欢被叫那刻夏。他性情孤傲、不近人情，却总能在众人迷茫时给出最独到的洞察。",
      "element": "风", "zodiac": "智识",
      "image": "那刻夏_Anaxa.jpg", "titan": "瑟希斯", "fire_seed": "理性"},
     {"id": 6, "name": "风堇", "name_en": "Hyacine", "number": "VI", "arcana": "golden",
      "upright": ["希望", "治愈", "自由", "广阔", "守护", "新生"],
      "reversed": ["逃避现实", "好高骛远", "治疗疲劳", "过度保护"],
-     "description": "晨昏之眼艾格勒的继承者，掌管天空火种。百眼巨鸟的化身，本名雅辛忒丝。喜欢在称呼后加「宝」字，打破了丰饶才有回复的刻板印象。",
+     "description": "晨昏之眼艾格勒的继承者，掌管天空火种。百眼巨鸟的化身，本名雅辛忒丝。喜欢在称呼后加「宝」字，以开朗的治愈之心守护着逐火之旅的每一位同行者。",
      "element": "风", "zodiac": "记忆",
      "image": "风堇_Hyacine.jpg", "titan": "艾格勒", "fire_seed": "天空"},
     {"id": 7, "name": "赛飞儿", "name_en": "Cipher", "number": "VII", "arcana": "golden",
      "upright": ["机智", "灵活", "真相", "口才", "化险为夷", "牺牲"],
      "reversed": ["谎言", "欺骗", "狡诈", "迷失", "言不由衷", "代价沉重"],
-     "description": "翻飞之币扎格列斯的继承者，掌管诡计火种。本名赛法利娅，游戏第一个猫娘角色。利用谎话成真特性，将翁法罗斯的白昼延长了三百年，直至牺牲时才失效。",
+     "description": "翻飞之币扎格列斯的继承者，掌管诡计火种。本名赛法利娅，玩弄谎言的精灵。她以「谎话成真」之力将翁法罗斯的白昼延长了三百年，直至牺牲的最后一刻，谎言才随风而散。",
      "element": "量子", "zodiac": "虚无",
      "image": "赛飞儿_Cipher_重复2.jpg", "titan": "扎格列斯", "fire_seed": "诡计"},
     {"id": 8, "name": "白厄", "name_en": "Phainon", "number": "VIII", "arcana": "golden",
@@ -173,13 +180,13 @@ _GOLDEN_CARDS = [
     {"id": 9, "name": "海瑟音", "name_en": "Hysilens", "number": "IX", "arcana": "golden",
      "upright": ["深邃", "情感", "包容", "力量", "直觉", "净化"],
      "reversed": ["情绪淹没", "无法自拔", "暗流涌动", "孤立感"],
-     "description": "满溢之杯法吉娜的继承者，掌管海洋火种。海妖一族公主，本名海列屈拉。她的加入盘活了持续伤害队，如同深海中涌动的暗流。",
+     "description": "满溢之杯法吉娜的继承者，掌管海洋火种。海妖一族公主，本名海列屈拉。如深海中涌动的暗流，她将深沉的情感藏于平静的水面之下，歌声里承载着净化的力量。",
      "element": "物理", "zodiac": "虚无",
      "image": "海瑟音_Hysilens.jpg", "titan": "法吉娜", "fire_seed": "海洋"},
     {"id": 10, "name": "刻律德菈", "name_en": "Cerydra", "number": "X", "arcana": "golden",
      "upright": ["秩序", "公正", "规则", "权威", "策略", "平衡"],
      "reversed": ["僵化", "专制", "过度约束", "失去灵活性"],
-     "description": "公正之秤塔兰顿的继承者，掌管律法火种。代表物为棋子，事物内容体现国际象棋要素。她使队友连续施放两次战技，是策略型辅助角色。",
+     "description": "公正之秤塔兰顿的继承者，掌管律法火种。代表物为棋子，一举一动皆含棋道与律法之意。她以秩序与谋略维系着黄金裔之间的平衡，是众人信赖的执秤者。",
      "element": "风", "zodiac": "同谐",
      "image": "刻律德菈_Cerydra.jpg", "titan": "塔兰顿", "fire_seed": "律法"},
     {"id": 11, "name": "长夜月", "name_en": "LongNight", "number": "XI", "arcana": "golden",
@@ -191,7 +198,7 @@ _GOLDEN_CARDS = [
     {"id": 12, "name": "丹恒·腾荒", "name_en": "DanHeng · Terrae", "number": "XII", "arcana": "golden",
      "upright": ["稳固", "根基", "成长", "守护", "不朽", "蜕变"],
      "reversed": ["停滞", "固守", "无法成长", "依赖他人"],
-     "description": "磐岩之脊吉奥里亚的继承者，掌管大地火种。为找回开拓者，在荒笛处继承大地火种，体型由青年变为成年。他是免费赠送的限定五星，象征着不朽与蜕变。",
+     "description": "磐岩之脊吉奥里亚的继承者，掌管大地火种。为找回开拓者，他在荒笛处继承大地火种，体型由青年变为成年，如磐石般沉默坚定地守护着重要之人，象征不朽与蜕变。",
      "element": "物理", "zodiac": "存护",
      "image": "丹恒·腾荒_DanHeng_Terrae.jpg", "titan": "吉奥里亚", "fire_seed": "大地"},
     {"id": 13, "name": "昔涟", "name_en": "Cyrene", "number": "XIII", "arcana": "golden",
@@ -1072,8 +1079,6 @@ class TarotReaderPlugin(NekoPluginBase):
             }
         })
 
-    BIRTHDAY_PROMPT = "我请求你担任中国传统的生辰八字算命的角色。我将会给你我的生日，请你根据我的生日推算命盘，分析五行属性、吉凶祸福、财运、婚姻、健康、事业等方面的情况，并为其提供相应的指导和建议。"
-
     @plugin_entry(
         id="birthday_divination",
         name="生辰八字",
@@ -1089,14 +1094,14 @@ class TarotReaderPlugin(NekoPluginBase):
     )
     async def birthday_divination(self, birthday: str, **_):
         self.logger.info(f"[生辰八字] 生日: {birthday}")
-        result_text = f"我的生日是{birthday}。\n\n{self.BIRTHDAY_PROMPT}"
+        result_text = _build_birthday_reading(str(birthday or "").strip())
+        if result_text is None:
+            return Err(SdkError("无法识别生日信息，请输入如 2000-01-01 格式的日期"))
         self._reading_count += 1
         self._readings.append({"type": "birthday", "birthday": birthday, "result": result_text, "timestamp": _iso()})
         await self._save_state()
-        await self._notify_catgirl_birthday(result_text)
+        await self._notify_catgirl_divination("生辰八字", birthday, result_text)
         return Ok({"success": True, "data": {"result": result_text}})
-
-    DREAM_PROMPT = "我请求你担任中国传统的周公解梦师的角色。我将会给你我的梦境，请你解释我的梦境，并为其提供相应的指导和建议。"
 
     @plugin_entry(
         id="dream_interpretation",
@@ -1113,16 +1118,17 @@ class TarotReaderPlugin(NekoPluginBase):
     )
     async def dream_interpretation(self, prompt: str, **_):
         self.logger.info(f"[周公解梦] 梦境: {prompt}")
-        if len(prompt) > 40:
-            return Err(SdkError("梦境描述不能超过40字"))
-        result_text = f"我的梦境是: {prompt}\n\n{self.DREAM_PROMPT}"
+        prompt = str(prompt or "").strip()
+        if not prompt:
+            return Err(SdkError("请描述你的梦境"))
+        if len(prompt) > 200:
+            return Err(SdkError("梦境描述不能超过200字"))
+        result_text = _build_dream_reading(prompt)
         self._reading_count += 1
         self._readings.append({"type": "dream", "prompt": prompt, "result": result_text, "timestamp": _iso()})
         await self._save_state()
-        self._notify_catgirl_divination("周公解梦", prompt, result_text)
+        await self._notify_catgirl_divination("周公解梦", prompt, result_text)
         return Ok({"success": True, "data": {"result": result_text}})
-
-    NAME_PROMPT = "我请求你担任中国传统的姓名五格算命师的角色。我将会给你我的名字，请你根据我的名字推算，分析姓氏格、名字格、和自己格。并为其提供相应的指导和建议。"
 
     @plugin_entry(
         id="name_analysis",
@@ -1139,16 +1145,20 @@ class TarotReaderPlugin(NekoPluginBase):
     )
     async def name_analysis(self, name: str, **_):
         self.logger.info(f"[姓名五格] 姓名: {name}")
-        if len(name) < 1 or len(name) > 10:
-            return Err(SdkError("姓名长度必须在1-10个字之间"))
-        result_text = f"我的名字是{name}。\n\n{self.NAME_PROMPT}"
+        name = str(name or "").strip()
+        if len(name) < 2 or len(name) > 4:
+            return Err(SdkError("请输入2-4个字的中文姓名"))
+        result_text = _build_name_reading(name)
+        if result_text is None:
+            missing = [ch for ch in name if _name_data.stroke_of(ch) is None]
+            if missing:
+                return Err(SdkError(f"「{'、'.join(missing)}」不在本地笔画字库中，暂无法分析五格，换用常见字试试吧"))
+            return Err(SdkError("姓名结构暂不支持五格分析（需1-2字姓氏+1-2字名字）"))
         self._reading_count += 1
         self._readings.append({"type": "name", "name": name, "result": result_text, "timestamp": _iso()})
         await self._save_state()
-        self._notify_catgirl_divination("姓名五格", name, result_text)
+        await self._notify_catgirl_divination("姓名五格", name, result_text)
         return Ok({"success": True, "data": {"result": result_text}})
-
-    NEW_NAME_PROMPT = "我请求你担任起名师的角色，我将会给你我的姓氏、生日、性别等，请返回你认为最适合我的名字，请注意姓氏在前，名字在后。"
 
     @plugin_entry(
         id="new_name_generation",
@@ -1168,21 +1178,19 @@ class TarotReaderPlugin(NekoPluginBase):
     )
     async def new_name_generation(self, surname: str, birthday: str, sex: str, prompt: str = "", **_):
         self.logger.info(f"[起名取名] 姓氏: {surname}, 生日: {birthday}, 性别: {sex}")
+        surname = str(surname or "").strip()
+        birthday = str(birthday or "").strip()
+        sex = str(sex or "").strip()
         if not surname or not birthday or not sex:
-            return Err(SdkError("起名参数错误"))
+            return Err(SdkError("起名参数错误，需提供姓氏、生日、性别"))
         if len(prompt) > 20:
             return Err(SdkError("其他要求不能超过20字"))
-        req_text = f"姓氏是{surname}, 生日是{birthday}, 性别是{sex}"
-        if prompt:
-            req_text += f", 我的要求是: {prompt}"
-        result_text = f"{req_text}\n\n{self.NEW_NAME_PROMPT}"
+        result_text = _build_new_name_reading(surname, birthday, sex, str(prompt or "").strip())
         self._reading_count += 1
         self._readings.append({"type": "new_name", "surname": surname, "birthday": birthday, "sex": sex, "result": result_text, "timestamp": _iso()})
         await self._save_state()
-        self._notify_catgirl_divination("起名取名", f"{surname}姓{sex}宝宝", result_text)
+        await self._notify_catgirl_divination("起名取名", f"{surname}姓{sex}宝宝", result_text)
         return Ok({"success": True, "data": {"result": result_text}})
-
-    PLUM_FLOWER_PROMPT = "我请求你担任中国传统的梅花易数占卜师的角色。我会随意说出两个数，第一个数取为上卦，第二个数取为下卦。请你直接以数起卦, 并向我解释结果"
 
     @plugin_entry(
         id="plum_flower_divination",
@@ -1200,23 +1208,16 @@ class TarotReaderPlugin(NekoPluginBase):
     )
     async def plum_flower_divination(self, num1: int, num2: int, **_):
         self.logger.info(f"[梅花易数] 数字: {num1}, {num2}")
-        result_text = f"我选择的数字是: {num1} 和 {num2}\n\n{self.PLUM_FLOWER_PROMPT}"
+        try:
+            num1, num2 = int(num1), int(num2)
+        except (TypeError, ValueError):
+            return Err(SdkError("请输入两个整数作为卦数"))
+        result_text = _build_plum_reading(num1, num2)
         self._reading_count += 1
         self._readings.append({"type": "plum_flower", "num1": num1, "num2": num2, "result": result_text, "timestamp": _iso()})
         await self._save_state()
-        self._notify_catgirl_divination("梅花易数", f"{num1}和{num2}", result_text)
+        await self._notify_catgirl_divination("梅花易数", f"{num1}和{num2}", result_text)
         return Ok({"success": True, "data": {"result": result_text}})
-
-    FATE_PROMPT = (
-        "你是一个姻缘助手，我给你发两个人的名字，用逗号隔开，"
-        "你来 随机说一下，这两个人之间的缘分如何？"
-        "不需要很真实，只需要娱乐化的说一下即可，"
-        "你可以根据人名先判断一下这个人名的真实性，"
-        "如果输入是一些类似张三李四之类的，就返回不合适，"
-        "或者如果两个人的名字性别，都是同性，也最好返回不合适。"
-        "然后基本主要围绕, 90%的概率 说二人很合适, 然后10%的概率，"
-        "说对方不合适，并列出为啥这样的原因。"
-    )
 
     @plugin_entry(
         id="fate_divination",
@@ -1234,26 +1235,18 @@ class TarotReaderPlugin(NekoPluginBase):
     )
     async def fate_divination(self, name1: str, name2: str, **_):
         self.logger.info(f"[姻缘占卜] {name1} 和 {name2}")
+        name1 = str(name1 or "").strip()
+        name2 = str(name2 or "").strip()
+        if not name1 or not name2:
+            return Err(SdkError("请输入两个人的名字"))
         if len(name1) > 40 or len(name2) > 40:
             return Err(SdkError("名字不能超过40字"))
-        result_text = f"{name1}, {name2}\n\n{self.FATE_PROMPT}"
+        result_text = _build_fate_reading(name1, name2)
         self._reading_count += 1
         self._readings.append({"type": "fate", "name1": name1, "name2": name2, "result": result_text, "timestamp": _iso()})
         await self._save_state()
-        self._notify_catgirl_divination("姻缘占卜", f"{name1}和{name2}", result_text)
+        await self._notify_catgirl_divination("姻缘占卜", f"{name1}和{name2}", result_text)
         return Ok({"success": True, "data": {"result": result_text}})
-
-    async def _notify_catgirl_birthday(self, result: str) -> None:
-        try:
-            self.ctx.push_message(
-                source="divination_master",
-                ai_behavior="respond",
-                parts=[{"type": "text", "text": f"主人刚刚做了生辰八字占卜，请帮他解读一下：\n\n{result}"}],
-                priority=5,
-            )
-            self.logger.info("[生辰八字] 已推送给猫娘")
-        except Exception as exc:
-            self.logger.warning(f"[生辰八字] 推送失败: {exc}")
 
     async def _notify_catgirl_divination(self, div_type: str, prompt: str, result: str) -> None:
         try:
@@ -1289,33 +1282,7 @@ class TarotReaderPlugin(NekoPluginBase):
             available = "、".join(_ZODIAC_SIGNS.keys())
             return Err(SdkError(f"未知星座 '{sign}'。可选: {available}"))
 
-        zodiac_info = _ZODIAC_SIGNS[sign]
-        today = datetime.now().strftime("%Y年%m月%d日")
-        
-        result_parts = [f"## {today} · {sign}运势", ""]
-        result_parts.append(f"**日期范围**: {zodiac_info['dates']} | **属性**: {zodiac_info['element']}象星座 | **守护星**: {zodiac_info['ruling']}")
-        result_parts.append(f"**性格特质**: {zodiac_info['traits']}")
-        result_parts.append(f"**最佳配对**: {zodiac_info['compatibility']}")
-        result_parts.append("")
-        result_parts.append("---")
-        result_parts.append("")
-
-        for aspect in _ZODIAC_ASPECTS:
-            rating = random.choice(_ZODIAC_RATINGS)
-            advice = random.choice(_ZODIAC_ADVICE_POOL[aspect])
-            result_parts.append(f"### {aspect} {rating}")
-            result_parts.append(advice)
-            result_parts.append("")
-
-        lucky_color = random.choice(_LUCKY_ELEMENTS["colors"])
-        lucky_number = random.choice(_LUCKY_ELEMENTS["numbers"])
-        lucky_direction = random.choice(_LUCKY_ELEMENTS["directions"])
-        result_parts.append(f"**幸运元素**")
-        result_parts.append(f"- 幸运色: {lucky_color}")
-        result_parts.append(f"- 幸运数字: {lucky_number}")
-        result_parts.append(f"- 幸运方向: {lucky_direction}")
-
-        result_text = "\n".join(result_parts)
+        result_text = _build_horoscope_reading(sign)
         self._reading_count += 1
         self._readings.append({"type": "horoscope", "sign": sign, "result": result_text, "timestamp": _iso()})
         await self._save_state()
@@ -1337,53 +1304,8 @@ class TarotReaderPlugin(NekoPluginBase):
     )
     async def fortune_stick(self, question: str = "", lottery_type: str = "关帝灵签", **_):
         self.logger.info(f"[抽签占卜] 问题: {question or '无'}, 类型: {lottery_type}")
-        
-        lottery_level = _weighted_draw_lottery()
-        level_info = _LOTTERY_LEVELS[lottery_level]
-        emoji = level_info["emoji"]
-        
-        poems = _LOTTERY_POEMS[lottery_level]
-        poem = random.choice(poems)
-        
-        interpretations = _LOTTERY_INTERPRETATIONS[lottery_level]
-        interpretation = random.choice(interpretations)
-        
-        stick_number = random.randint(1, 100)
-        
-        today = datetime.now().strftime("%Y年%m月%d日")
-        result_parts = [f"## {emoji} {lottery_type} · 第{stick_number}签", ""]
-        result_parts.append(f"**占卜日期**: {today}")
-        if question:
-            result_parts.append(f"**所求之事**: {question}")
-        result_parts.append("")
-        result_parts.append("---")
-        result_parts.append("")
-        result_parts.append(f"### {emoji} {lottery_level}")
-        result_parts.append("")
-        result_parts.append(f"> {poem}")
-        result_parts.append("")
-        result_parts.append("---")
-        result_parts.append("")
-        result_parts.append(f"### 📜 签文解读")
-        result_parts.append(interpretation)
-        result_parts.append("")
-        
-        if lottery_level in ["上上签", "上签"]:
-            result_parts.append("### 💡 建议")
-            result_parts.append("把握良机，积极行动。好运当前，但也要保持谦逊，不可骄傲自满。")
-        elif lottery_level == "中签":
-            result_parts.append("### 💡 建议")
-            result_parts.append("保持平常心，稳扎稳打。不急不躁，等待时机成熟。")
-        else:
-            result_parts.append("### 💡 建议")
-            result_parts.append("韬光养晦，静待转机。困难只是暂时的，调整心态，积蓄力量。")
-        
-        result_parts.append("")
-        result_parts.append("---")
-        result_parts.append("")
-        result_parts.append("*心诚则灵，但命运始终掌握在自己手中。*")
 
-        result_text = "\n".join(result_parts)
+        result_text, lottery_level, stick_number = _build_fortune_stick_reading(question, lottery_type)
         self._reading_count += 1
         self._readings.append({"type": "fortune_stick", "question": question, "level": lottery_level, "stick_number": stick_number, "result": result_text, "timestamp": _iso()})
         await self._save_state()
@@ -1549,9 +1471,554 @@ class TarotReaderPlugin(NekoPluginBase):
             }
         })
 
+    # ═══════════════════════════════════════════════════════════
+    # 猫娘 LLM 工具（@llm_tool 注册，猫娘可直接调用为用户占卜）
+    # ═══════════════════════════════════════════════════════════
+
+    @staticmethod
+    def _summarize_reading(reading: dict[str, Any]) -> dict[str, Any]:
+        return {
+            "spread": reading["spread"]["name"],
+            "question": reading.get("question", ""),
+            "cards": [
+                {
+                    "position": c["position"],
+                    "card": c["card"]["name"],
+                    "card_en": c["card"]["name_en"],
+                    "orientation": c["orientation"],
+                    "keywords": c["keywords"],
+                    "interpretation": c["interpretation"],
+                }
+                for c in reading["cards"]
+            ],
+            "advice": reading["advice"],
+            "lucky": reading.get("lucky", {}),
+        }
+
+    async def _record(self, record: dict[str, Any]) -> None:
+        self._reading_count += 1
+        self._readings.append(record)
+        await self._save_state()
+
+    @llm_tool(
+        name="tarot_reading",
+        description="为用户进行塔罗牌占卜。支持牌阵：single(单牌今日指引)、three_card(过去现在未来)、love(爱情牌阵)、celtic_cross(凯尔特十字)。返回各位置牌名、正逆位、解读、建议与幸运元素，调用后请用自己的话把结果讲给用户听。",
+        parameters={
+            "type": "object",
+            "properties": {
+                "spread": {"type": "string", "enum": ["single", "three_card", "love", "celtic_cross"], "description": "牌阵类型，默认 single"},
+                "question": {"type": "string", "description": "用户想占卜的问题，可为空"},
+            },
+        },
+    )
+    async def tool_tarot_reading(self, spread: str = "single", question: str = "", **_):
+        if spread not in _SPREADS:
+            return {"output": f"未知牌阵 '{spread}'，可选：{', '.join(_SPREADS)}", "is_error": True, "error": "invalid_spread"}
+        reading = _build_reading(spread, str(question or ""))
+        await self._record(reading)
+        return {"success": True, **self._summarize_reading(reading)}
+
+    @llm_tool(
+        name="golden_tarot_reading",
+        description="为用户进行黄金裔塔罗占卜（翁法罗斯·逐火之旅世界观，13张黄金裔牌）。支持牌阵：golden_single(火种单抽)、trinity_cycle(三相轮回：过去/现在/未来之我)、fire_journey(逐火之旅五牌阵)。返回牌名、火种、泰坦、正逆位与解读，调用后请用自己的话讲给用户听。",
+        parameters={
+            "type": "object",
+            "properties": {
+                "spread": {"type": "string", "enum": ["golden_single", "trinity_cycle", "fire_journey"], "description": "牌阵类型，默认 golden_single"},
+                "question": {"type": "string", "description": "用户想占卜的问题，可为空"},
+            },
+        },
+    )
+    async def tool_golden_tarot_reading(self, spread: str = "golden_single", question: str = "", **_):
+        if spread not in _GOLDEN_SPREADS:
+            return {"output": f"未知牌阵 '{spread}'，可选：{', '.join(_GOLDEN_SPREADS)}", "is_error": True, "error": "invalid_spread"}
+        reading = _build_golden_reading(spread, str(question or ""))
+        await self._record(reading)
+        summary = self._summarize_reading(reading)
+        for idx, c in enumerate(reading["cards"]):
+            summary["cards"][idx]["fire_seed"] = c["card"].get("fire_seed", "")
+            summary["cards"][idx]["titan"] = c["card"].get("titan", "")
+        return {"success": True, **summary}
+
+    @llm_tool(
+        name="birthday_fortune",
+        description="为用户做生辰八字解读：根据生日推算干支、生肖、纳音五行，给出五行属性、事业财运、情感婚姻、健康与建议。返回 markdown 报告，请用自然语言转述给用户。",
+        parameters={
+            "type": "object",
+            "properties": {
+                "birthday": {"type": "string", "description": "用户生日，如 2000-01-01 或 2000年1月1日"},
+            },
+            "required": ["birthday"],
+        },
+    )
+    async def tool_birthday_fortune(self, birthday: str = "", **_):
+        text = _build_birthday_reading(str(birthday or "").strip())
+        if text is None:
+            return {"output": "无法识别生日信息，请提供如 2000-01-01 格式的日期", "is_error": True, "error": "invalid_birthday"}
+        await self._record({"type": "birthday", "birthday": birthday, "result": text, "timestamp": _iso()})
+        return {"success": True, "result": text}
+
+    @llm_tool(
+        name="zodiac_horoscope",
+        description="查询指定星座的今日运势：综合/爱情/事业学业/财富/健康五方面评分与建议，及幸运元素。返回 markdown 报告，请转述给用户。",
+        parameters={
+            "type": "object",
+            "properties": {
+                "sign": {"type": "string", "description": "十二星座之一，如 狮子座"},
+            },
+            "required": ["sign"],
+        },
+    )
+    async def tool_zodiac_horoscope(self, sign: str = "", **_):
+        sign = str(sign or "").strip()
+        if sign not in _ZODIAC_SIGNS:
+            return {"output": f"未知星座 '{sign}'，可选：{'、'.join(_ZODIAC_SIGNS)}", "is_error": True, "error": "invalid_sign"}
+        text = _build_horoscope_reading(sign)
+        await self._record({"type": "horoscope", "sign": sign, "result": text, "timestamp": _iso()})
+        return {"success": True, "result": text}
+
+    @llm_tool(
+        name="fortune_stick",
+        description="为用户求签问卦（抽签占卜）：按权重抽取签等，给出签诗、签文解读与建议。返回 markdown 报告，请转述给用户。",
+        parameters={
+            "type": "object",
+            "properties": {
+                "question": {"type": "string", "description": "用户所求之事，可为空"},
+                "lottery_type": {"type": "string", "description": "签筒名称，默认关帝灵签"},
+            },
+        },
+    )
+    async def tool_fortune_stick(self, question: str = "", lottery_type: str = "关帝灵签", **_):
+        text, level, stick_number = _build_fortune_stick_reading(str(question or ""), str(lottery_type or "关帝灵签"))
+        await self._record({"type": "fortune_stick", "question": question, "level": level, "stick_number": stick_number, "result": text, "timestamp": _iso()})
+        return {"success": True, "result": text}
+
+    @llm_tool(
+        name="dream_interpretation",
+        description="为用户做周公解梦：从梦境描述中匹配传统意象并逐条解读，结合梦中情绪给出通则与建议。返回 markdown 报告，请用温柔语气转述给用户。",
+        parameters={
+            "type": "object",
+            "properties": {
+                "prompt": {"type": "string", "description": "用户的梦境描述（200字以内）"},
+            },
+            "required": ["prompt"],
+        },
+    )
+    async def tool_dream_interpretation(self, prompt: str = "", **_):
+        prompt = str(prompt or "").strip()
+        if not prompt:
+            return {"output": "请提供梦境描述", "is_error": True, "error": "empty_prompt"}
+        if len(prompt) > 200:
+            return {"output": "梦境描述不能超过200字", "is_error": True, "error": "too_long"}
+        text = _build_dream_reading(prompt)
+        await self._record({"type": "dream", "prompt": prompt, "result": text, "timestamp": _iso()})
+        return {"success": True, "result": text}
+
+    @llm_tool(
+        name="name_analysis",
+        description="为用户分析姓名五格（五格剖象法）：计算天格/人格/地格/外格/总格笔画，配 81 数理吉凶与五行断语。返回 markdown 报告，请转述给用户。",
+        parameters={
+            "type": "object",
+            "properties": {
+                "name": {"type": "string", "description": "2-4字的中文姓名"},
+            },
+            "required": ["name"],
+        },
+    )
+    async def tool_name_analysis(self, name: str = "", **_):
+        name = str(name or "").strip()
+        if len(name) < 2 or len(name) > 4:
+            return {"output": "请输入2-4个字的中文姓名", "is_error": True, "error": "invalid_name"}
+        text = _build_name_reading(name)
+        if text is None:
+            missing = [ch for ch in name if _name_data.stroke_of(ch) is None]
+            reason = f"「{'、'.join(missing)}」不在本地笔画字库中" if missing else "姓名结构暂不支持五格分析"
+            return {"output": f"{reason}，无法分析五格", "is_error": True, "error": "unknown_strokes"}
+        await self._record({"type": "name", "name": name, "result": text, "timestamp": _iso()})
+        return {"success": True, "result": text}
+
+    @llm_tool(
+        name="name_generation",
+        description="为用户起名取名：根据姓氏与出生年份纳音五行给出补益方向，并推荐带寓意的候选名。返回 markdown 报告，请转述给用户。",
+        parameters={
+            "type": "object",
+            "properties": {
+                "surname": {"type": "string", "description": "姓氏"},
+                "birthday": {"type": "string", "description": "生日，如 2024-05-01"},
+                "sex": {"type": "string", "description": "性别，男或女"},
+                "prompt": {"type": "string", "description": "其他起名要求，可为空"},
+            },
+            "required": ["surname", "birthday", "sex"],
+        },
+    )
+    async def tool_name_generation(self, surname: str = "", birthday: str = "", sex: str = "", prompt: str = "", **_):
+        surname = str(surname or "").strip()
+        birthday = str(birthday or "").strip()
+        sex = str(sex or "").strip()
+        if not surname or not birthday or not sex:
+            return {"output": "起名需提供姓氏、生日、性别", "is_error": True, "error": "invalid_args"}
+        text = _build_new_name_reading(surname, birthday, sex, str(prompt or "").strip())
+        await self._record({"type": "new_name", "surname": surname, "birthday": birthday, "sex": sex, "result": text, "timestamp": _iso()})
+        return {"success": True, "result": text}
+
+    @llm_tool(
+        name="plum_flower_divination",
+        description="为用户做梅花易数占卜：以两个数字起卦，给出本卦、体用生克、动爻、变卦、互卦与总断建议。返回 markdown 报告，请转述给用户。",
+        parameters={
+            "type": "object",
+            "properties": {
+                "num1": {"type": "integer", "description": "第一个数（取上卦）"},
+                "num2": {"type": "integer", "description": "第二个数（取下卦）"},
+            },
+            "required": ["num1", "num2"],
+        },
+    )
+    async def tool_plum_flower_divination(self, num1: int = 0, num2: int = 0, **_):
+        try:
+            num1, num2 = int(num1), int(num2)
+        except (TypeError, ValueError):
+            return {"output": "请提供两个整数", "is_error": True, "error": "invalid_numbers"}
+        text = _build_plum_reading(num1, num2)
+        await self._record({"type": "plum_flower", "num1": num1, "num2": num2, "result": text, "timestamp": _iso()})
+        return {"success": True, "result": text}
+
+    @llm_tool(
+        name="fate_divination",
+        description="为用户做姻缘占卜：输入两个名字，给出确定性缘分指数、缘分评语与建议（娱乐向）。返回 markdown 报告，请用轻松语气转述给用户。",
+        parameters={
+            "type": "object",
+            "properties": {
+                "name1": {"type": "string", "description": "第一个人的名字"},
+                "name2": {"type": "string", "description": "第二个人的名字"},
+            },
+            "required": ["name1", "name2"],
+        },
+    )
+    async def tool_fate_divination(self, name1: str = "", name2: str = "", **_):
+        name1 = str(name1 or "").strip()
+        name2 = str(name2 or "").strip()
+        if not name1 or not name2:
+            return {"output": "请提供两个人的名字", "is_error": True, "error": "invalid_names"}
+        text = _build_fate_reading(name1, name2)
+        await self._record({"type": "fate", "name1": name1, "name2": name2, "result": text, "timestamp": _iso()})
+        return {"success": True, "result": text}
+
 
 def _weighted_draw_lottery() -> str:
     """根据权重随机抽取签等"""
     levels = list(_LOTTERY_LEVELS.keys())
     weights = [_LOTTERY_LEVELS[l]["weight"] for l in levels]
     return random.choices(levels, weights=weights, k=1)[0]
+
+
+# ═══════════════════════════════════════════════════════════
+# 五大占卜本地生成引擎（确定性规则生成真实内容，不依赖 LLM）
+# ═══════════════════════════════════════════════════════════
+
+_FIVE_ELEMENTS = ["木", "火", "土", "金", "水"]
+
+
+def _stable_seed(*parts: Any) -> int:
+    digest = hashlib.md5("|".join(str(p) for p in parts).encode("utf-8")).hexdigest()
+    return int(digest[:8], 16)
+
+
+def _parse_date(text: str) -> tuple[int, int, int] | None:
+    """解析 2000-01-01 / 2000.1.1 / 2000年1月1日 等生日字符串"""
+    m = re.search(r"(\d{4})\D*(\d{1,2})\D*(\d{1,2})", text)
+    if m:
+        return int(m.group(1)), int(m.group(2)), int(m.group(3))
+    m = re.search(r"(\d{4})\D*(\d{1,2})", text)
+    if m:
+        return int(m.group(1)), int(m.group(2)), 1
+    m = re.search(r"(\d{4})", text)
+    if m:
+        return int(m.group(1)), 1, 1
+    return None
+
+
+_BIRTHDAY_ELEMENT_READINGS: dict[str, dict[str, str]] = {
+    "金": {
+        "性情": "性情刚毅果断，重义守诺，心中有尺、行事有度，认准的事会坚持到底。",
+        "事业": "事业运宜稳中求进，适合承担需要责任与决断的事务，凭实力立身，中年后渐入佳境。",
+        "情感": "感情上内敛含蓄，不擅甜言蜜语，却是一旦认定便相守一生的深情之人。",
+        "健康": "宜留意呼吸系统与肌肤保养，秋冬季注意保暖，作息规律则百病不侵。",
+    },
+    "木": {
+        "性情": "性情仁厚正直，如草木向阳，有进取心与同情心，不折不挠。",
+        "事业": "事业如树木扎根，前期积累越厚，后期枝叶越茂，适合教育、文化、策划类发展方向。",
+        "情感": "感情中温柔而有原则，善解人意，是细水长流型的伴侣。",
+        "健康": "宜多亲近自然、舒筋活络，春季养肝，忌郁结于心。",
+    },
+    "水": {
+        "性情": "性情聪慧灵动，反应敏捷，如水般能方能圆，适应力强。",
+        "事业": "适合需要谋略、沟通与变通的事务，财如活水，宜开源节流，忌投机冒进。",
+        "情感": "感情丰富细腻，重心灵契合，易被懂自己的人打动。",
+        "健康": "宜留意肾脏与腰膝保养，冬季勿贪凉，宜适度运动以通气血。",
+    },
+    "火": {
+        "性情": "性情热情豪爽，行动力强，如烈日当空，光明磊落。",
+        "事业": "事业心旺盛，敢闯敢拼，适合开拓性事务，但关键时刻须戒急躁，稳得住方能守得久。",
+        "情感": "感情热烈直接，爱得坦荡，宜多一分耐心与休贴。",
+        "健康": "宜留意心血管与睡眠，夏季防燥热，忌熬夜伤神。",
+    },
+    "土": {
+        "性情": "性情敦厚宽容，讲信修睦，如山岳般沉稳可靠。",
+        "事业": "事业宜守正出奇，适合稳健发展的道路，贵人运厚，晚运尤佳。",
+        "情感": "感情中踏实可靠，是家人朋友都安心的存在，宜偶添浪漫。",
+        "健康": "宜留意脾胃调养，饮食有节，忌思虑过重。",
+    },
+}
+
+_BIRTHDAY_ADVICE_POOL = [
+    "命由天定，运由己造。八字只示气运的轮廓，真正的人生轮廓，永远由你自己提笔。",
+    "顺势而为，逆势而修。运气好的时候乘势而上，运气蛰伏时修身养性，皆是好安排。",
+    "五行贵在流通，人生贵在平衡。不偏不倚，从容中道，福泽自然绵长。",
+    "贵人不在天边，而在眼前。善待身边人，便是为自己种下最好的福田。",
+]
+
+
+def _build_birthday_reading(birthday: str) -> str | None:
+    parsed = _parse_date(birthday)
+    if parsed is None:
+        return None
+    year, month, day = parsed
+    ganzhi, zodiac, element = _name_data.year_pillar(year)
+    seed = _stable_seed(year, month, day)
+    readings = _BIRTHDAY_ELEMENT_READINGS[element]
+    advice = _BIRTHDAY_ADVICE_POOL[seed % len(_BIRTHDAY_ADVICE_POOL)]
+    parts = [
+        "## 🎴 生辰八字 · 命盘解读", "",
+        f"**生辰**: {birthday}（{year}年·{ganzhi}年·属{zodiac}）", "",
+        f"**纳音五行**: 本命纳音属 **{element}**", "",
+        "---", "",
+        f"### ✨ 五行属性 · {element}",
+        f"纳音属{element}。{readings['性情']}", "",
+        "### 💼 事业财运", readings["事业"], "",
+        "### 💞 情感婚姻", readings["情感"], "",
+        "### 🌿 健康提示", readings["健康"], "",
+        "### 💡 大师建议", advice, "",
+        "---", "",
+        "*八字算命为传统民俗文化，仅供娱乐参考，人生始终掌握在自己手中。*",
+    ]
+    return "\n".join(parts)
+
+
+def _build_dream_reading(prompt: str) -> str:
+    today = datetime.now().strftime("%Y年%m月%d日")
+    parts = ["## 🌙 周公解梦 · 解梦报告", "",
+             f"**日期**: {today}", f"**梦境描述**: {prompt}", "",
+             "---", ""]
+    hits = _dream_dict.match_symbols(prompt)
+    if hits:
+        parts.append("### 🔮 意象解读")
+        parts.append("")
+        for kw, meaning, fortune in hits:
+            parts.append(f"**「{kw}」** · {fortune}")
+            parts.append(meaning)
+            parts.append("")
+    emo_hit = _dream_dict.emotion_reading(prompt)
+    if emo_hit is not None:
+        emo, text, _fortune = emo_hit
+        parts.append(f"### 💭 梦中情绪 · {emo}")
+        parts.append("")
+        parts.append(text)
+        parts.append("")
+    if not hits:
+        text, fortune = _dream_dict.generic_reading(prompt, _stable_seed(prompt))
+        parts.append("### 🔮 通则解读")
+        parts.append("")
+        parts.append(f"**总体**: {fortune}")
+        parts.append(text)
+        parts.append("")
+    parts += ["---", "", "*梦为心声，传统解梦属民俗文化，仅供娱乐参考。*"]
+    return "\n".join(parts)
+
+
+_NAME_ELEMENT_ADVICE = {
+    "木": "人格属木，性仁而直，有上进之心。宜从事文教、策划之业，如树木之日长，日渐葱茏。",
+    "火": "人格属火，性礼而烈，行动迅捷。宜从事文艺、传播之业，然须戒急躁，方能行远。",
+    "土": "人格属土，性信而厚，稳重宽宏。宜从事理财、服务之业，稳中求进，可得久安。",
+    "金": "人格属金，性义而刚，决断果敢。宜从事需决断之业，然须防过刚易折，以柔济之。",
+    "水": "人格属水，性智而灵，变通多谋。宜从事谋略、沟通之业，然须防志趣不定，守一方深耕。",
+}
+
+
+def _split_name(name: str) -> tuple[str, str]:
+    """拆分姓氏与名字：前两字为常见复姓则作复姓"""
+    if len(name) >= 3 and name[:2] in _name_data.COMPOUND_SURNAMES:
+        return name[:2], name[2:]
+    return name[:1], name[1:]
+
+
+def _build_name_reading(name: str) -> str | None:
+    surname, given = _split_name(name)
+    grids = _name_data.compute_five_grids(surname, given)
+    if grids is None:
+        return None
+    parts = [f"## 📜 五格剖象 · 「{name}」姓名分析", "",
+             f"**姓氏**: {surname} · **名字**: {given}", "",
+             "---", "",
+             "### 🔢 五格数理", ""]
+    element_count: dict[str, int] = {}
+    for grid, strokes in grids.items():
+        desc, fortune = _name_data.number_fortune(strokes)
+        element = _name_data.stroke_element(strokes)
+        element_count[element] = element_count.get(element, 0) + 1
+        parts.append(f"- **{grid}**（{strokes}画·属{element}）：{desc} —— **{fortune}**")
+    parts.append("")
+    distribution = "、".join(f"{e}×{n}" for e, n in element_count.items())
+    lacking = [e for e in _FIVE_ELEMENTS if e not in element_count]
+    parts += ["### ⚖️ 五格五行分布", "", distribution, ""]
+    if lacking:
+        parts.append(f"五格之中不见「{'、'.join(lacking)}」之气，平日可于衣着配色、居所摆设中稍作补益。")
+        parts.append("")
+    ren_element = _name_data.stroke_element(grids["人格"])
+    parts += ["### 💡 解读建议", "",
+              _NAME_ELEMENT_ADVICE.get(ren_element, "人格为五格之枢，宜稳宣守正。"), "",
+              "---", "",
+              "*五格剖象法为姓名学民俗，笔画采用现代规范字，仅供娱乐参考。*"]
+    return "\n".join(parts)
+
+
+def _build_new_name_reading(surname: str, birthday: str, sex: str, prompt: str) -> str:
+    parsed = _parse_date(birthday)
+    year = parsed[0] if parsed else datetime.now().year
+    ganzhi, zodiac, element = _name_data.year_pillar(year)
+    direction, suggestions = _name_data.suggest_names(surname, sex, element, count=5)
+    parts = [f"## ✒️ 起名取名 · {surname}姓{sex}宝宝", "",
+             f"**生于{year}年**: {ganzhi}年 · 属{zodiac} · 纳音属 **{element}**", "",
+             f"**取名方向**: {direction}", "",
+             "### 🌟 推荐用名", ""]
+    for s in suggestions:
+        parts.append(f"- **{s['name']}**（{s['char']}·属{s['element']}）：{s['meaning']}")
+    if prompt:
+        parts += ["", f"**你的要求**: {prompt}（以上名字以五行补益为先，可结合要求再作取舍）"]
+    parts += ["", "---", "", "*起名属民俗文化，仅供娱乐参考，正式取名请以家人喜好为准。*"]
+    return "\n".join(parts)
+
+
+def _build_plum_reading(num1: int, num2: int) -> str:
+    r = _yijing.divine(num1, num2)
+    upper_info = _yijing.TRIGRAMS[r.upper]
+    lower_info = _yijing.TRIGRAMS[r.lower]
+    body_info = _yijing.TRIGRAMS[r.body_trigram]
+    use_info = _yijing.TRIGRAMS[r.use_trigram]
+    parts = [
+        "## 🌸 梅花易数 · 以数起卦", "",
+        f"**所报之数**: {r.num1}、{r.num2}", "",
+        "---", "",
+        f"### ☯ 本卦 · {r.hexagram_name}（{r.upper}上{r.lower}下） —— **{r.fortune}**", "",
+        f"> {r.hexagram_text}", "",
+        f"上卦{r.upper}（{upper_info['nature']}·属{upper_info['element']}）：{upper_info['image']}",
+        f"下卦{r.lower}（{lower_info['nature']}·属{lower_info['element']}）：{lower_info['image']}", "",
+        "### 🎯 体用与动爻", "",
+        f"**体卦** {r.body_trigram}（属{body_info['element']}） · **用卦** {r.use_trigram}（属{use_info['element']}） · **动爻** 第{r.moving_line}爻", "",
+        r.relation, "", _yijing.moving_line_meaning(r.moving_line), "",
+        f"### 🔄 变卦 · {r.changed_name} —— {r.changed_fortune}", "",
+        f"> {r.changed_text}", "",
+        f"### 🔗 互卦 · {r.mutual_name} —— {r.mutual_fortune}", "",
+        f"> {r.mutual_text}", "",
+        "### 📜 总断", "", r.verdict, "",
+        "### 💡 建议", "", _yijing.fortune_advice(r.fortune), "",
+        "---", "",
+        "*梅花易数为传统易学文化，仅供娱乐参考。*",
+    ]
+    return "\n".join(parts)
+
+
+_FATE_EXTRA_ADVICE = [
+    "二人性格互补，若多沟通、多坦诚，缘分自会越走越近。",
+    "缘分天注定，相处在人为。日常的细水长流，才是感情长久的秘诀。",
+    "你们三观相近，适合一起规划未来，彼此成就对方的梦想。",
+    "感情需要仪式感，偶尔为对方准备一份小惊喜，关系会更甜蜜稳固。",
+]
+
+
+def _build_fate_reading(name1: str, name2: str) -> str:
+    n1, n2 = name1.strip(), name2.strip()
+    if n1 in _name_data.FATE_INVALID_NAMES or n2 in _name_data.FATE_INVALID_NAMES:
+        return "\n".join([
+            "## 💞 姻缘占卜", "",
+            f"**{n1}** × **{n2}**", "",
+            "这名字看着像是随手写的（比如张三李四），姻缘簿上查无此缘，请输入两个真实的名字再来占卜吧～",
+        ])
+    score = _name_data.fate_score(n1, n2)
+    title, desc = next((t, d) for threshold, t, d in _name_data.FATE_TIERS if score >= threshold)
+    extra = _FATE_EXTRA_ADVICE[_stable_seed(n1, n2) % len(_FATE_EXTRA_ADVICE)]
+    hearts = "❤️" * max(1, round(score / 20))
+    parts = [
+        "## 💞 姻缘占卜 · 缘分解读", "",
+        f"**{n1}** × **{n2}**", "",
+        f"### 缘分指数：{score} 分 {hearts}", "",
+        f"**缘分评语**: {title}", "",
+        desc, "", extra, "",
+        "---", "",
+        "*姻缘占卜仅供娱乐，感情好坏还是你们自己说了算。*",
+    ]
+    return "\n".join(parts)
+
+
+def _build_horoscope_reading(sign: str) -> str:
+    zodiac_info = _ZODIAC_SIGNS[sign]
+    today = datetime.now().strftime("%Y年%m月%d日")
+    parts = [f"## {today} · {sign}运势", ""]
+    parts.append(f"**日期范围**: {zodiac_info['dates']} | **属性**: {zodiac_info['element']}象星座 | **守护星**: {zodiac_info['ruling']}")
+    parts.append(f"**性格特质**: {zodiac_info['traits']}")
+    parts.append(f"**最佳配对**: {zodiac_info['compatibility']}")
+    parts.append("")
+    parts.append("---")
+    parts.append("")
+    for aspect in _ZODIAC_ASPECTS:
+        rating = random.choice(_ZODIAC_RATINGS)
+        advice = random.choice(_ZODIAC_ADVICE_POOL[aspect])
+        parts.append(f"### {aspect} {rating}")
+        parts.append(advice)
+        parts.append("")
+    lucky_color = random.choice(_LUCKY_ELEMENTS["colors"])
+    lucky_number = random.choice(_LUCKY_ELEMENTS["numbers"])
+    lucky_direction = random.choice(_LUCKY_ELEMENTS["directions"])
+    parts.append("**幸运元素**")
+    parts.append(f"- 幸运色: {lucky_color}")
+    parts.append(f"- 幸运数字: {lucky_number}")
+    parts.append(f"- 幸运方向: {lucky_direction}")
+    return "\n".join(parts)
+
+
+def _build_fortune_stick_reading(question: str, lottery_type: str) -> tuple[str, str, int]:
+    """返回 (markdown 报告, 签等, 签号)"""
+    lottery_level = _weighted_draw_lottery()
+    level_info = _LOTTERY_LEVELS[lottery_level]
+    emoji = level_info["emoji"]
+    poem = random.choice(_LOTTERY_POEMS[lottery_level])
+    interpretation = random.choice(_LOTTERY_INTERPRETATIONS[lottery_level])
+    stick_number = random.randint(1, 100)
+    today = datetime.now().strftime("%Y年%m月%d日")
+    parts = [f"## {emoji} {lottery_type} · 第{stick_number}签", ""]
+    parts.append(f"**占卜日期**: {today}")
+    if question:
+        parts.append(f"**所求之事**: {question}")
+    parts.append("")
+    parts.append("---")
+    parts.append("")
+    parts.append(f"### {emoji} {lottery_level}")
+    parts.append("")
+    parts.append(f"> {poem}")
+    parts.append("")
+    parts.append("---")
+    parts.append("")
+    parts.append("### 📜 签文解读")
+    parts.append(interpretation)
+    parts.append("")
+    parts.append("### 💡 建议")
+    if lottery_level in ["上上签", "上签"]:
+        parts.append("把握良机，积极行动。好运当前，但也要保持谦逊，不可骄傲自满。")
+    elif lottery_level == "中签":
+        parts.append("保持平常心，稳扎稳打。不急不躁，等待时机成熟。")
+    else:
+        parts.append("韬光养晦，静待转机。困难只是暂时的，调整心态，积蓄力量。")
+    parts.append("")
+    parts.append("---")
+    parts.append("")
+    parts.append("*心诚则灵，但命运始终掌握在自己手中。*")
+    return "\n".join(parts), lottery_level, stick_number
