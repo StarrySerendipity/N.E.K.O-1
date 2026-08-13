@@ -6,18 +6,15 @@
 
 import asyncio
 import json
-import shutil
-import subprocess
 import os
 import re
+import shutil
+import subprocess
 import threading
-from typing import Optional, Dict, Any, List
 from datetime import datetime
+from typing import Any, Dict, List
 
-from plugin.sdk.plugin import (
-    NekoPluginBase, neko_plugin, plugin_entry, lifecycle,
-    Ok, Err, SdkError, llm_tool
-)
+from plugin.sdk.plugin import Err, NekoPluginBase, Ok, SdkError, lifecycle, llm_tool, neko_plugin, plugin_entry
 
 
 # 错误码定义
@@ -281,7 +278,7 @@ def format_email_list(emails: List[Dict], max_count: int = 20) -> str:
             try:
                 dt = datetime.fromisoformat(date.replace('Z', '+00:00'))
                 date_str = dt.strftime("%m-%d %H:%M")
-            except:
+            except (ValueError, TypeError):
                 date_str = date[:16]
         else:
             date_str = ""
@@ -308,7 +305,7 @@ def format_email_detail(email: Dict) -> str:
     attachments = email.get("attachments", [])
 
     lines = [
-        f"📧 邮件详情",
+        "📧 邮件详情",
         f"主题: {subject}",
         f"发件人: {from_name} <{from_email}>",
     ]
@@ -436,7 +433,7 @@ class NekoMailAgentlyEntry(NekoPluginBase):
             self.auto_open_browser = bool(plugin_cfg.get("auto_open_browser", True))
             _runtime_settings["auto_refresh_auth"] = bool(plugin_cfg.get("auto_refresh_auth", True))
 
-            self.logger.info(f"猫娘邮箱(Agently) 插件启动")
+            self.logger.info("猫娘邮箱(Agently) 插件启动")
             self.logger.info(f"邮箱地址(配置): {self.email_addr or '(待登录后自动获取)'}")
             self.logger.info(f"CLI路径: {self.cli_path or '(未找到)'}")
 
@@ -1225,7 +1222,9 @@ class NekoMailAgentlyEntry(NekoPluginBase):
                 await asyncio.sleep(2)
             elif first.get("exit_code") == 0:
                 # 直接成功（无需确认）→ 信任 CLI
-                _cleanup_token = lambda: None
+                def _cleanup_token():
+                    pass
+
                 attach_info = f"\n附件({len(attachment_names)}个): {', '.join(attachment_names)}" if attachment_names else ""
                 return Ok({"success": True, "status": "sent", "message": f"✅ 邮件已发送\n收件人: {to}\n主题: {subject}{attach_info}"})
             else:
@@ -1503,7 +1502,7 @@ class NekoMailAgentlyEntry(NekoPluginBase):
         # 两阶段确认：首次调用拿 token → 等待 → 用 token 确认。
         ctk = None
         if not confirmation_token:
-            self.logger.info(f"[forward_email] 首次调用获取令牌")
+            self.logger.info("[forward_email] 首次调用获取令牌")
             first = await run_agently_command(args, self.cli_path, logger=self.logger)
             first_data = first.get("data", {})
             ctk = first_data.get("confirmation_token", "")
@@ -1602,7 +1601,7 @@ class NekoMailAgentlyEntry(NekoPluginBase):
         # 两阶段确认：首次调用拿 token → 等待 → 用 token 确认。
         ctk = None
         if not confirmation_token:
-            self.logger.info(f"[trash_email] 首次调用获取令牌")
+            self.logger.info("[trash_email] 首次调用获取令牌")
             first = await run_agently_command(args, self.cli_path, logger=self.logger)
             first_data = first.get("data", {})
             ctk = first_data.get("confirmation_token", "")
