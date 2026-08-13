@@ -245,6 +245,8 @@
             background-repeat:no-repeat; background-position:right 14px center;
         }
         .form-group select option { background:var(--bg-elevated); color:var(--text-primary); }
+        .md-img { max-width:68%; display:block; margin:14px auto; border-radius:14px;
+            box-shadow:0 6px 24px rgba(0,0,0,.45), 0 0 0 1px rgba(155,141,181,.25); }
         .form-hint { font-size:0.8em; color:var(--text-muted); margin-top:6px; }
         .two-names-row, .two-nums-row { display:flex; gap:14px; }
         .two-names-row .form-group, .two-nums-row .form-group { flex:1; }
@@ -1046,6 +1048,7 @@
         function renderMarkdown(text) {
             let html = text
                 .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
+                .replace(/!\[([^\]]*)\]\(([^)\s]+)\)/g,'<img src="$2" alt="$1" class="md-img" onerror="this.style.display=\'none\'">')
                 .replace(/^### (.+)$/gm,'<h3>$1</h3>').replace(/^## (.+)$/gm,'<h2>$1</h2>').replace(/^# (.+)$/gm,'<h1>$1</h1>')
                 .replace(/\*\*(.+?)\*\*/g,'<strong>$1</strong>').replace(/\*(.+?)\*/g,'<em>$1</em>').replace(/`(.+?)`/g,'<code>$1</code>')
                 .replace(/^---$/gm,'<hr>').replace(/^> (.+)$/gm,'<blockquote>$1</blockquote>')
@@ -1053,7 +1056,8 @@
                 .replace(/\n\n/g,'</p><p>').replace(/\n/g,'<br>');
             html = '<p>' + html + '</p>';
             html = html.replace(/(<li>.*?<\/li>)/gs,'<ul>$1</ul>').replace(/<\/ul><ul>/g,'');
-            html = html.replace(/<p><(h[1-3]|ul|hr|blockquote)/g,'<$1').replace(/<\/(h[1-3]|ul|hr|blockquote)><\/p>/g,'</$1>');
+            html = html.replace(/<p><(h[1-3]|ul|hr|blockquote|img)/g,'<$1').replace(/<\/(h[1-3]|ul|hr|blockquote)><\/p>/g,'</$1>');
+            html = html.replace(/<p>(<img[^>]*>)<\/p>/g,'$1');
             return html;
         }
 

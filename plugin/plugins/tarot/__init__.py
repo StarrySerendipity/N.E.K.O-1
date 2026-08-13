@@ -286,18 +286,18 @@ _LUCKY_ELEMENTS = {
 
 # 十二星座数据
 _ZODIAC_SIGNS = {
-    "白羊座": {"dates": "3.21-4.19", "element": "火", "ruling": "火星", "traits": "热情、冲动、自信、勇敢", "compatibility": "狮子座、射手座"},
-    "金牛座": {"dates": "4.20-5.20", "element": "土", "ruling": "金星", "traits": "稳重、踏实、固执、忠诚", "compatibility": "处女座、摩羯座"},
-    "双子座": {"dates": "5.21-6.21", "element": "风", "ruling": "水星", "traits": "聪明、善变、好奇、社交", "compatibility": "天秤座、水瓶座"},
-    "巨蟹座": {"dates": "6.22-7.22", "element": "水", "ruling": "月亮", "traits": "温柔、敏感、顾家、体贴", "compatibility": "天蝎座、双鱼座"},
-    "狮子座": {"dates": "7.23-8.22", "element": "火", "ruling": "太阳", "traits": "自信、大方、慷慨、领导力", "compatibility": "白羊座、射手座"},
-    "处女座": {"dates": "8.23-9.22", "element": "土", "ruling": "水星", "traits": "细心、完美主义、理性、务实", "compatibility": "金牛座、摩羯座"},
-    "天秤座": {"dates": "9.23-10.23", "element": "风", "ruling": "金星", "traits": "优雅、公正、善交际、和平主义", "compatibility": "双子座、水瓶座"},
-    "天蝎座": {"dates": "10.24-11.22", "element": "水", "ruling": "冥王星", "traits": "神秘、执着、洞察力强、感性", "compatibility": "巨蟹座、双鱼座"},
-    "射手座": {"dates": "11.23-12.21", "element": "火", "ruling": "木星", "traits": "乐观、自由、冒险、幽默", "compatibility": "白羊座、狮子座"},
-    "摩羯座": {"dates": "12.22-1.19", "element": "土", "ruling": "土星", "traits": "坚韧、负责任、自律、务实", "compatibility": "金牛座、处女座"},
-    "水瓶座": {"dates": "1.20-2.18", "element": "风", "ruling": "天王星", "traits": "独立、创新、理性、博爱", "compatibility": "双子座、天秤座"},
-    "双鱼座": {"dates": "2.19-3.20", "element": "水", "ruling": "海王星", "traits": "浪漫、敏感、想象力、同情心", "compatibility": "巨蟹座、天蝎座"},
+    "白羊座": {"dates": "3.21-4.19", "element": "火", "ruling": "火星", "traits": "热情、冲动、自信、勇敢", "compatibility": "狮子座、射手座", "image": "zodiac/aries.png"},
+    "金牛座": {"dates": "4.20-5.20", "element": "土", "ruling": "金星", "traits": "稳重、踏实、固执、忠诚", "compatibility": "处女座、摩羯座", "image": "zodiac/taurus.png"},
+    "双子座": {"dates": "5.21-6.21", "element": "风", "ruling": "水星", "traits": "聪明、善变、好奇、社交", "compatibility": "天秤座、水瓶座", "image": "zodiac/gemini.png"},
+    "巨蟹座": {"dates": "6.22-7.22", "element": "水", "ruling": "月亮", "traits": "温柔、敏感、顾家、体贴", "compatibility": "天蝎座、双鱼座", "image": "zodiac/cancer.png"},
+    "狮子座": {"dates": "7.23-8.22", "element": "火", "ruling": "太阳", "traits": "自信、大方、慷慨、领导力", "compatibility": "白羊座、射手座", "image": "zodiac/leo.png"},
+    "处女座": {"dates": "8.23-9.22", "element": "土", "ruling": "水星", "traits": "细心、完美主义、理性、务实", "compatibility": "金牛座、摩羯座", "image": "zodiac/virgo.png"},
+    "天秤座": {"dates": "9.23-10.23", "element": "风", "ruling": "金星", "traits": "优雅、公正、善交际、和平主义", "compatibility": "双子座、水瓶座", "image": "zodiac/libra.png"},
+    "天蝎座": {"dates": "10.24-11.22", "element": "水", "ruling": "冥王星", "traits": "神秘、执着、洞察力强、感性", "compatibility": "巨蟹座、双鱼座", "image": "zodiac/scorpius.png"},
+    "射手座": {"dates": "11.23-12.21", "element": "火", "ruling": "木星", "traits": "乐观、自由、冒险、幽默", "compatibility": "白羊座、狮子座", "image": "zodiac/sagittarius.png"},
+    "摩羯座": {"dates": "12.22-1.19", "element": "土", "ruling": "土星", "traits": "坚韧、负责任、自律、务实", "compatibility": "金牛座、处女座", "image": "zodiac/capricornus.png"},
+    "水瓶座": {"dates": "1.20-2.18", "element": "风", "ruling": "天王星", "traits": "独立、创新、理性、博爱", "compatibility": "双子座、天秤座", "image": "zodiac/aquarius.png"},
+    "双鱼座": {"dates": "2.19-3.20", "element": "水", "ruling": "海王星", "traits": "浪漫、敏感、想象力、同情心", "compatibility": "巨蟹座、天蝎座", "image": "zodiac/pisces.png"},
 }
 
 _ZODIAC_ASPECTS = ["综合运势", "爱情运势", "事业学业", "财富运势", "健康运势"]
@@ -1982,6 +1982,9 @@ def _build_horoscope_reading(sign: str) -> str:
     zodiac_info = _ZODIAC_SIGNS[sign]
     today = datetime.now().strftime("%Y年%m月%d日")
     parts = [f"## {today} · {sign}运势", ""]
+    if zodiac_info.get("image"):
+        parts.append(f"![{sign}星图](/plugin/tarot/ui/image/{zodiac_info['image']})")
+        parts.append("")
     parts.append(f"**日期范围**: {zodiac_info['dates']} | **属性**: {zodiac_info['element']}象星座 | **守护星**: {zodiac_info['ruling']}")
     parts.append(f"**性格特质**: {zodiac_info['traits']}")
     parts.append(f"**最佳配对**: {zodiac_info['compatibility']}")
