@@ -1,9 +1,9 @@
 [plugin]
 name = "猫娘邮件秘书"
-description = "让猫娘帮你管理QQ邮箱,生成邮件摘要、判断优先级、标记已读、发送邮件。清新诗意的前端界面,支持i18n多语言。"
-short_description = "Catgirl mail secretary — QQ mailbox summaries, priority classification, mark read, and send emails."
-keywords = ["邮件", "邮箱", "email", "mail", "QQ邮箱", "IMAP", "SMTP", "摘要", "猫娘", "メール", "메일", "почта", "correo"]
-version = "0.2.0"
+description = "让猫娘帮你管理QQ邮箱，生成邮件摘要、判断优先级、标记已读、发送邮件（支持附件）。支持新邮件轮询推送、智能分类、去重校验。清新诗意的前端界面，支持i18n多语言。配置详见 README。"
+short_description = "Catgirl mail secretary — QQ mailbox summaries, priority classification, mark read, send emails with attachments."
+keywords = ["邮件", "邮箱", "email", "mail", "QQ邮箱", "IMAP", "SMTP", "摘要", "猫娘", "附件", "轮询", "推送", "メール", "메일", "почта", "correo"]
+version = "0.3.0"
 id = "neko_mail"
 entry = "plugin.plugins.neko_mail:NekoMailPluginEntry"
 
@@ -26,10 +26,10 @@ auto_start = true
 enabled = false
 
 [neko_mail]
-# QQ 邮箱地址
-email_addr = "2987293848@qq.com"
-# QQ 邮箱授权码(16位,在 QQ 邮箱设置中生成)
-auth_code = "fgbnvkwbqtlzdcjg"
+# QQ 邮箱地址 (必填, 例如: your_email@qq.com)
+email_addr = ""
+# QQ 邮箱授权码 (必填, 16位, 在 QQ 邮箱设置中生成)
+auth_code = ""
 # IMAP 服务器
 imap_server = "imap.qq.com"
 imap_port = 993
