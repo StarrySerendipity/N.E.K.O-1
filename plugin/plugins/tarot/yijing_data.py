@@ -218,12 +218,12 @@ def divine(num1: int, num2: int) -> PlumReading:
     main_r = rank.index(fortune)
     ch_r = rank.index(ch_fortune)
     verdict = (
-        f"本卦主当前之势，变卦示事态之终。"
-        f"若本卦吉而变卦亦吉，则善始善终；"
+        "本卦主当前之势，变卦示事态之终。"
+        "若本卦吉而变卦亦吉，则善始善终；"
         if main_r >= 4 and ch_r >= 4 else
         f"本卦{fortune}、变卦{ch_fortune}，始虽{'顺' if main_r >= 4 else '滞'}而终{'成' if ch_r >= 4 else '变'}，行事宜察其终。"
         if main_r >= 4 or ch_r >= 4 else
-        f"本卦变卦俱见险象，近时诸事宜缓，守正待时，勿轻举妄动。"
+        "本卦变卦俱见险象，近时诸事宜缓，守正待时，勿轻举妄动。"
     )
 
     return PlumReading(

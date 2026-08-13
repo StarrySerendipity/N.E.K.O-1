@@ -1,8 +1,8 @@
 # 打包规则：排除运行时用户数据与本地调研资料
 [tool.neko.build]
-exclude_dirs = ["data", "workspace32"]
-exclude_files = ["*.neko-plugin", "*.md"]
+exclude_dirs = ["data", "workspace32", "tests", ".vscode", ".github"]
+exclude_files = ["*.neko-plugin", "*.md", "conftest.py", "pytest.ini", ".gitignore"]
 
 [tool.neko.pack]
-exclude_dirs = ["data", "workspace32"]
-exclude_files = ["*.neko-plugin", "*.md"]
+exclude_dirs = ["data", "workspace32", "tests", ".vscode", ".github"]
+exclude_files = ["*.neko-plugin", "*.md", "conftest.py", "pytest.ini", ".gitignore"]

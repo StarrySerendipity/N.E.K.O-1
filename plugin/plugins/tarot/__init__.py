@@ -16,14 +16,14 @@ from pathlib import Path
 from typing import Any
 
 from plugin.sdk.plugin import (
+    Err,
     NekoPluginBase,
-    neko_plugin,
-    plugin_entry,
+    Ok,
+    SdkError,
     lifecycle,
     llm_tool,
-    Ok,
-    Err,
-    SdkError,
+    neko_plugin,
+    plugin_entry,
 )
 
 from . import dream_dict as _dream_dict
@@ -1713,7 +1713,7 @@ class TarotReaderPlugin(NekoPluginBase):
 def _weighted_draw_lottery() -> str:
     """根据权重随机抽取签等"""
     levels = list(_LOTTERY_LEVELS.keys())
-    weights = [_LOTTERY_LEVELS[l]["weight"] for l in levels]
+    weights = [_LOTTERY_LEVELS[lv]["weight"] for lv in levels]
     return random.choices(levels, weights=weights, k=1)[0]
 
 
