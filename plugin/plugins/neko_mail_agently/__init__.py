@@ -1,10 +1,12 @@
 """
 猫娘邮箱(Agently) - 通过 Agently CLI 管理猫娘专属邮箱
-让猫娘拥有专属邮箱，实现类似 Claude Code 使用 Agently CLI 的邮件收发功能
+让猫娘拥有自己的专属邮箱(@agent.qq.com)，支持收发、搜索、回复、转发、附件管理与新邮件提醒。
+跨平台通用：自动探测 Agently CLI 安装位置，无需手动配置个人路径。
 """
 
 import asyncio
 import json
+import shutil
 import subprocess
 import os
 import re
@@ -32,6 +34,155 @@ class AgentlyExitCode:
 
 # 确认令牌缓存
 confirmation_tokens: Dict[str, Dict[str, Any]] = {}
+
+# Agently Mail 管理端地址（注册/管理猫娘专属邮箱）
+AGENT_PORTAL_URL = "https://agent.qq.com"
+
+# 从 CLI 输出中提取 OAuth 授权链接的正则
+_AUTH_URL_RE = re.compile(r'https?://[^\s\'"<>\)\]\}]+')
+
+# 运行时设置（由插件配置控制）
+_runtime_settings: Dict[str, Any] = {"auto_refresh_auth": True}
+
+
+def detect_agently_cli() -> str:
+    """跨平台自动探测 agently-cli 可执行文件路径，找不到返回空字符串。
+
+    探测顺序：
+    1. 系统 PATH 中的命令（Windows: agently-cli.cmd / .exe，Unix: agently-cli）
+    2. npm 全局安装的常见默认位置
+    3. 通过 npm root -g 定位包入口脚本 run.js
+    """
+    names = ["agently-cli", "agently-cli.cmd", "agently-cli.exe"] if os.name == "nt" else ["agently-cli"]
+    for name in names:
+        found = shutil.which(name)
+        if found:
+            return found
+
+    candidates: List[str] = []
+    if os.name == "nt":
+        appdata = os.environ.get("APPDATA") or ""
+        if appdata:
+            candidates.append(os.path.join(appdata, "npm", "agently-cli.cmd"))
+        home = os.path.expanduser("~")
+        candidates.extend([
+            os.path.join(home, "AppData", "Roaming", "npm", "agently-cli.cmd"),
+            os.path.join(home, ".npm-global", "agently-cli.cmd"),
+        ])
+    else:
+        home = os.path.expanduser("~")
+        candidates.extend([
+            os.path.join(home, ".npm-global", "bin", "agently-cli"),
+            os.path.join(home, ".local", "bin", "agently-cli"),
+            os.path.join(home, ".volta", "bin", "agently-cli"),
+            "/usr/local/bin/agently-cli",
+            "/usr/bin/agently-cli",
+            "/opt/homebrew/bin/agently-cli",
+        ])
+    for candidate in candidates:
+        if os.path.exists(candidate):
+            return candidate
+
+    # 兜底：通过 npm 全局根目录定位包入口脚本 run.js
+    try:
+        proc = subprocess.run(
+            ["npm", "root", "-g"],
+            capture_output=True, text=True, timeout=10,
+        )
+        if proc.returncode == 0:
+            run_js = os.path.join(
+                proc.stdout.strip(),
+                "@tencent-qqmail", "agently-cli", "scripts", "run.js",
+            )
+            if os.path.exists(run_js) and shutil.which("node"):
+                return run_js
+    except Exception:
+        pass
+    return ""
+
+
+def build_cmd_list(cli_path: str, args: List[str]) -> List[str]:
+    """根据 CLI 路径形态构建最终命令行。
+
+    - .cmd（Windows npm 全局 shim）：提取 node 路径和脚本路径，绕过 cmd /c 直接调用 node，
+      这样 --body 参数中的换行符不会被 cmd.exe 当作命令分隔符截断。
+    - .js（直接定位到包入口脚本）：通过 node 调用。
+    - 其他（Unix shim / 完整路径）：直接执行。
+    """
+    lower = cli_path.lower()
+    if lower.endswith(".cmd"):
+        npm_dir = os.path.dirname(os.path.abspath(cli_path))
+        script_path = os.path.join(npm_dir, "node_modules", "@tencent-qqmail", "agently-cli", "scripts", "run.js")
+        node_path = shutil.which("node")
+        if node_path and os.path.exists(script_path):
+            return [node_path, script_path] + args
+        # fallback：找不到 node 或脚本，退回 cmd /c
+        return ["cmd", "/c", cli_path] + args
+    if lower.endswith(".js"):
+        node_path = shutil.which("node") or "node"
+        return [node_path, cli_path] + args
+    return [cli_path] + args
+
+
+async def _run_agently_once(
+    args: List[str], cli_path: str = "", cwd: str = None, logger=None, timeout: float = 30.0
+) -> Dict[str, Any]:
+    """异步执行一次 Agently CLI 命令（不含授权刷新重试）"""
+    if not cli_path:
+        err = "未找到 Agently CLI，请先安装：npm install -g @tencent-qqmail/agently-cli"
+        if logger:
+            logger.error(f"[Agently CLI] {err}")
+        return {"error": err, "exit_code": -1}
+    try:
+        cmd_list = build_cmd_list(cli_path, args)
+
+        if logger:
+            logger.info(f"[Agently CLI] 执行: {' '.join(cmd_list)}")
+            logger.info(f"[Agently CLI] cwd: {cwd or '默认'}")
+
+        process = await asyncio.create_subprocess_exec(
+            *cmd_list,
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.PIPE,
+            cwd=cwd
+        )
+        stdout, stderr = await asyncio.wait_for(process.communicate(), timeout=timeout)
+
+        stdout_str = stdout.decode('utf-8', errors='ignore')
+        stderr_str = stderr.decode('utf-8', errors='ignore')
+
+        if logger:
+            logger.info(f"[Agently CLI] exit={process.returncode}")
+            if stdout_str.strip():
+                logger.info(f"[Agently CLI] stdout: {stdout_str[:500]}")
+            if stderr_str.strip():
+                logger.info(f"[Agently CLI] stderr: {stderr_str[:500]}")
+
+        result = parse_agently_output(stdout_str, stderr_str)
+        result["exit_code"] = process.returncode
+        result["stdout_raw"] = stdout_str
+        result["stderr_raw"] = stderr_str
+
+        return result
+    except asyncio.TimeoutError:
+        err = f"Agently CLI 执行超时 ({timeout}秒): {' '.join(args)}"
+        if logger:
+            logger.error(f"[Agently CLI] {err}")
+        try:
+            process.kill()
+        except Exception:
+            pass
+        return {"error": err, "exit_code": -1}
+    except FileNotFoundError:
+        err = f"找不到 Agently CLI: {cli_path}"
+        if logger:
+            logger.error(f"[Agently CLI] {err}")
+        return {"error": err, "exit_code": -1}
+    except Exception as e:
+        err = f"执行命令失败: {str(e)}"
+        if logger:
+            logger.error(f"[Agently CLI] {err}")
+        return {"error": err, "exit_code": -1}
 
 
 def parse_agently_output(stdout: str, stderr: str) -> Dict[str, Any]:
@@ -86,75 +237,23 @@ def parse_agently_output(stdout: str, stderr: str) -> Dict[str, Any]:
     return {"error": "无法解析输出", "stdout": stdout, "stderr": stderr}
 
 
-def _build_node_cmd(cli_path: str, args: List[str]) -> List[str]:
-    """从 .cmd 文件提取 node 路径和脚本路径，绕过 cmd /c 直接调用 node。
-    这样 --body 参数中的换行符不会被 cmd.exe 当作命令分隔符截断。"""
-    import shutil
-    npm_dir = os.path.dirname(os.path.abspath(cli_path))
-    script_path = os.path.join(npm_dir, "node_modules", "@tencent-qqmail", "agently-cli", "scripts", "run.js")
-    node_path = shutil.which("node")
-    if node_path and os.path.exists(script_path):
-        return [node_path, script_path] + args
-    # fallback：找不到 node 或脚本，退回 cmd /c
-    return ["cmd", "/c", cli_path] + args
-
-
-async def run_agently_command(args: List[str], cli_path: str = "agently-cli", cwd: str = None, logger=None, timeout: float = 30.0) -> Dict[str, Any]:
-    """异步执行 Agently CLI 命令"""
-    try:
-        # Windows .cmd 文件：绕过 cmd /c 直接调用 node，避免换行符被截断
-        if cli_path.lower().endswith('.cmd'):
-            cmd_list = _build_node_cmd(cli_path, args)
-        else:
-            cmd_list = [cli_path] + args
-
+async def run_agently_command(
+    args: List[str], cli_path: str = "", cwd: str = None, logger=None, timeout: float = 30.0
+) -> Dict[str, Any]:
+    """异步执行 Agently CLI 命令（授权过期时按配置自动刷新令牌并重试一次）"""
+    result = await _run_agently_once(args, cli_path, cwd, logger, timeout)
+    if (
+        result.get("exit_code") == AgentlyExitCode.REAUTH
+        and _runtime_settings.get("auto_refresh_auth")
+        and cli_path
+        and args[:1] != ["auth"]
+    ):
         if logger:
-            logger.info(f"[Agently CLI] 执行: {' '.join(cmd_list)}")
-            logger.info(f"[Agently CLI] cwd: {cwd or '默认'}")
-
-        process = await asyncio.create_subprocess_exec(
-            *cmd_list,
-            stdout=asyncio.subprocess.PIPE,
-            stderr=asyncio.subprocess.PIPE,
-            cwd=cwd
-        )
-        stdout, stderr = await asyncio.wait_for(process.communicate(), timeout=timeout)
-
-        stdout_str = stdout.decode('utf-8', errors='ignore')
-        stderr_str = stderr.decode('utf-8', errors='ignore')
-
-        if logger:
-            logger.info(f"[Agently CLI] exit={process.returncode}")
-            if stdout_str.strip():
-                logger.info(f"[Agently CLI] stdout: {stdout_str[:500]}")
-            if stderr_str.strip():
-                logger.info(f"[Agently CLI] stderr: {stderr_str[:500]}")
-
-        result = parse_agently_output(stdout_str, stderr_str)
-        result["exit_code"] = process.returncode
-        result["stdout_raw"] = stdout_str
-        result["stderr_raw"] = stderr_str
-
-        return result
-    except asyncio.TimeoutError:
-        err = f"Agently CLI 执行超时 ({timeout}秒): {' '.join(args)}"
-        if logger:
-            logger.error(f"[Agently CLI] {err}")
-        try:
-            process.kill()
-        except Exception:
-            pass
-        return {"error": err, "exit_code": -1}
-    except FileNotFoundError:
-        err = f"找不到 Agently CLI: {cli_path}"
-        if logger:
-            logger.error(f"[Agently CLI] {err}")
-        return {"error": err, "exit_code": -1}
-    except Exception as e:
-        err = f"执行命令失败: {str(e)}"
-        if logger:
-            logger.error(f"[Agently CLI] {err}")
-        return {"error": err, "exit_code": -1}
+            logger.info("[Agently CLI] 授权已过期，自动尝试刷新令牌...")
+        refresh = await _run_agently_once(["auth", "refresh"], cli_path, None, logger, 30.0)
+        if refresh.get("exit_code") == 0:
+            result = await _run_agently_once(args, cli_path, cwd, logger, timeout)
+    return result
 
 
 def format_email_list(emails: List[Dict], max_count: int = 20) -> str:
@@ -254,7 +353,7 @@ def handle_agently_error(result: Dict[str, Any]) -> str:
     if exit_code == AgentlyExitCode.BAD_ARGS:
         return f"❌ 参数错误: {error_msg}"
     elif exit_code == AgentlyExitCode.REAUTH:
-        return f"🔐 需要重新授权: {error_msg}\n请运行 `agently-cli auth login` 重新授权"
+        return f"🔐 未登录或授权已过期: {error_msg}\n请对猫娘说「帮我登录邮箱」重新完成授权（或手动执行 agently-cli auth login）"
     elif exit_code == AgentlyExitCode.NETWORK_RETRY:
         return f"🌐 网络错误（可重试）: {error_msg}"
     elif exit_code == AgentlyExitCode.PERMANENT_DENY:
@@ -279,10 +378,11 @@ class NekoMailAgentlyEntry(NekoPluginBase):
     def __init__(self, ctx):
         super().__init__(ctx)
         self.logger = ctx.logger
-        self.cli_path = "agently-cli"
-        self.email_addr = "starryserendipity@agent.qq.com"
+        self.cli_path = ""
+        self.email_addr = ""
         self.two_factor_confirm = True
-        self.polling_interval = 60
+        self.polling_interval = 30
+        self.auto_open_browser = True
         self._polling_thread = None
         self._polling_stop_event = threading.Event()
         self._last_check_time = None
@@ -291,6 +391,8 @@ class NekoMailAgentlyEntry(NekoPluginBase):
         self._polling_baseline_loaded = False
         self._seen_ids_path = os.path.join(os.path.dirname(__file__), ".seen_email_ids.json")
         self._rate_limit_count = 0
+        self._login_in_progress = False
+        self._setup_warned = False
 
     def _load_seen_ids(self):
         """从磁盘加载已知邮件ID，避免重启后重复推送"""
@@ -322,20 +424,43 @@ class NekoMailAgentlyEntry(NekoPluginBase):
             cfg = cfg if isinstance(cfg, dict) else {}
             plugin_cfg = cfg.get("neko_mail_agently") if isinstance(cfg.get("neko_mail_agently"), dict) else cfg
 
-            self.cli_path = plugin_cfg.get("cli_path", "C:/Users/Yanfq/AppData/Roaming/npm/agently-cli.cmd")
-            self.email_addr = plugin_cfg.get("email_addr", "starryserendipity@agent.qq.com")
+            # CLI 路径：优先用户配置，留空则跨平台自动探测（不再依赖任何个人环境硬编码）
+            cfg_cli_path = str(plugin_cfg.get("cli_path", "") or "").strip()
+            self.cli_path = cfg_cli_path or detect_agently_cli()
+            if not cfg_cli_path and self.cli_path:
+                self.logger.info(f"自动探测到 Agently CLI: {self.cli_path}")
+            # 邮箱地址：留空则授权登录后通过 +me 自动获取
+            self.email_addr = str(plugin_cfg.get("email_addr", "") or "").strip()
             self.two_factor_confirm = plugin_cfg.get("two_factor_confirm", True)
-            self.polling_interval = plugin_cfg.get("polling_interval", 60)
+            self.polling_interval = int(plugin_cfg.get("polling_interval", 30) or 30)
+            self.auto_open_browser = bool(plugin_cfg.get("auto_open_browser", True))
+            _runtime_settings["auto_refresh_auth"] = bool(plugin_cfg.get("auto_refresh_auth", True))
 
             self.logger.info(f"猫娘邮箱(Agently) 插件启动")
-            self.logger.info(f"邮箱地址(配置): {self.email_addr}")
-            self.logger.info(f"CLI路径: {self.cli_path}")
+            self.logger.info(f"邮箱地址(配置): {self.email_addr or '(待登录后自动获取)'}")
+            self.logger.info(f"CLI路径: {self.cli_path or '(未找到)'}")
 
             # 保存主线程事件循环引用（用于轮询线程推送消息）
             try:
                 self._main_loop = asyncio.get_running_loop()
             except RuntimeError:
                 self._main_loop = None
+
+            # 未检测到 CLI 时，主动推送安装引导，帮助用户完成首次配置
+            if not self.cli_path:
+                self.logger.warning(
+                    "未检测到 Agently CLI，插件功能暂不可用。"
+                    "安装方法：先安装 Node.js 18+，再执行 npm install -g @tencent-qqmail/agently-cli"
+                )
+                await self._push_text(
+                    "📧 主人，猫娘邮箱插件还差一步就能用啦～本机还没有安装 Agently CLI。\n"
+                    "配置很简单，只需两步：\n"
+                    "1. 安装 Node.js 18+（https://nodejs.org 下载安装）\n"
+                    "2. 打开终端执行：npm install -g @tencent-qqmail/agently-cli\n"
+                    "装好之后对我说「帮我登录邮箱」，我会自动打开授权页面，你用微信扫码就好啦～\n"
+                    "还没有专属邮箱？对我说「打开邮箱管理页面」，先去 agent.qq.com 创建一个吧！",
+                    event_type="setup_required",
+                )
 
             # 加载已知邮件ID（避免重启后重复推送）
             self._load_seen_ids()
@@ -357,6 +482,8 @@ class NekoMailAgentlyEntry(NekoPluginBase):
 
     async def _detect_real_account(self):
         """异步检测真实认证账户（不阻塞启动）"""
+        if not self._ensure_cli():
+            return
         try:
             me_result = await asyncio.wait_for(
                 run_agently_command(["+me"], self.cli_path, logger=self.logger),
@@ -374,6 +501,45 @@ class NekoMailAgentlyEntry(NekoPluginBase):
             self.logger.warning("检测真实账户超时，使用配置值")
         except Exception as e:
             self.logger.warning(f"检测真实账户失败: {e}，使用配置值")
+
+    def _ensure_cli(self) -> bool:
+        """确保 Agently CLI 可用（未配置时重新自动探测）"""
+        if self.cli_path:
+            return True
+        detected = detect_agently_cli()
+        if detected:
+            self.cli_path = detected
+            self.logger.info(f"自动探测到 Agently CLI: {detected}")
+            return True
+        if not self._setup_warned:
+            self._setup_warned = True
+            self.logger.warning(
+                "未检测到 Agently CLI，插件功能不可用。"
+                "安装方法：npm install -g @tencent-qqmail/agently-cli"
+            )
+        return False
+
+    async def _push_text(self, text: str, event_type: str = "notice", priority: int = 7):
+        """向用户推送一条文本通知（主线程或轮询线程均可安全调用）"""
+        try:
+            try:
+                current_loop = asyncio.get_running_loop()
+            except RuntimeError:
+                current_loop = None
+            kwargs = dict(
+                source="neko_mail_agently",
+                visibility=[],
+                ai_behavior="respond",
+                parts=[{"type": "text", "text": text}],
+                priority=priority,
+                metadata={"event_type": event_type},
+            )
+            if current_loop is not None and self._main_loop and current_loop is not self._main_loop and self._main_loop.is_running():
+                asyncio.run_coroutine_threadsafe(self.ctx.push_message_async(**kwargs), self._main_loop)
+            else:
+                await self.ctx.push_message_async(**kwargs)
+        except Exception as e:
+            self.logger.warning(f"推送消息失败: {e}")
 
     def _start_polling(self):
         """启动邮件轮询（参考 neko_mail 使用线程）"""
@@ -459,6 +625,8 @@ class NekoMailAgentlyEntry(NekoPluginBase):
 
     async def _check_new_emails(self):
         """检查新邮件并通知（首次运行建立基线，不推送已有邮件）"""
+        if not self._ensure_cli():
+            return
         try:
             self.logger.info("[轮询] 开始检查新邮件...")
             result = await run_agently_command(
@@ -1656,36 +1824,242 @@ class NekoMailAgentlyEntry(NekoPluginBase):
 
     @llm_tool(
         name="neko_agently_login",
-        description="启动 OAuth 登录流程。需要用户在浏览器中完成授权。",
+        description="登录/注册猫娘专属邮箱。自动启动 Agently OAuth 授权流程，提取授权链接并自动在浏览器中打开，"
+                    "用户只需微信扫码即可完成注册与授权；授权成功后自动获取猫娘的专属邮箱地址。"
+                    "若用户还没有专属邮箱，先用 neko_agently_open_portal 打开管理页面创建。"
+                    "注意：此工具会等待用户完成扫码，可能耗时几分钟，请提前告知用户。",
         parameters={
             "type": "object",
             "properties": {},
             "required": []
         },
-        timeout=180.0
+        timeout=600.0
     )
     @plugin_entry(
         id="login",
         name="登录邮箱",
-        description="启动 OAuth 登录流程",
+        description="启动 OAuth 登录流程（自动打开浏览器，用户微信扫码完成授权）",
         input_schema={"type": "object", "properties": {}, "required": []},
-        llm_result_fields=["status"]
+        llm_result_fields=["status", "email"]
     )
     async def login(self, **_) -> Dict[str, Any]:
-        """登录邮箱"""
-        result = await run_agently_command(["auth", "login"], self.cli_path)
-
-        if result.get("exit_code") == 0:
-            data = result.get("data", result)
+        """登录邮箱：启动 auth login，提取授权链接推送给用户并自动打开浏览器，等待扫码完成"""
+        if not self._ensure_cli():
+            return Err(SdkError(
+                "❌ 未检测到 Agently CLI，无法登录。\n"
+                "请先安装：\n"
+                "1. 安装 Node.js 18+（https://nodejs.org）\n"
+                "2. 终端执行：npm install -g @tencent-qqmail/agently-cli"
+            ))
+        if self._login_in_progress:
             return Ok({
                 "success": True,
-                "email": data.get("email", self.email_addr),
-                "status": "logged_in",
-                "message": f"✅ 已登录邮箱: {data.get('email', self.email_addr)}"
+                "status": "in_progress",
+                "message": "🔐 登录流程已在进行中，请提醒主人在浏览器里完成微信扫码授权～"
             })
-        else:
-            error_msg = handle_agently_error(result)
-            return Err(SdkError(error_msg or "登录失败"))
+
+        self._login_in_progress = True
+        try:
+            cmd_list = build_cmd_list(self.cli_path, ["auth", "login"])
+            self.logger.info(f"[login] 启动授权流程: {' '.join(cmd_list)}")
+            try:
+                proc = await asyncio.create_subprocess_exec(
+                    *cmd_list,
+                    stdout=asyncio.subprocess.PIPE,
+                    stderr=asyncio.subprocess.PIPE,
+                )
+            except FileNotFoundError:
+                self.cli_path = ""
+                return Err(SdkError(f"❌ 找不到 Agently CLI: {self.cli_path}，请重新安装或检查 cli_path 配置"))
+
+            collected: List[str] = []
+            auth_url = {"url": ""}
+            url_event = asyncio.Event()
+
+            async def _drain(stream):
+                while True:
+                    line = await stream.readline()
+                    if not line:
+                        break
+                    text = line.decode("utf-8", errors="ignore")
+                    collected.append(text)
+                    if not auth_url["url"]:
+                        m = _AUTH_URL_RE.search(text)
+                        if m:
+                            auth_url["url"] = m.group(0)
+                            url_event.set()
+
+            drain_tasks = [
+                asyncio.create_task(_drain(proc.stdout)),
+                asyncio.create_task(_drain(proc.stderr)),
+            ]
+
+            # 最多等待 60 秒拿到授权链接
+            try:
+                await asyncio.wait_for(url_event.wait(), timeout=60)
+            except asyncio.TimeoutError:
+                pass
+
+            if auth_url["url"]:
+                url = auth_url["url"]
+                self.logger.info(f"[login] 已获取授权链接: {url}")
+                # 自动打开浏览器，让用户直接扫码
+                if self.auto_open_browser:
+                    try:
+                        import webbrowser
+                        webbrowser.open(url, new=2)
+                    except Exception as e:
+                        self.logger.warning(f"自动打开浏览器失败: {e}")
+                # 推送提醒，确保用户能看到授权链接
+                await self._push_text(
+                    "🔐 猫娘邮箱登录已开始～授权页面已在浏览器中打开。\n"
+                    "主人请用微信扫一扫完成授权（注册/绑定猫娘的专属邮箱）。\n"
+                    "如果页面没有自动打开，请手动复制下面的链接到浏览器打开：\n"
+                    f"{url}",
+                    event_type="auth_url",
+                    priority=9,
+                )
+            else:
+                self.logger.warning("[login] 60 秒内未获取到授权链接，继续等待命令结果")
+
+            # 等待授权完成（用户在浏览器完成扫码后命令会自动退出）
+            try:
+                await asyncio.wait_for(proc.wait(), timeout=500)
+            except asyncio.TimeoutError:
+                proc.kill()
+                for t in drain_tasks:
+                    t.cancel()
+                return Err(SdkError("❌ 登录超时：8 分钟内未完成授权。可以再说「帮我登录邮箱」重试"))
+
+            for t in drain_tasks:
+                t.cancel()
+
+            if proc.returncode == 0:
+                # 授权成功：验证并获取真实邮箱地址
+                email = ""
+                me = await run_agently_command(["+me"], self.cli_path, logger=self.logger)
+                if me.get("exit_code") == 0:
+                    aliases = me.get("data", {}).get("aliases", [])
+                    primary = next((a for a in aliases if a.get("is_primary")), aliases[0] if aliases else None)
+                    if isinstance(primary, dict):
+                        email = primary.get("email", "")
+                if email:
+                    self.email_addr = email
+                    try:
+                        await self.config.set("neko_mail_agently.email_addr", email)
+                    except Exception:
+                        pass
+                    return Ok({
+                        "success": True,
+                        "email": email,
+                        "status": "logged_in",
+                        "message": f"✅ 猫娘邮箱登录成功！\n专属邮箱地址: {email}\n现在可以正常收发邮件啦～"
+                    })
+                return Ok({
+                    "success": True,
+                    "status": "logged_in",
+                    "message": "✅ 授权成功！猫娘的专属邮箱已就绪～"
+                })
+
+            stderr_tail = "".join(collected)[-500:].strip()
+            return Err(SdkError(
+                f"❌ 登录失败 (exit={proc.returncode}): {stderr_tail or '未知错误'}\n"
+                "请检查网络连接或稍后再试，也可以再说「帮我登录邮箱」重试"
+            ))
+        finally:
+            self._login_in_progress = False
+
+    @llm_tool(
+        name="neko_agently_open_portal",
+        description="在浏览器中打开 Agently Mail 管理端 (agent.qq.com)。"
+                    "当用户想注册/创建猫娘专属邮箱、管理邮箱设置、查看绑定状态时使用。"
+                    "用户在页面上微信扫码登录后即可免费创建最多 2 个专属邮箱。",
+        parameters={
+            "type": "object",
+            "properties": {},
+            "required": []
+        },
+        timeout=15.0
+    )
+    @plugin_entry(
+        id="open_portal",
+        name="打开邮箱管理页面",
+        description="在浏览器中打开 Agently Mail 管理端，供用户注册/管理猫娘专属邮箱",
+        input_schema={"type": "object", "properties": {}, "required": []},
+        llm_result_fields=["url"]
+    )
+    async def open_portal(self, **_) -> Dict[str, Any]:
+        """在浏览器中打开 Agently Mail 管理端"""
+        try:
+            import webbrowser
+            opened = webbrowser.open(AGENT_PORTAL_URL, new=2)
+        except Exception as e:
+            return Err(SdkError(f"打开浏览器失败: {e}\n请手动访问: {AGENT_PORTAL_URL}"))
+        if opened:
+            return Ok({
+                "success": True,
+                "url": AGENT_PORTAL_URL,
+                "message": "✅ 已在浏览器中打开 Agently Mail 管理端。\n"
+                           "主人可以微信扫码登录，创建/管理猫娘的专属邮箱（每个微信号免费创建 2 个）。\n"
+                           "创建好邮箱后，再对我说「帮我登录邮箱」完成授权～"
+            })
+        return Ok({
+            "success": False,
+            "url": AGENT_PORTAL_URL,
+            "message": f"未能自动打开浏览器，请手动访问: {AGENT_PORTAL_URL}"
+        })
+
+    @llm_tool(
+        name="neko_agently_setup_guide",
+        description="获取猫娘邮箱插件的完整配置教程。当用户询问如何配置/安装/使用邮箱插件、"
+                    "或插件出现环境问题时，调用此工具并把教程内容转述给用户。",
+        parameters={
+            "type": "object",
+            "properties": {},
+            "required": []
+        },
+        timeout=10.0
+    )
+    @plugin_entry(
+        id="setup_guide",
+        name="获取配置教程",
+        description="返回猫娘邮箱插件的完整配置使用教程",
+        input_schema={"type": "object", "properties": {}, "required": []},
+        llm_result_fields=["guide"]
+    )
+    async def setup_guide(self, **_) -> Dict[str, Any]:
+        """返回完整配置教程"""
+        guide = (
+            "📧 猫娘邮箱(Agently) 配置教程\n"
+            "\n"
+            "【简介】\n"
+            "Agently Mail 是腾讯 QQ 邮箱推出的 AI Agent 专属邮箱，猫娘会拥有自己的 xxx@agent.qq.com 邮箱，"
+            "与主人的个人邮箱完全隔离，安全放心。\n"
+            "\n"
+            "【配置三步走】\n"
+            "第 1 步：安装 Node.js 18 或更高版本（https://nodejs.org 下载，一路下一步即可）\n"
+            "第 2 步：打开终端（Windows 用 PowerShell），执行：\n"
+            "    npm install -g @tencent-qqmail/agently-cli\n"
+            "第 3 步：对猫娘说「帮我登录邮箱」，浏览器会自动打开授权页面，用微信扫码完成授权。\n"
+            "\n"
+            "【还没有专属邮箱？】\n"
+            "对猫娘说「打开邮箱管理页面」，在 agent.qq.com 微信扫码登录后创建专属邮箱"
+            "（每个微信号最多 2 个，好名字先到先得），创建后再执行登录即可。\n"
+            "\n"
+            "【日常使用】\n"
+            "直接用自然语言对猫娘说即可，例如：\n"
+            "- 看看有没有新邮件 / 读一下某某发来的邮件\n"
+            "- 给 xxx@example.com 发一封邮件，主题是...，内容是...\n"
+            "- 回复/转发那封邮件；把附件下载到桌面\n"
+            "发送、回复、转发、删除都是两阶段确认：先展示摘要，主人确认后才真正执行。\n"
+            "\n"
+            "【常见问题】\n"
+            "- 提示「需要重新授权」：对猫娘说「帮我登录邮箱」重新扫码即可\n"
+            "- 提示找不到 Agently CLI：确认第 1、2 步已完成，然后重启 N.E.K.O\n"
+            "- 新邮件提醒间隔：默认 30 秒，可在 plugin.toml 的 [neko_mail_agently] 中修改 polling_interval\n"
+            "更多细节见插件目录内的 README.md"
+        )
+        return Ok({"success": True, "guide": guide, "message": guide})
 
     @llm_tool(
         name="neko_agently_get_polling_status",
@@ -1713,8 +2087,8 @@ class NekoMailAgentlyEntry(NekoPluginBase):
             "interval": self.polling_interval,
             "baseline_loaded": self._polling_baseline_loaded,
             "known_emails_count": len(self._seen_email_ids),
-            "email": self.email_addr,
-            "message": f"{'🟢 轮询运行中' if is_running else '🔴 轮询已停止'}\n间隔: {self.polling_interval} 秒\n邮箱: {self.email_addr}\n已知邮件: {len(self._seen_email_ids)} 封"
+            "email": self.email_addr or "(未登录)",
+            "message": f"{'🟢 轮询运行中' if is_running else '🔴 轮询已停止'}\n间隔: {self.polling_interval} 秒\n邮箱: {self.email_addr or '(未登录，请对我说「帮我登录邮箱」)'}\n已知邮件: {len(self._seen_email_ids)} 封"
         })
 
     @llm_tool(
@@ -1808,23 +2182,35 @@ class NekoMailAgentlyEntry(NekoPluginBase):
     async def diagnose(self, **_) -> Dict[str, Any]:
         """诊断邮箱插件状态"""
         import platform
+
+        # CLI 未配置时先尝试重新自动探测
+        if not self.cli_path:
+            detected = detect_agently_cli()
+            if detected:
+                self.cli_path = detected
+                self.logger.info(f"自动探测到 Agently CLI: {detected}")
+
         info = {
             "cli_path": self.cli_path,
-            "email_addr": self.email_addr,
+            "email_addr": self.email_addr or "(未登录，待自动获取)",
             "two_factor_confirm": self.two_factor_confirm,
             "polling_interval": self.polling_interval,
             "platform": platform.system(),
         }
 
-        # 检查 CLI 是否存在
-        cli_exists = os.path.exists(self.cli_path)
+        # 检查 CLI 是否存在（.js 入口脚本同样有效）
+        cli_exists = bool(self.cli_path) and os.path.exists(self.cli_path)
         info["cli_exists"] = cli_exists
 
         if not cli_exists:
             return Ok({
                 "success": False,
                 "diagnosis": info,
-                "message": f"❌ CLI 文件不存在: {self.cli_path}"
+                "message": "❌ 未检测到 Agently CLI，请按以下步骤安装：\n"
+                           "1. 安装 Node.js 18+（https://nodejs.org）\n"
+                           "2. 终端执行：npm install -g @tencent-qqmail/agently-cli\n"
+                           "3. 安装完成后重启 N.E.K.O，再对我说「帮我登录邮箱」\n"
+                           "（若已安装在非默认位置，可在 plugin.toml 的 [neko_mail_agently] 中手动填写 cli_path）"
             })
 
         # 检查认证状态
