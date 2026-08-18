@@ -1,0 +1,75 @@
+[plugin]
+name = "OpenCode Adapter"
+type = "plugin"
+description = "通过 @llm_tool 将 OpenCode CLI 注册为猫娘可调用的工具集。猫娘可以直接调用 OpenCode 执行项目开发任务：写代码、改 bug、跑测试、查文档。支持会话恢复（session_id）、JSONL 流式输出解析、成本追踪和瞬态错误自动重试。"
+short_description = "Expose OpenCode CLI as catgirl-callable LLM tools. Run OpenCode tasks from the main project."
+keywords = [
+    "opencode",
+    "agent",
+    "cli",
+    "coding",
+    "developer",
+    "llm_tool",
+    "adapter",
+    "catgirl",
+    "猫娘",
+]
+
+version = "0.1.0"
+id = "opencode_adapter"
+entry = "plugins.opencode_adapter:OpenCodeAdapterPlugin"
+
+[plugin.author]
+name = "N.E.K.O Community"
+
+[plugin.i18n]
+default_locale = "zh-CN"
+locales_dir = "i18n"
+
+[plugin.sdk]
+recommended = ">=0.1.0,<0.2.0"
+supported = ">=0.1.0,<0.3.0"
+
+[plugin_runtime]
+enabled = true
+auto_start = true
+
+[plugin_state]
+backend = "file"
+persist_mode = "auto"
+
+# 启用 PluginStore（SQLite KV 存储），用于持久化会话记录
+[plugin.store]
+enabled = true
+
+# ---------------------------------------------------------------------------
+# OpenCode Adapter 配置
+# 参考 paperclip/packages/adapters/opencode-local 的 agentConfigurationDoc
+# ---------------------------------------------------------------------------
+[opencode]
+# OpenCode CLI 可执行文件路径。留空则自动检测（PATH 上的 opencode）。
+# Windows 上 npm 全局安装后通常在 PATH 中即可找到。
+# 安装：npm install -g opencode-ai
+command = ""
+# 默认模型 ID（provider/model 格式）。必需。
+# OpenCode 使用 provider/model 格式，如：
+#   anthropic/claude-sonnet-4-20250514
+#   anthropic/claude-opus-4-20250514
+#   openai/gpt-4o
+#   openai/gpt-4.1
+#   google/gemini-2.5-pro
+# 查看可用模型：opencode models
+model = "anthropic/claude-sonnet-4-20250514"
+# 推理变体（可选）："" | "low" | "medium" | "high"。留空使用默认。
+# OpenCode 的 --variant 参数，控制推理深度/成本。
+variant = ""
+# 单次执行超时（秒）。main_server LLM 工具上限 300s。
+timeout_sec = 300
+# 默认工作目录（留空 = 当前插件进程 cwd）。猫娘调用时可覆盖。
+cwd = ""
+# 指令文件路径（markdown）。内容会前置到 stdin 提示。
+instructions_file_path = ""
+# 失败后自动重试新会话的次数。
+max_retries = 1
+# 额外 CLI 参数（JSON 数组字符串，如 "[\"--verbose\"]"）。
+extra_args = "[]"
