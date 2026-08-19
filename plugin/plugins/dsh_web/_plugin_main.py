@@ -244,7 +244,7 @@ class DshWebPlugin(NekoPluginBase):
 
     # ----- 生命周期 -----
 
-    @lifecycle("startup")
+    @lifecycle(id="startup")
     async def startup(self) -> Optional[str]:
         """插件启动"""
         # 加载配置
@@ -263,7 +263,7 @@ class DshWebPlugin(NekoPluginBase):
         self.logger.info("DSH Web API 插件已启动，连接到 {}", self._config.base_url)
         return None
 
-    @lifecycle("shutdown")
+    @lifecycle(id="shutdown")
     async def shutdown(self) -> None:
         """插件关闭"""
         if self._client:
