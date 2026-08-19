@@ -1,0 +1,68 @@
+# DeepSeek Harness Web API 插件配置
+
+[plugin]
+id = "dsh_web"
+name = "DeepSeek Harness Web API"
+version = "0.1.0"
+description = """让猫娘可以通过 HTTP API 直接调用 DeepSeek Harness。
+
+【架构】猫娘 → HTTP API → DSH Web Server (localhost:3080) → DSH Agent
+
+【快速上手：怎么和猫娘说】
+- 执行任务：直接说「用 DeepSeek 帮我把 xxx 项目的 xxx 功能实现一下」
+- 对话式执行：说「用 DeepSeek 分析一下这个项目，然后优化性能」
+- 检查状态：说「检查一下 DeepSeek 是否可用」
+
+【工具集】
+- dsh_web_send: 发送消息给 DeepSeek（支持文本和图片）
+- dsh_web_status: 检查 DSH Web Server 状态
+- dsh_web_sessions: 列出所有会话
+- dsh_web_create_session: 创建新会话
+
+【前置要求】
+1. DSH Web Server 已启动（npx @deepseek-ai/dsh web）
+2. 服务器监听在 127.0.0.1:3080"""
+short_description = "让猫娘可以通过 HTTP API 直接调用 DeepSeek Harness，支持文本和图片。"
+keywords = [
+    "deepseek",
+    "harness",
+    "web",
+    "api",
+    "http",
+    "llm_tool",
+    "猫娘",
+]
+entry = "plugins.dsh_web._plugin_main:DshWebPlugin"
+
+[plugin.author]
+name = "N.E.K.O Community"
+
+[plugin.i18n]
+default_locale = "zh-CN"
+locales_dir = "i18n"
+
+[plugin.sdk]
+recommended = ">=0.1.0,<0.2.0"
+supported = ">=0.1.0,<0.3.0"
+
+[plugin_runtime]
+enabled = true
+auto_start = true
+
+[plugin_state]
+backend = "file"
+persist_mode = "auto"
+
+# ---------------------------------------------------------------------------
+# DeepSeek Web API 配置
+# ---------------------------------------------------------------------------
+[dsh_web]
+# DSH Web Server 地址
+host = "127.0.0.1"
+port = 3080
+
+# 默认工作目录（可选）
+# workspace = "/path/to/your/project"
+
+# 请求超时时间（秒）
+timeout_sec = 300
