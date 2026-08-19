@@ -1,0 +1,54 @@
+[plugin]
+name = "Feishu Adapter"
+type = "plugin"
+description = "飞书/Lark 频道适配器，让猫娘通过飞书与用户交互。支持文本、卡片、媒体消息，WebSocket/Webhook 双模式连接。"
+short_description = "Feishu/Lark channel adapter for catgirl interaction via text, cards, and media."
+keywords = ["feishu", "lark", "channel", "adapter", "messaging", "catgirl", "猫娘"]
+
+version = "0.1.0"
+id = "feishu_adapter"
+entry = "plugins.feishu_adapter:FeishuAdapterPlugin"
+
+[plugin.author]
+name = "N.E.K.O Community"
+
+[plugin.i18n]
+default_locale = "zh-CN"
+locales_dir = "i18n"
+
+[plugin.sdk]
+recommended = ">=0.1.0,<0.2.0"
+supported = ">=0.1.0,<0.3.0"
+
+[plugin_runtime]
+enabled = true
+auto_start = false
+
+[plugin_state]
+backend = "file"
+persist_mode = "auto"
+
+[plugin.store]
+enabled = true
+
+# ---------------------------------------------------------------------------
+# Feishu Adapter 配置
+# 参考飞书开放平台文档 https://open.feishu.cn/document/home/index
+# ---------------------------------------------------------------------------
+[feishu]
+# 飞书应用 App ID（必填）。从飞书开放平台获取。
+app_id = ""
+# 飞书应用 App Secret（必填）。从飞书开放平台获取。
+app_secret = ""
+# 事件订阅加密密钥（可选）。在飞书开放平台 > 事件订阅中获取。
+encrypt_key = ""
+# 事件订阅验证令牌（可选）。在飞书开放平台 > 事件订阅中获取。
+verification_token = ""
+# 连接模式：websocket 或 webhook（默认 websocket）
+connection_mode = "websocket"
+# Webhook 模式的端口（默认 7777）
+webhook_port = 7777
+# Webhook 模式的路径（默认 /feishu/webhook）
+webhook_path = "/feishu/webhook"
+# 日志级别（DEBUG, INFO, WARNING, ERROR）
+log_level = "INFO"
