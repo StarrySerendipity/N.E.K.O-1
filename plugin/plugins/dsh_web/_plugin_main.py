@@ -12,8 +12,17 @@ from typing import Any, Optional
 
 import httpx
 
-from neko_plugin import PluginBase, lifecycle
-from neko_plugin.llm_tool import llm_tool
+from plugin.sdk.plugin import (
+    Err,
+    NekoPluginBase,
+    Ok,
+    SdkError,
+    lifecycle,
+    llm_tool,
+    neko_plugin,
+    plugin_entry,
+    ui,
+)
 
 
 # ---------------------------------------------------------------------------
@@ -221,36 +230,41 @@ class DshWebClient:
 # ---------------------------------------------------------------------------
 
 
-class DshWebPlugin:
+@neko_plugin
+class DshWebPlugin(NekoPluginBase):
     """DeepSeek Harness Web API 插件"""
 
-    def __init__(self):
+    def __init__(self, ctx) -> None:
+        super().__init__(ctx)
+        self.file_logger = self.enable_file_logging(log_level="INFO")
+        self.logger = self.file_logger
+
         self._config: Optional[DshWebConfig] = None
         self._client: Optional[DshWebClient] = None
 
     # ----- 生命周期 -----
 
     @lifecycle("startup")
-    async def startup(self, ctx) -> Optional[str]:
+    async def startup(self) -> Optional[str]:
         """插件启动"""
         # 加载配置
-        cfg_dict = ctx.get("config", {})
+        cfg_dict = self.ctx.get("config", {})
         self._config = DshWebConfig.from_config_dict(cfg_dict)
 
         # 创建客户端
-        self._client = DshWebClient(self._config, logger=ctx.get("logger"))
+        self._client = DshWebClient(self._config, logger=self.logger)
 
         # 检查 DSH Web Server 是否可用
         health = await self._client.check_health()
         if not health["available"]:
-            ctx.get("logger").warning("DSH Web Server 不可用: {}", health["message"])
+            self.logger.warning("DSH Web Server 不可用: {}", health["message"])
             return None  # 非阻塞，继续启动
 
-        ctx.get("logger").info("DSH Web API 插件已启动，连接到 {}", self._config.base_url)
+        self.logger.info("DSH Web API 插件已启动，连接到 {}", self._config.base_url)
         return None
 
     @lifecycle("shutdown")
-    async def shutdown(self, ctx) -> None:
+    async def shutdown(self) -> None:
         """插件关闭"""
         if self._client:
             await self._client.close()
@@ -259,7 +273,14 @@ class DshWebPlugin:
 
     @llm_tool(
         name="dsh_web_send",
-        description="发送消息给 DeepSeek Harness。支持文本和图片。DSH 会执行任务并返回结果。",
+        description=(
+            "发送消息给 DeepSeek Harness。支持文本和图片。DSH 会执行任务并返回结果。\n\n"
+            "适用场景：\n"
+            "- 执行复杂编程任务\n"
+            "- 分析代码项目\n"
+            "- 发送图片进行分析\n"
+            "- 任何需要 DeepSeek 能力的任务"
+        ),
         parameters={
             "type": "object",
             "properties": {
@@ -269,7 +290,7 @@ class DshWebPlugin:
                 },
                 "session_id": {
                     "type": "string",
-                    "description": "会话 ID（可选，不传则使用默认会话）",
+                    "description": "会话 ID（可选，不传则创建新会话）",
                 },
                 "image_path": {
                     "type": "string",
@@ -280,14 +301,19 @@ class DshWebPlugin:
         },
         timeout=300.0,
     )
-    async def tool_send(self, ctx, arguments: dict[str, Any]) -> Any:
+    async def dsh_web_send(
+        self,
+        prompt: str = "",
+        session_id: str = "",
+        image_path: str = "",
+        **_,
+    ) -> dict[str, Any]:
         """发送消息给 DSH"""
         if not self._client:
             return {"error": "DSH Web 客户端未初始化"}
 
-        prompt = arguments["prompt"]
-        session_id = arguments.get("session_id")
-        image_path = arguments.get("image_path")
+        if not prompt or not prompt.strip():
+            return Err(SdkError("prompt 不能为空"))
 
         # 如果没有指定会话，创建一个新会话
         if not session_id:
@@ -312,7 +338,7 @@ class DshWebPlugin:
                 if attachment_id:
                     images = [{"attachmentId": attachment_id, "mediaType": media_type}]
             except Exception as e:
-                ctx.get("logger").warning("图片上传失败: {}", str(e))
+                self.logger.warning("图片上传失败: {}", str(e))
 
         # 发送消息
         try:
@@ -332,14 +358,19 @@ class DshWebPlugin:
 
     @llm_tool(
         name="dsh_web_status",
-        description="检查 DeepSeek Harness Web Server 是否可用。",
+        description=(
+            "检查 DeepSeek Harness Web Server 是否可用。\n\n"
+            "适用场景：\n"
+            "- 在调用 dsh_web_send 之前确认服务可用\n"
+            "- 排查连接问题"
+        ),
         parameters={
             "type": "object",
             "properties": {},
         },
         timeout=10.0,
     )
-    async def tool_status(self, ctx, arguments: dict[str, Any]) -> Any:
+    async def dsh_web_status(self, **_) -> dict[str, Any]:
         """检查 DSH 状态"""
         if not self._client:
             return {
@@ -364,7 +395,7 @@ class DshWebPlugin:
         },
         timeout=30.0,
     )
-    async def tool_sessions(self, ctx, arguments: dict[str, Any]) -> Any:
+    async def dsh_web_sessions(self, **_) -> dict[str, Any]:
         """列出所有会话"""
         if not self._client:
             return {"error": "DSH Web 客户端未初始化"}
@@ -395,15 +426,17 @@ class DshWebPlugin:
         },
         timeout=30.0,
     )
-    async def tool_create_session(self, ctx, arguments: dict[str, Any]) -> Any:
+    async def dsh_web_create_session(
+        self,
+        name: str = "",
+        **_,
+    ) -> dict[str, Any]:
         """创建新会话"""
         if not self._client:
             return {"error": "DSH Web 客户端未初始化"}
 
-        name = arguments.get("name")
-
         try:
-            result = await self._client.create_session(name)
+            result = await self._client.create_session(name if name else None)
             return {
                 "session": result,
                 "message": "会话已创建",
